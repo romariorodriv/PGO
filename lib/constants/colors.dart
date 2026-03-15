@@ -1,26 +1,24 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary colors - Azul oscuro (como en el diseño PGO)
-  static const Color primary = Color(0xFF1e3a5f);
-  static const Color primaryDark = Color(0xFF152a45);
-  static const Color primaryLight = Color(0xFF2a5a8a);
+  // Primary colors - white oscuro (como en el diseño PGO)
+  static const Color primary = Color(0xFFf7f8fa);
+  static const Color primaryDark = Color(0xFFf1f3f6);
+  static const Color primaryLight = Color(0xFFe5e7eb);
+
+  static const Color gray = Color(0xFF6b7280);
 
   // Secondary colors - Verde lima (como en el diseño PGO)
-  static const Color secondary = Color(0xFFAFD700); // Verde lima
-  static const Color secondaryDark = Color(0xFF9ACD32);
-  static const Color secondaryLight = Color(0xFFC8E6C9);
+  static const Color PrimaryGreen = Color(0xFFa9c93e); // Verde lima
+  static const Color secondaryGreen = Color(0xFF9fbe2e); //verde oscuro
+  static const Color primaryOrange = Color(0xFFf49705); //naranja
 
   // Neutral colors
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color black = Color(0xFF000000);
-  static const Color grey = Color(0xFF9E9E9E);
-  static const Color greyLight = Color(0xFFEEEEEE);
-  static const Color greyDark = Color(0xFF616161);
+  static const Color brown = Color(0xFF898675);
+  static const Color brownLight = Color(0xFF999682);
+  static const Color brownDark = Color(0xFFdbd8b9);
 
   // Status colors
-  static const Color success = Color(0xFF4CAF50);
-  static const Color error = Color(0xFFf44336);
-  static const Color warning = Color(0xFFFFC107);
-  static const Color info = Color(0xFF2196F3);
+  static const Color blue = Color(0xFF33d659a);
+  static const Color SecondBlue = Color(0xFF1c2a3a);
 }

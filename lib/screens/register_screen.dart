@@ -47,14 +47,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.primary,
+              AppColors.primaryDark,
               AppColors.primaryDark,
             ],
           ),
         ),
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 50.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -63,29 +63,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Logo PGO
                 _buildLogo(),
 
-                SizedBox(height: 32),
+                SizedBox(height: 5),
 
                 // Título
                 Text(
                   'Registrate',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.white,
+                        color: AppColors.SecondBlue,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
 
-                SizedBox(height: 24),
+                SizedBox(height: 10),
 
                 // Botones sociales
                 _buildSocialButtons(),
 
-                SizedBox(height: 24),
+                SizedBox(height: 10),
 
                 // Texto "O usa tu correo electrónico"
                 Text(
                   'O usa tu correo electrónico',
                   style: TextStyle(
-                    color: AppColors.white.withOpacity(0.7),
+                    color: AppColors.SecondBlue.withOpacity(0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -133,7 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(
                       '¿Ya tienes una cuenta? ',
                       style: TextStyle(
-                        color: AppColors.white.withOpacity(0.7),
+                        color: AppColors.SecondBlue.withOpacity(0.7),
                         fontSize: 12,
                       ),
                     ),
@@ -148,7 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Text(
                         'Inicia sesión',
                         style: TextStyle(
-                          color: AppColors.secondary,
+                          color: AppColors.PrimaryGreen,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -169,35 +169,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Widget para el logo
   Widget _buildLogo() {
     return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
+      width: 220,
+      height: 220,
       child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.white.withOpacity(0.2),
-              ),
-              child: Center(
-                child: Text(
-                  'P',
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.secondary,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        child: Image.asset(
+          'assets/images/Logo_Icono.png',
+          width: 180,
+          height: 180,
+          fit: BoxFit.contain,
         ),
       ),
     );
@@ -213,18 +192,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: TextStyle(color: AppColors.white),
+      style: TextStyle(color: AppColors.gray),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         prefixIcon: Icon(
           icon,
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         filled: true,
-        fillColor: AppColors.white.withOpacity(0.1),
+        fillColor: AppColors.SecondBlue.withOpacity(0.1),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -242,15 +221,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return TextField(
       controller: _passwordController,
       obscureText: _obscurePassword,
-      style: TextStyle(color: AppColors.white),
+      style: TextStyle(color: AppColors.SecondBlue),
       decoration: InputDecoration(
         hintText: 'Crea una contraseña',
         hintStyle: TextStyle(
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         prefixIcon: Icon(
           Icons.lock,
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         suffixIcon: GestureDetector(
           onTap: () {
@@ -260,11 +239,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           },
           child: Icon(
             _obscurePassword ? Icons.visibility_off : Icons.visibility,
-            color: AppColors.white.withOpacity(0.5),
+            color: AppColors.SecondBlue.withOpacity(0.5),
           ),
         ),
         filled: true,
-        fillColor: AppColors.white.withOpacity(0.1),
+        fillColor: AppColors.SecondBlue.withOpacity(0.1),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -297,13 +276,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _rememberUser = value ?? false;
                   });
                 },
-                activeColor: AppColors.secondary,
+                activeColor: AppColors.PrimaryGreen,
               ),
               Expanded(
                 child: Text(
                   'Recordar usuario',
                   style: TextStyle(
-                    color: AppColors.white.withOpacity(0.7),
+                    color: AppColors.SecondBlue.withOpacity(0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -327,13 +306,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _agreeTerms = value ?? false;
                   });
                 },
-                activeColor: AppColors.secondary,
+                activeColor: AppColors.PrimaryGreen,
               ),
               Expanded(
                 child: Text(
                   'He leído y estoy de acuerdo con los términos y condiciones',
                   style: TextStyle(
-                    color: AppColors.white.withOpacity(0.7),
+                    color: AppColors.SecondBlue.withOpacity(0.7),
                     fontSize: 11,
                   ),
                   maxLines: 2,
@@ -353,7 +332,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       height: 50,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.secondary,
+          backgroundColor: AppColors.PrimaryGreen,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -375,11 +354,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             );
           } else if (password.length < 6) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('La contraseña debe tener al menos 6 caracteres')),
+              SnackBar(
+                  content:
+                      Text('La contraseña debe tener al menos 6 caracteres')),
             );
           } else if (!_agreeTerms) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Debes aceptar los términos y condiciones')),
+              SnackBar(
+                  content: Text('Debes aceptar los términos y condiciones')),
             );
           } else {
             // Aquí va la lógica de registro (por ahora solo mostramos un mensaje)
@@ -430,16 +412,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: AppColors.white.withOpacity(0.1),
+          color: AppColors.SecondBlue.withOpacity(0.1),
           shape: BoxShape.circle,
           border: Border.all(
-            color: AppColors.white.withOpacity(0.2),
+            color: AppColors.SecondBlue.withOpacity(0.2),
           ),
         ),
         child: Center(
           child: Icon(
             Icons.share,
-            color: AppColors.secondary,
+            color: AppColors.PrimaryGreen,
           ),
         ),
       ),

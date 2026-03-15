@@ -22,7 +22,7 @@ class WeeklyStatsChart extends StatelessWidget {
           Text(
             'Racha semanal',
             style: TextStyle(
-              color: AppColors.white,
+              color: AppColors.SecondBlue,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -40,8 +40,8 @@ class WeeklyStatsChart extends StatelessWidget {
                     height: 60 * heights[index],
                     decoration: BoxDecoration(
                       color: isToday[index]
-                          ? AppColors.secondary
-                          : AppColors.secondary.withOpacity(0.5),
+                          ? AppColors.PrimaryGreen
+                          : AppColors.PrimaryGreen.withOpacity(0.5),
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(4),
                         topRight: Radius.circular(4),
@@ -53,8 +53,8 @@ class WeeklyStatsChart extends StatelessWidget {
                     days[index],
                     style: TextStyle(
                       color: isToday[index]
-                          ? AppColors.secondary
-                          : AppColors.white.withOpacity(0.6),
+                          ? AppColors.PrimaryGreen
+                          : AppColors.SecondBlue.withOpacity(0.6),
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -67,7 +67,7 @@ class WeeklyStatsChart extends StatelessWidget {
           Text(
             'Nivel actual: 🔥 Desempenando',
             style: TextStyle(
-              color: AppColors.white.withOpacity(0.7),
+              color: AppColors.SecondBlue.withOpacity(0.7),
               fontSize: 11,
             ),
           ),

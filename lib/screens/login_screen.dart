@@ -14,10 +14,10 @@ class _LoginScreenState extends State<LoginScreen> {
   // Controladores para los campos de texto
   late TextEditingController _userController;
   late TextEditingController _passwordController;
-  
+
   // Variable para el checkbox
   bool _rememberUser = false;
-  
+
   // Variable para mostrar/ocultar contraseña
   bool _obscurePassword = true;
 
@@ -41,85 +41,86 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        height: double.infinity, // Ocupa toda la pantalla
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.primary,
+              AppColors.primaryDark,
               AppColors.primaryDark,
             ],
           ),
         ),
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 50.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min, // Usa el mínimo espacio necesario
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.08),
-                
+                SizedBox(height: 20), // espacio encima del logo
                 // Logo PGO
                 _buildLogo(),
-                
-                SizedBox(height: 40),
-                
+
+                SizedBox(height: 10),
+
                 // Título
                 Text(
                   'Inicia sesión',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.white,
+                        color: AppColors.SecondBlue,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
-                
-                SizedBox(height: 30),
-                
+
+                SizedBox(height: 10),
+
                 // Campo Usuario
                 _buildTextField(
                   controller: _userController,
                   hintText: 'Usuario o correo electrónico',
                   icon: Icons.person,
                   borderRadius: BorderRadius.circular(30),
-                  backgroundColor: AppColors.white.withOpacity(0.1),
+                  backgroundColor: AppColors.primary,
                 ),
-                
-                SizedBox(height: 16),
-                
+
+                SizedBox(height: 5),
+
                 // Campo Contraseña
                 _buildPasswordField(
                   borderRadius: BorderRadius.circular(30),
-                  backgroundColor: AppColors.white.withOpacity(0.1),
+                  backgroundColor: AppColors.primary,
                 ),
-                
-                SizedBox(height: 16),
-                
+
+                SizedBox(height: 5),
+
                 // Recordar usuario y Olvidaste contraseña
                 _buildRememberAndForgot(),
-                
-                SizedBox(height: 24),
-                
+
+                SizedBox(height: 10),
+
                 // Botón Ingresar
                 _buildLoginButton(),
-                
+
                 SizedBox(height: 32),
-                
+
                 // Texto "Inicia sesión con"
                 Text(
                   'Inicia sesión con',
                   style: TextStyle(
-                    color: AppColors.white.withOpacity(0.7),
+                    color: AppColors.primary,
                     fontSize: 12,
                   ),
                 ),
-                
-                SizedBox(height: 16),
-                
+
+                SizedBox(height: 10),
+
                 // Botones sociales
                 _buildSocialButtons(),
-                
-                SizedBox(height: 24),
-                
+
+                SizedBox(height: 20),
+
                 // Link Registrarse
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -127,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text(
                       '¿No tienes una cuenta? ',
                       style: TextStyle(
-                        color: AppColors.white.withOpacity(0.7),
+                        color: AppColors.PrimaryGreen,
                       ),
                     ),
                     GestureDetector(
@@ -141,15 +142,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         'Registrate',
                         style: TextStyle(
-                          color: AppColors.secondary,
+                          color: AppColors.blue,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ],
                 ),
-                
-                SizedBox(height: 40),
               ],
             ),
           ),
@@ -163,13 +162,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return Container(
       width: 220,
       height: 220,
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
       child: Center(
         child: Image.asset(
-          'assets/images/logo_login.png',
+          'assets/images/Logo_Icono.png',
           width: 180,
           height: 180,
           fit: BoxFit.contain,
@@ -188,25 +183,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return TextField(
       controller: controller,
-      style: TextStyle(color: AppColors.white),
+      style: TextStyle(color: AppColors.SecondBlue),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         prefixIcon: Icon(
           icon,
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         filled: true,
-        fillColor: backgroundColor ?? AppColors.white.withOpacity(0.1),
+        fillColor: backgroundColor ?? AppColors.SecondBlue.withOpacity(0.1),
         border: OutlineInputBorder(
           borderRadius: borderRadius ?? BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         contentPadding: EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 10, // Reduce de 14 a 10 para hacer el campo más bajo
         ),
       ),
     );
@@ -220,15 +215,15 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextField(
       controller: _passwordController,
       obscureText: _obscurePassword,
-      style: TextStyle(color: AppColors.white),
+      style: TextStyle(color: AppColors.SecondBlue),
       decoration: InputDecoration(
         hintText: 'Contraseña',
         hintStyle: TextStyle(
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         prefixIcon: Icon(
           Icons.lock,
-          color: AppColors.white.withOpacity(0.5),
+          color: AppColors.SecondBlue.withOpacity(0.5),
         ),
         suffixIcon: GestureDetector(
           onTap: () {
@@ -238,11 +233,11 @@ class _LoginScreenState extends State<LoginScreen> {
           },
           child: Icon(
             _obscurePassword ? Icons.visibility_off : Icons.visibility,
-            color: AppColors.white.withOpacity(0.5),
+            color: AppColors.SecondBlue.withOpacity(0.5),
           ),
         ),
         filled: true,
-        fillColor: backgroundColor ?? AppColors.white.withOpacity(0.1),
+        fillColor: backgroundColor ?? AppColors.SecondBlue.withOpacity(0.1),
         border: OutlineInputBorder(
           borderRadius: borderRadius ?? BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -276,12 +271,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     _rememberUser = value ?? false;
                   });
                 },
-                activeColor: AppColors.secondary,
+                activeColor: AppColors.blue,
               ),
               Text(
                 'Recordar usuario',
                 style: TextStyle(
-                  color: AppColors.white.withOpacity(0.7),
+                  color: AppColors.SecondBlue.withOpacity(0.7),
                   fontSize: 12,
                 ),
               ),
@@ -299,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Text(
             'Olvidaste tu contraseña?',
             style: TextStyle(
-              color: AppColors.white.withOpacity(0.7),
+              color: AppColors.SecondBlue.withOpacity(0.7),
               fontSize: 12,
             ),
           ),
@@ -315,17 +310,15 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 50,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.secondary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          backgroundColor: AppColors.PrimaryGreen,
+          shape: StadiumBorder(), // Forma ovalada para más redondeado
           elevation: 0,
         ),
         onPressed: () {
           // Aquí va la lógica de login
           String user = _userController.text;
           String password = _passwordController.text;
-          
+
           if (user.isEmpty || password.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Completa todos los campos')),
@@ -340,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Text(
           'Ingresar',
           style: TextStyle(
-            color: AppColors.primary,
+            color: AppColors.SecondBlue,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -373,17 +366,17 @@ class _LoginScreenState extends State<LoginScreen> {
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: AppColors.white.withOpacity(0.1),
+          color: AppColors.SecondBlue.withOpacity(0.1),
           shape: BoxShape.circle,
           border: Border.all(
-            color: AppColors.white.withOpacity(0.2),
+            color: AppColors.SecondBlue.withOpacity(0.2),
           ),
         ),
         child: Center(
           // Por ahora usamos un icono, después agregaremos imágenes
           child: Icon(
             Icons.share,
-            color: AppColors.secondary,
+            color: AppColors.blue,
           ),
         ),
       ),

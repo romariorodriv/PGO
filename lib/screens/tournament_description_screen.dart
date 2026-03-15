@@ -61,7 +61,8 @@ class TournamentDescriptionScreen extends StatelessWidget {
             top: 12,
             child: GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
-              child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+              child:
+                  const Icon(Icons.arrow_back, color: Colors.white, size: 22),
             ),
           ),
           Positioned(
@@ -86,7 +87,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
                 Text(
                   'Torneo PGO',
                   style: TextStyle(
-                    color: AppColors.secondary,
+                    color: AppColors.PrimaryGreen,
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                   ),
@@ -95,7 +96,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
                 Text(
                   'REY DE LA CANCHA',
                   style: TextStyle(
-                    color: AppColors.secondary,
+                    color: AppColors.PrimaryGreen,
                     fontSize: 12,
                     letterSpacing: 1.0,
                   ),
@@ -235,7 +236,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.secondary,
+            color: AppColors.PrimaryGreen,
             borderRadius: BorderRadius.circular(18),
           ),
           child: Text(
@@ -281,7 +282,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
             bottom: 32,
             child: CircleAvatar(
               radius: 26,
-              backgroundColor: AppColors.secondary,
+              backgroundColor: AppColors.PrimaryGreen,
               child: Icon(Icons.emoji_events, color: AppColors.primary),
             ),
           ),
