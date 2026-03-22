@@ -49,26 +49,34 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
         backgroundColor: AppColors.SecondBlue,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Actividad'),
+        title: const Text(
+          'Actividad',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.menu),
+            icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () {},
           ),
         ],
       ),
       body: SafeArea(
+        top: false,
         child: Container(
           width: double.infinity,
           decoration: const BoxDecoration(
-            color: AppColors.primaryDark,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
           ),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
+            padding: const EdgeInsets.fromLTRB(26, 24, 26, 34),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -76,46 +84,46 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
                   child: Text(
                     widget.matchDate,
                     style: TextStyle(
-                      color: AppColors.SecondBlue.withOpacity(0.82),
-                      fontSize: 16,
+                      color: AppColors.SecondBlue.withOpacity(0.8),
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 _buildXpCard(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildClubChip(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 const Text(
                   'Añade tu foto del match',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 _buildPhotoCard(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 const Text(
                   'Descripción',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 _buildDescriptionField(),
-                const SizedBox(height: 36),
+                const SizedBox(height: 48),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
                     onPressed: _finishMatch,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4FF63),
+                      backgroundColor: const Color(0xFFD7FF59),
                       foregroundColor: AppColors.SecondBlue,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -123,10 +131,10 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Finalizar',
+                      'FINALIZAR',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
@@ -142,15 +150,15 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
   Widget _buildXpCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(26),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.09),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -160,30 +168,30 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
             '+30 XP',
             style: TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 56,
+              fontSize: 58,
               height: 1,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             '+10 puntos para subir de nivel',
             style: TextStyle(
-              color: AppColors.SecondBlue.withOpacity(0.85),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+              color: AppColors.SecondBlue,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 18),
           const Text(
             '4ta categoría',
             style: TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: SizedBox(
@@ -191,16 +199,16 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
               child: Row(
                 children: const [
                   Expanded(
-                    flex: 52,
-                    child: ColoredBox(color: Color(0xFFA79F85)),
+                    flex: 50,
+                    child: ColoredBox(color: Color(0xFFA7A087)),
                   ),
                   Expanded(
-                    flex: 24,
-                    child: ColoredBox(color: Color(0xFFD3D1B2)),
+                    flex: 18,
+                    child: ColoredBox(color: Color(0xFFC6C0A4)),
                   ),
                   Expanded(
-                    flex: 24,
-                    child: ColoredBox(color: Color(0xFFE4E6EB)),
+                    flex: 32,
+                    child: ColoredBox(color: Color(0xFFDADDE3)),
                   ),
                 ],
               ),
@@ -209,20 +217,20 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
+            children: const [
               Text(
                 '+14 PCM',
                 style: TextStyle(
-                  color: AppColors.SecondBlue.withOpacity(0.85),
-                  fontSize: 15,
+                  color: AppColors.SecondBlue,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
                 '+2 ranking',
                 style: TextStyle(
-                  color: AppColors.SecondBlue.withOpacity(0.85),
-                  fontSize: 15,
+                  color: AppColors.SecondBlue,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -236,17 +244,17 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
   Widget _buildClubChip() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      height: 40,
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(22),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
       ),
+      alignment: Alignment.center,
       child: const Text(
         'One Padel Olguín',
-        textAlign: TextAlign.center,
         style: TextStyle(
           color: AppColors.SecondBlue,
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -259,15 +267,19 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
-        height: 182,
+        height: 152,
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          color: const Color(0xFFF0F2F5),
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: const Color(0xFFCDD4DE),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -276,18 +288,18 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
           children: [
             Icon(
               _photoAdded ? Icons.check_circle : Icons.photo_camera,
-              size: 52,
+              size: 50,
               color: _photoAdded
                   ? AppColors.PrimaryGreen
-                  : const Color(0xFF99A5BA),
+                  : const Color(0xFFA6B0C1),
             ),
             const SizedBox(height: 10),
             Text(
               _photoAdded ? 'Foto agregada' : 'Subir foto',
               style: const TextStyle(
                 color: AppColors.SecondBlue,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -298,22 +310,24 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
 
   Widget _buildDescriptionField() {
     return Container(
+      height: 42,
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: TextField(
         controller: _descriptionController,
-        maxLines: 3,
+        maxLines: 1,
         decoration: InputDecoration(
           hintText: 'Descripción opcional',
           hintStyle: TextStyle(
-            color: AppColors.SecondBlue.withOpacity(0.45),
+            color: AppColors.SecondBlue.withOpacity(0.42),
+            fontSize: 15,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 14,
+            vertical: 10,
           ),
         ),
       ),

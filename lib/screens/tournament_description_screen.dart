@@ -1,113 +1,192 @@
 import 'package:flutter/material.dart';
+
 import '../constants/colors.dart';
+import 'tournament_bracket_screen.dart';
+import 'tournament_live_screen.dart';
+import 'tournament_profile_screen.dart';
+import 'tournament_register_screen.dart';
 
 class TournamentDescriptionScreen extends StatelessWidget {
-  const TournamentDescriptionScreen({Key? key}) : super(key: key);
+  final bool isPaid;
+
+  const TournamentDescriptionScreen({
+    Key? key,
+    this.isPaid = false,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: AppColors.SecondBlue,
+      appBar: AppBar(
+        backgroundColor: AppColors.SecondBlue,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Actividad',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _buildTabs(context),
-                    const SizedBox(height: 16),
-                    _buildDescriptionSection(),
-                    const SizedBox(height: 20),
-                    _buildJoinButton(),
-                    const SizedBox(height: 24),
-                  ],
+        top: false,
+        child: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHero(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(30, 14, 30, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildTabs(context),
+                            const SizedBox(height: 22),
+                            _buildLocationRow(),
+                            const SizedBox(height: 14),
+                            _buildDivider(),
+                            const SizedBox(height: 16),
+                            _buildPlayersProgress(),
+                            const SizedBox(height: 18),
+                            _buildSimpleRow(
+                              icon: Icons.emoji_events_outlined,
+                              text: 'S/ 250 en premios',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildSimpleRow(
+                              icon: Icons.monetization_on_outlined,
+                              text: 'S/.60',
+                            ),
+                            const SizedBox(height: 22),
+                            _buildPlayersPreview(),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (isPaid) {
+                                    return;
+                                  }
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const TournamentRegisterScreen(),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFD7FF59),
+                                  foregroundColor: AppColors.SecondBlue,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(28),
+                                  ),
+                                ),
+                                child: Text(
+                                  isPaid ? 'IR AL PARTIDO' : 'UNIRME',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              _buildBottomNavigation(context),
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHero() {
     return SizedBox(
-      height: 260,
+      height: 240,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
-            'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?w=1200',
-            fit: BoxFit.cover,
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            child: Image.asset(
+              'assets/images/trigal_onepadel.png',
+              fit: BoxFit.cover,
+            ),
           ),
           Container(
             decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.14),
                   Colors.black.withOpacity(0.55),
-                  Colors.black.withOpacity(0.15),
                 ],
               ),
             ),
           ),
           Positioned(
-            left: 16,
-            top: 12,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).maybePop(),
-              child:
-                  const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-            ),
-          ),
-          Positioned(
-            top: 12,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: const Text(
-                'Torneos',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          Center(
+            left: 24,
+            right: 24,
+            bottom: 10,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
                 Text(
                   'Torneo PGO',
                   style: TextStyle(
-                    color: AppColors.PrimaryGreen,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 2),
                 Text(
-                  'REY DE LA CANCHA',
-                  style: TextStyle(
-                    color: AppColors.PrimaryGreen,
-                    fontSize: 12,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '4ta categoria',
+                  '4TA categoria',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: [
+                    _HeroChip(text: '1 buscando dupla'),
+                    SizedBox(width: 10),
+                    _HeroChip(text: '3 amigos inscritos'),
+                  ],
                 ),
               ],
             ),
@@ -119,48 +198,89 @@ class TournamentDescriptionScreen extends StatelessWidget {
 
   Widget _buildTabs(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(4),
+      height: 34,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFE6EAF0),
+        borderRadius: BorderRadius.circular(17),
       ),
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.SecondBlue,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'Descripcion',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                 ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const TournamentBracketScreen(),
+                  ),
+                );
+              },
+              child: Center(
+                child: Text(
+                  'Bracket',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const TournamentLiveScreen(),
+                  ),
+                );
+              },
+              child: Center(
+                child: Text(
+                  'En vivo',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const TournamentProfileScreen(),
+                  ),
+                );
+              },
+              child: Center(
                 child: Text(
                   'Jugadores',
-                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  'Descripcion',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -171,119 +291,306 @@ class TournamentDescriptionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDescriptionSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          Text(
-            'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 12,
-              height: 1.5,
-            ),
+  Widget _buildLocationRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        Icon(
+          Icons.location_on_outlined,
+          size: 22,
+          color: Color(0xFFA8B1C1),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'One Padel Trigal',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Lunes 19 Dic',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            'PREMIOS',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlayersProgress() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.groups_2_outlined,
+          size: 22,
+          color: Color(0xFFA8B1C1),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '8 de 16 jugadores',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: SizedBox(
+                  height: 10,
+                  child: Row(
+                    children: const [
+                      Expanded(
+                        flex: 8,
+                        child: ColoredBox(color: Color(0xFFD7FF59)),
+                      ),
+                      Expanded(
+                        flex: 8,
+                        child: ColoredBox(color: Color(0xFFAAB5CB)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 12,
-              height: 1.5,
-            ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSimpleRow({
+    required IconData icon,
+    required String text,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: const Color(0xFFA8B1C1),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          text,
+          style: const TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(height: 18),
-          Text(
-            'COSTO',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 12,
-              height: 1.5,
-            ),
-          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlayersPreview() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          _PreviewPlayer(label: 'Romario', image: true),
+          SizedBox(width: 8),
+          _PreviewPlayer(label: 'Jugador 2'),
+          SizedBox(width: 8),
+          _PreviewPlayer(label: 'Jugador 3'),
+          SizedBox(width: 8),
+          _PreviewPlayer(label: 'Jugador 4'),
+          SizedBox(width: 8),
+          _PreviewPlayer(label: 'Jugador 3'),
+          SizedBox(width: 8),
+          _PreviewMore(text: '+8 mas'),
         ],
       ),
     );
   }
 
-  Widget _buildJoinButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.PrimaryGreen,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Text(
-            'UNIRME',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-            ),
+  Widget _buildBottomNavigation(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF7F7F8),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              IconButton(
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                icon: const Icon(
+                  Icons.home,
+                  color: Color(0xFF7D8491),
+                  size: 34,
+                ),
+              ),
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: AppColors.SecondBlue.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Icon(
+                  Icons.emoji_events,
+                  color: AppColors.SecondBlue,
+                  size: 34,
+                ),
+              ),
+              const Icon(
+                Icons.person,
+                color: Color(0xFF7D8491),
+                size: 34,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBottomBar() {
+  Widget _buildDivider() {
+    return Container(
+      width: double.infinity,
+      height: 1,
+      color: const Color(0xFFD3DAE3),
+    );
+  }
+}
+
+class _PreviewPlayer extends StatelessWidget {
+  final String label;
+  final bool image;
+
+  const _PreviewPlayer({
+    required this.label,
+    this.image = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
-      height: 88,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
+      width: 42,
+      child: Column(
         children: [
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 12,
-            child: Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: const [
-                  Icon(Icons.home, color: Colors.white),
-                  Icon(Icons.emoji_events, color: Colors.white),
-                  Icon(Icons.people, color: Colors.white),
-                  Icon(Icons.person, color: Colors.white),
-                ],
+          Container(
+            width: 38,
+            height: 38,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.PrimaryGreen,
+                width: 1.2,
               ),
             ),
+            child: ClipOval(
+              child: image
+                  ? Image.asset(
+                      'assets/images/Logo_Icono.png',
+                      fit: BoxFit.cover,
+                    )
+                  : Container(color: const Color(0xFFAAB5CB)),
+            ),
           ),
-          Positioned(
-            bottom: 32,
-            child: CircleAvatar(
-              radius: 26,
-              backgroundColor: AppColors.PrimaryGreen,
-              child: Icon(Icons.emoji_events, color: AppColors.primary),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 8,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewMore extends StatelessWidget {
+  final String text;
+
+  const _PreviewMore({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.SecondBlue,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  final String text;
+
+  const _HeroChip({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.whatshot,
+            size: 14,
+            color: AppColors.primaryOrange,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

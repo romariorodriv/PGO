@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../constants/colors.dart';
+import 'tournament_bracket_screen.dart';
 import 'tournament_description_screen.dart';
+import 'tournament_live_screen.dart';
 
 class TournamentProfileScreen extends StatelessWidget {
   const TournamentProfileScreen({Key? key}) : super(key: key);
@@ -8,106 +11,167 @@ class TournamentProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: AppColors.SecondBlue,
+      appBar: AppBar(
+        backgroundColor: AppColors.SecondBlue,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Actividad',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _buildTabs(context),
-                    const SizedBox(height: 16),
-                    _buildPlayersList(),
-                    const SizedBox(height: 20),
-                    _buildJoinButton(),
-                    const SizedBox(height: 24),
-                  ],
+        top: false,
+        child: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHero(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(30, 14, 30, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildTabs(context),
+                            const SizedBox(height: 16),
+                            const Center(
+                              child: _HeroChip(text: '3 amigos inscritos'),
+                            ),
+                            const SizedBox(height: 14),
+                            _buildSelectedTeamCard(),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Jugadores',
+                              style: TextStyle(
+                                color: AppColors.SecondBlue,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const _PlayerListTile(
+                              name: 'Tom',
+                              subtitle: 'Amigo',
+                              score: '#110',
+                            ),
+                            const _PlayerDivider(),
+                            const _PlayerListTile(
+                              name: 'Karo',
+                              score: '#105',
+                              showFollow: true,
+                            ),
+                            const _PlayerDivider(),
+                            const _PlayerListTile(
+                              name: 'Mafer',
+                              subtitle: 'Amiga',
+                              score: '#97',
+                            ),
+                            const _PlayerDivider(),
+                            const _PlayerListTile(
+                              name: 'Paula',
+                              score: '#90',
+                              showFollow: true,
+                            ),
+                            const _PlayerDivider(),
+                            const _PlayerListTile(
+                              name: 'Logan',
+                              subtitle: 'Amigo',
+                              score: '#12',
+                            ),
+                            const _PlayerDivider(),
+                            const _PlayerListTile(
+                              name: 'Yupi',
+                              score: '#89',
+                              showFollow: true,
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              _buildBottomNavigation(context),
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHero() {
     return SizedBox(
-      height: 260,
+      height: 240,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
-            'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?w=1200',
-            fit: BoxFit.cover,
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            child: Image.asset(
+              'assets/images/trigal_onepadel.png',
+              fit: BoxFit.cover,
+            ),
           ),
           Container(
             decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.14),
                   Colors.black.withOpacity(0.55),
-                  Colors.black.withOpacity(0.15),
                 ],
               ),
             ),
           ),
           Positioned(
-            left: 16,
-            top: 12,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).maybePop(),
-              child:
-                  const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-            ),
-          ),
-          Positioned(
-            top: 12,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: const Text(
-                'Torneos',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          Center(
+            left: 24,
+            right: 24,
+            bottom: 10,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
                 Text(
                   'Torneo PGO',
                   style: TextStyle(
-                    color: AppColors.PrimaryGreen,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 2),
                 Text(
-                  'REY DE LA CANCHA',
-                  style: TextStyle(
-                    color: AppColors.PrimaryGreen,
-                    fontSize: 12,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '4ta categoria',
+                  '4TA categoría',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -120,55 +184,90 @@ class TournamentProfileScreen extends StatelessWidget {
 
   Widget _buildTabs(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(4),
+      height: 34,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFE6EAF0),
+        borderRadius: BorderRadius.circular(17),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  'Jugadores',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: GestureDetector(
+            child: InkWell(
               onTap: () {
-                Navigator.of(context).push(
+                Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder: (context) => const TournamentDescriptionScreen(),
                   ),
                 );
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              child: Center(
                 child: Text(
-                  'Descripcion',
-                  textAlign: TextAlign.center,
+                  'Descripción',
                   style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
+                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const TournamentBracketScreen(),
+                  ),
+                );
+              },
+              child: Center(
+                child: Text(
+                  'Bracket',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const TournamentLiveScreen(),
+                  ),
+                );
+              },
+              child: Center(
+                child: Text(
+                  'En vivo',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.SecondBlue,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'Jugadores',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -178,47 +277,145 @@ class TournamentProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlayersList() {
-    final players = List.generate(6, (index) => index);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: players
-            .map(
-              (index) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildPlayerTile(
-                  name: 'Romario Rodriguez',
-                  level: 'veterano',
-                  rank: '#11',
+  Widget _buildSelectedTeamCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const _AvatarCircle(selected: true),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Romario / Arom',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+                Text(
+                  'Arom | amigo',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withOpacity(0.55),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '#120',
+            style: TextStyle(
+              color: AppColors.SecondBlue.withOpacity(0.55),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD7FF59),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Text(
+              '#111',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
               ),
-            )
-            .toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPlayerTile({
-    required String name,
-    required String level,
-    required String rank,
-  }) {
+  Widget _buildBottomNavigation(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF3B73C4),
-        borderRadius: BorderRadius.circular(18),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF7F7F8),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              IconButton(
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                icon: const Icon(
+                  Icons.home,
+                  color: Color(0xFF7D8491),
+                  size: 34,
+                ),
+              ),
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: AppColors.SecondBlue.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Icon(
+                  Icons.emoji_events,
+                  color: AppColors.SecondBlue,
+                  size: 34,
+                ),
+              ),
+              const Icon(
+                Icons.person,
+                color: Color(0xFF7D8491),
+                size: 34,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerListTile extends StatelessWidget {
+  final String name;
+  final String? subtitle;
+  final String score;
+  final bool showFollow;
+
+  const _PlayerListTile({
+    required this.name,
+    this.subtitle,
+    required this.score,
+    this.showFollow = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 18,
-            backgroundImage: NetworkImage(
-              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200',
-            ),
-          ),
-          const SizedBox(width: 12),
+          const _AvatarCircle(),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,33 +423,53 @@ class TournamentProfileScreen extends StatelessWidget {
                 Text(
                   name,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    color: AppColors.SecondBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                Text(
-                  level,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 11,
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      color: AppColors.SecondBlue.withOpacity(0.45),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
+          if (showFollow) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.SecondBlue,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Text(
+                '+ Seguir',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.PrimaryGreen,
-              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFFD7FF59),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
-              rank,
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+              score,
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -260,63 +477,82 @@ class TournamentProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildJoinButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.PrimaryGreen,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Text(
-            'UNIRME',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+class _PlayerDivider extends StatelessWidget {
+  const _PlayerDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(left: 20),
+      width: double.infinity,
+      height: 1,
+      color: const Color(0xFFD7DDE5),
+    );
+  }
+}
+
+class _AvatarCircle extends StatelessWidget {
+  final bool selected;
+
+  const _AvatarCircle({
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? AppColors.PrimaryGreen : AppColors.PrimaryGreen,
+          width: 1.2,
+        ),
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/Logo_Icono.png',
+          fit: BoxFit.cover,
         ),
       ),
     );
   }
+}
 
-  Widget _buildBottomBar() {
-    return SizedBox(
-      height: 88,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
+class _HeroChip extends StatelessWidget {
+  final String text;
+
+  const _HeroChip({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 12,
-            child: Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: const [
-                  Icon(Icons.home, color: Colors.white),
-                  Icon(Icons.emoji_events, color: Colors.white),
-                  Icon(Icons.people, color: Colors.white),
-                  Icon(Icons.person, color: Colors.white),
-                ],
-              ),
-            ),
+          const Icon(
+            Icons.whatshot,
+            size: 14,
+            color: AppColors.primaryOrange,
           ),
-          Positioned(
-            bottom: 32,
-            child: CircleAvatar(
-              radius: 26,
-              backgroundColor: AppColors.PrimaryGreen,
-              child: Icon(Icons.emoji_events, color: AppColors.primary),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

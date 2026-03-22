@@ -19,83 +19,91 @@ class MatchSummaryScreen extends StatelessWidget {
         backgroundColor: AppColors.SecondBlue,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Actividad'),
+        title: const Text(
+          'Actividad',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.menu),
+            icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () {},
           ),
         ],
       ),
       body: SafeArea(
+        top: false,
         child: Container(
           width: double.infinity,
           decoration: const BoxDecoration(
-            color: AppColors.primaryDark,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
           ),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 26),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 10),
                 _buildHeroCard(),
                 Transform.translate(
-                  offset: const Offset(0, -34),
-                  child: Column(
-                    children: [
-                      _buildScoreCard(),
-                      const SizedBox(height: 18),
-                      _buildInfoCard(),
-                      const SizedBox(height: 18),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
+                  offset: const Offset(0, -28),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 26),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildScoreCard(),
+                        const SizedBox(height: 18),
+                        _buildInfoCard(),
+                        const SizedBox(height: 14),
+                        const Text(
                           'Jugadores',
                           style: TextStyle(
                             color: AppColors.SecondBlue,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildPlayersRow(),
-                      const SizedBox(height: 28),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (context) => const HomeScreen(),
+                        const SizedBox(height: 12),
+                        _buildPlayersRow(),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (context) => const HomeScreen(),
+                                ),
+                                (route) => false,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD7FF59),
+                              foregroundColor: AppColors.SecondBlue,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
                               ),
-                              (route) => false,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD4FF63),
-                            foregroundColor: AppColors.SecondBlue,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
                             ),
-                          ),
-                          child: const Text(
-                            'Regresar a inicio',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
+                            child: const Text(
+                              'REGRESAR AL INICIO',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -110,33 +118,33 @@ class MatchSummaryScreen extends StatelessWidget {
     return Stack(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
           child: Image.asset(
-            'assets/images/one_padel_trigal.jpg',
+            'assets/images/trigal_onepadel.png',
             width: double.infinity,
-            height: 300,
+            height: 330,
             fit: BoxFit.cover,
           ),
         ),
         Container(
-          height: 300,
+          height: 330,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
                 Colors.transparent,
-                Colors.black.withOpacity(0.18),
-                Colors.black.withOpacity(0.56),
+                Colors.transparent,
+                Colors.black.withOpacity(0.42),
               ],
             ),
           ),
         ),
         Positioned(
-          left: 18,
-          right: 18,
-          bottom: 24,
+          left: 30,
+          right: 30,
+          bottom: 28,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -144,8 +152,8 @@ class MatchSummaryScreen extends StatelessWidget {
                 'Match competitivo',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 4),
@@ -153,7 +161,7 @@ class MatchSummaryScreen extends StatelessWidget {
                 matchDate,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -167,46 +175,65 @@ class MatchSummaryScreen extends StatelessWidget {
   Widget _buildScoreCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(28),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.09),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '3 - 1',
+            'Sets',
             style: TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 42,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 4),
+          const Center(
+            child: Text(
+              '3 - 1',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 42,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           Container(
             width: double.infinity,
             height: 1,
-            color: AppColors.primaryLight,
-          ),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: const [
-              _SetScore(score: '6 - 4'),
-              _SetScore(score: '6 - 2'),
-              _SetScore(score: '7 - 5'),
-            ],
+            color: const Color(0xFFD7DDE5),
           ),
           const SizedBox(height: 10),
-          const Center(
-            child: _SetScore(score: '5 - 7'),
+          const Text(
+            'Games',
+            style: TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _GamePill(score: '6 - 2'),
+              _GamePill(score: '7 - 5'),
+              _GamePill(score: '5 - 7'),
+              _GamePill(score: '10 - 3'),
+            ],
           ),
         ],
       ),
@@ -216,13 +243,13 @@ class MatchSummaryScreen extends StatelessWidget {
   Widget _buildInfoCard() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -236,10 +263,10 @@ class MatchSummaryScreen extends StatelessWidget {
                   'Nivel',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Text(
                   '4ta categoría',
                   style: TextStyle(
@@ -252,14 +279,14 @@ class MatchSummaryScreen extends StatelessWidget {
                   'Ranking',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '#188 (+2)',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.72),
+                    color: AppColors.SecondBlue.withOpacity(0.48),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -269,7 +296,7 @@ class MatchSummaryScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             height: 1,
-            color: AppColors.primaryLight,
+            color: const Color(0xFFE3E7ED),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -279,7 +306,7 @@ class MatchSummaryScreen extends StatelessWidget {
                   'Club',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -315,21 +342,28 @@ class MatchSummaryScreen extends StatelessWidget {
   }
 }
 
-class _SetScore extends StatelessWidget {
+class _GamePill extends StatelessWidget {
   final String score;
 
-  const _SetScore({
+  const _GamePill({
     required this.score,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      score,
-      style: const TextStyle(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
         color: AppColors.SecondBlue,
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        score,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -349,18 +383,18 @@ class _SummaryPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 76,
+      width: 72,
       child: Column(
         children: [
           Container(
-            width: 68,
-            height: 68,
+            width: 58,
+            height: 58,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                 color: selected ? AppColors.PrimaryGreen : Colors.transparent,
-                width: 2,
+                width: 1.5,
               ),
             ),
             child: Container(
@@ -387,6 +421,8 @@ class _SummaryPlayer extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
