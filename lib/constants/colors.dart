@@ -18,7 +18,28 @@ class AppColors {
   static const Color brownLight = Color(0xFF999682);
   static const Color brownDark = Color(0xFFdbd8b9);
 
+  // Header colors
+  static const Color headerBlueStart = Color(0xFF3D659A);
+  static const Color headerBlueEnd = Color(0xFF1C2A3A);
+
+  static const LinearGradient headerGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    stops: [0, 0.45, 1],
+    colors: [
+      headerBlueStart,
+      Color(0xFF314F78),
+      headerBlueEnd,
+    ],
+  );
+
+  static const BoxDecoration headerGradientDecoration = BoxDecoration(
+    gradient: headerGradient,
+  );
+
+  static const double headerToolbarHeight = 88;
+
   // Status colors
-  static const Color blue = Color(0xFF33d659a);
-  static const Color SecondBlue = Color(0xFF1c2a3a);
+  static const Color blue = headerBlueStart;
+  static const Color SecondBlue = headerBlueEnd;
 }

@@ -11,6 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # UI & Navigation
   cupertino_icons: ^1.0.2
@@ -22,13 +24,17 @@ dependencies:
   # API & Networking
   http: ^1.1.0
   dio: ^5.3.0
+  image_picker: ^1.1.2
+  mobile_scanner: ^7.1.1
+  qr_flutter: ^4.1.0
+  url_launcher: ^6.3.1
 
   # Local Storage
   shared_preferences: ^2.2.0
   sqflite: ^2.3.0
 
   # Utils
-  intl: ^0.19.0
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

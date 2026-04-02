@@ -1,29 +1,39 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import '../models/match_record.dart';
+import '../models/selected_player.dart';
+import '../services/match_service.dart';
+import '../widgets/pgo_header_scaffold.dart';
+import '../widgets/pgo_options_menu.dart';
 import 'finish_match_screen.dart';
 
 class MatchScoreScreen extends StatefulWidget {
-  const MatchScoreScreen({Key? key}) : super(key: key);
+  const MatchScoreScreen({
+    super.key,
+    required this.match,
+    required this.players,
+  });
+
+  final MatchRecord match;
+  final List<SelectedPlayer> players;
 
   @override
   State<MatchScoreScreen> createState() => _MatchScoreScreenState();
 }
 
 class _MatchScoreScreenState extends State<MatchScoreScreen> {
-  DateTime _selectedDate = DateTime.now();
-  int _selectedTeam = 1;
-  final List<List<int>> _sets = [
+  late DateTime _selectedDate;
+  int? _selectedTeam;
+  bool _isSaving = false;
+  final List<List<int>> _games = [
     [6, 2],
-    [7, 5],
-    [5, 7],
-    [10, 3],
   ];
 
-  bool get _isMatchFinished {
-    final team1Wins = _sets.where((s) => s[0] > s[1]).length;
-    final team2Wins = _sets.where((s) => s[1] > s[0]).length;
-    return team1Wins >= 2 || team2Wins >= 2;
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.match.playedAt;
   }
 
   String get _formattedDate {
@@ -56,7 +66,13 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     return '$dayName ${_selectedDate.day} de $monthName';
   }
 
-  void _changeDate() async {
+  int get _team1Games => _games.fold<int>(0, (total, game) => total + game[0]);
+
+  int get _team2Games => _games.fold<int>(0, (total, game) => total + game[1]);
+
+  bool get _canContinue => _selectedTeam != null;
+
+  Future<void> _changeDate() async {
     final result = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
@@ -72,24 +88,22 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     }
   }
 
-  void _showEditScoreDialog(int setIndex) {
-    final controller1 = TextEditingController(text: '${_sets[setIndex][0]}');
-    final controller2 = TextEditingController(text: '${_sets[setIndex][1]}');
+  Future<void> _editGame(int index) async {
+    final controller1 = TextEditingController(text: '${_games[index][0]}');
+    final controller2 = TextEditingController(text: '${_games[index][1]}');
 
-    showDialog<void>(
+    await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Editar puntaje'),
+          title: Text('Editar game ${index + 1}'),
           content: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: controller1,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Equipo 1',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Equipo 1'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -97,9 +111,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                 child: TextField(
                   controller: controller2,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Equipo 2',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Equipo 2'),
                 ),
               ),
             ],
@@ -111,11 +123,10 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
             ),
             TextButton(
               onPressed: () {
-                final a = int.tryParse(controller1.text) ?? 0;
-                final b = int.tryParse(controller2.text) ?? 0;
+                final team1 = int.tryParse(controller1.text) ?? 0;
+                final team2 = int.tryParse(controller2.text) ?? 0;
                 setState(() {
-                  _sets[setIndex][0] = a.clamp(0, 99);
-                  _sets[setIndex][1] = b.clamp(0, 99);
+                  _games[index] = [team1, team2];
                 });
                 Navigator.of(context).pop();
               },
@@ -127,103 +138,145 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     );
   }
 
+  Future<void> _addGame() async {
+    setState(() {
+      _games.add([0, 0]);
+    });
+    await _editGame(_games.length - 1);
+  }
+
+  Future<void> _handleContinue() async {
+    if (_selectedTeam == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes seleccionar el equipo ganador')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await MatchService().updateMatchResult(
+        matchId: widget.match.id,
+        playedAt: _selectedDate,
+        winnerTeam: _selectedTeam!,
+        games: _games
+            .map(
+              (game) => {
+                'team1': game[0],
+                'team2': game[1],
+              },
+            )
+            .toList(),
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => FinishMatchScreen(
+            match: widget.match,
+            players: widget.players,
+            winnerTeam: _selectedTeam!,
+            matchDate: _formattedDate,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final team1Wins = _sets.where((s) => s[0] > s[1]).length;
-    final team2Wins = _sets.where((s) => s[1] > s[0]).length;
-
-    return Scaffold(
-      backgroundColor: AppColors.SecondBlue,
-      appBar: AppBar(
-        backgroundColor: AppColors.SecondBlue,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Actividad',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
+    return PgoHeaderScaffold(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
       ),
-      body: SafeArea(
-        top: false,
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F3F5),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(26, 22, 26, 34),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildDateRow(),
-                const SizedBox(height: 32),
-                _buildScoreCard(team1Wins, team2Wins),
-                const SizedBox(height: 18),
-                const Text(
-                  'Ganadores',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
+      title: const Text(
+        'Actividad',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      actions: const [PgoOptionsMenuButton()],
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFFF2F3F5),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(26, 22, 26, 34),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDateRow(),
+              const SizedBox(height: 32),
+              _buildScoreCard(),
+              const SizedBox(height: 18),
+              const Text(
+                'Ganadores',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: 12),
-                _buildTeamTabs(),
-                const SizedBox(height: 12),
-                _buildTeamPlayers(),
-                const SizedBox(height: 160),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isMatchFinished
-                        ? () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => FinishMatchScreen(
-                                  matchDate: _formattedDate,
-                                ),
-                              ),
-                            );
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD7FF59),
-                      disabledBackgroundColor: const Color(0xFFD7FF59)
-                          .withOpacity(0.45),
-                      foregroundColor: AppColors.SecondBlue,
-                      disabledForegroundColor:
-                          AppColors.SecondBlue.withOpacity(0.5),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                    child: const Text(
-                      'SIGUIENTE',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 17,
-                      ),
+              ),
+              const SizedBox(height: 12),
+              _buildTeamTabs(),
+              const SizedBox(height: 12),
+              _buildTeamPlayers(),
+              const SizedBox(height: 160),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed:
+                      _isSaving || !_canContinue ? null : _handleContinue,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD7FF59),
+                    disabledBackgroundColor:
+                        const Color(0xFFD7FF59).withValues(alpha: 0.45),
+                    foregroundColor: AppColors.SecondBlue,
+                    disabledForegroundColor:
+                        AppColors.SecondBlue.withValues(alpha: 0.55),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
                     ),
                   ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'SIGUIENTE',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 17,
+                          ),
+                        ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -239,7 +292,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -259,7 +312,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           ),
           GestureDetector(
             onTap: _changeDate,
-            child: Text(
+            child: const Text(
               'Cambiar',
               style: TextStyle(
                 color: AppColors.PrimaryGreen,
@@ -273,7 +326,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     );
   }
 
-  Widget _buildScoreCard(int team1Wins, int team2Wins) {
+  Widget _buildScoreCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
@@ -282,7 +335,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.09),
+            color: Colors.black.withValues(alpha: 0.09),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -305,7 +358,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: () => _showEditScoreDialog(0),
+                onTap: _addGame,
                 child: Container(
                   width: 28,
                   height: 28,
@@ -325,7 +378,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           const SizedBox(height: 2),
           Center(
             child: Text(
-              '$team1Wins - $team2Wins',
+              '$_team1Games - $_team2Games',
               style: const TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 44,
@@ -352,13 +405,16 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: List.generate(
-              _sets.length,
-              (index) => _GamePill(
-                score: '${_sets[index][0]} - ${_sets[index][1]}',
-                onTap: () => _showEditScoreDialog(index),
+            children: [
+              ...List.generate(
+                _games.length,
+                (index) => _GamePill(
+                  score: '${_games[index][0]} - ${_games[index][1]}',
+                  onTap: () => _editGame(index),
+                ),
               ),
-            ),
+              _AddGamePill(onTap: _addGame),
+            ],
           ),
         ],
       ),
@@ -396,29 +452,14 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   }
 
   Widget _buildTeamPlayers() {
-    return const Row(
+    final team1 = widget.players.take(2).toList();
+    final team2 = widget.players.skip(2).take(2).toList();
+
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _PlayerCircle(
-          label: 'Romario',
-          imageAsset: 'assets/images/Logo_Icono.png',
-          selected: true,
-        ),
-        _PlayerCircle(
-          label: 'Jugador 2',
-          imageAsset: 'assets/images/Logo_Icono.png',
-          usePlaceholder: true,
-        ),
-        _PlayerCircle(
-          label: 'Jugador 3',
-          imageAsset: 'assets/images/Logo_Icono.png',
-          usePlaceholder: true,
-        ),
-        _PlayerCircle(
-          label: 'Jugador 4',
-          imageAsset: 'assets/images/Logo_Icono.png',
-          usePlaceholder: true,
-        ),
+        ...team1.map((player) => _ScorePlayerCircle(player: player)),
+        ...team2.map((player) => _ScorePlayerCircle(player: player)),
       ],
     );
   }
@@ -456,6 +497,36 @@ class _GamePill extends StatelessWidget {
   }
 }
 
+class _AddGamePill extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AddGamePill({
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6EBF3),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Text(
+          '+ game',
+          style: TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TeamTab extends StatelessWidget {
   final String label;
   final bool selected;
@@ -480,7 +551,7 @@ class _TeamTab extends StatelessWidget {
               ? null
               : [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -500,17 +571,11 @@ class _TeamTab extends StatelessWidget {
   }
 }
 
-class _PlayerCircle extends StatelessWidget {
-  final String label;
-  final String imageAsset;
-  final bool selected;
-  final bool usePlaceholder;
+class _ScorePlayerCircle extends StatelessWidget {
+  final SelectedPlayer player;
 
-  const _PlayerCircle({
-    required this.label,
-    required this.imageAsset,
-    this.selected = false,
-    this.usePlaceholder = false,
+  const _ScorePlayerCircle({
+    required this.player,
   });
 
   @override
@@ -526,22 +591,23 @@ class _PlayerCircle extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? AppColors.PrimaryGreen : Colors.transparent,
+                color: AppColors.PrimaryGreen,
                 width: 1.5,
               ),
             ),
             child: ClipOval(
-              child: usePlaceholder
-                  ? Container(color: const Color(0xFFAAB5CB))
-                  : Image.asset(
-                      imageAsset,
+              child: player.photoUrl != null && player.photoUrl!.isNotEmpty
+                  ? Image.network(
+                      player.photoUrl!,
                       fit: BoxFit.cover,
-                    ),
+                      errorBuilder: (_, __, ___) => _fallbackAvatar(),
+                    )
+                  : _fallbackAvatar(),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            label,
+            player.name,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.SecondBlue,
@@ -552,6 +618,17 @@ class _PlayerCircle extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _fallbackAvatar() {
+    return Container(
+      color: const Color(0xFFABB8CC),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.person,
+        color: Colors.white,
       ),
     );
   }

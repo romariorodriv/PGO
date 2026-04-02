@@ -1,121 +1,189 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import '../models/tournament_record.dart';
+import '../services/tournament_service.dart';
+import '../utils/data_url_image.dart';
+import '../widgets/pgo_bottom_nav.dart';
+import '../widgets/pgo_header_scaffold.dart';
+import '../widgets/pgo_options_menu.dart';
+import 'home_screen.dart';
+import 'profile_screen.dart';
 import 'tournament_bracket_screen.dart';
 import 'tournament_description_screen.dart';
 import 'tournament_live_screen.dart';
 
-class TournamentProfileScreen extends StatelessWidget {
-  const TournamentProfileScreen({Key? key}) : super(key: key);
+class TournamentProfileScreen extends StatefulWidget {
+  const TournamentProfileScreen({
+    super.key,
+    this.tournament,
+  });
+
+  final TournamentRecord? tournament;
+
+  @override
+  State<TournamentProfileScreen> createState() => _TournamentProfileScreenState();
+}
+
+class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
+  TournamentRecord? _tournament;
+  bool _isLoading = false;
+  String? _loadError;
+
+  TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
+  String get _title => _currentTournament?.title ?? 'Torneo PGO';
+  String get _category => _currentTournament?.category ?? '4TA';
+  String get _photoUrl => _currentTournament?.photoUrl ?? '';
+  String get _createdByName => _currentTournament?.createdByName ?? 'Organizador';
+  String get _location => _currentTournament?.location ?? 'One Padel Trigal';
+  String get _city => _currentTournament?.city ?? 'Lima';
+  String get _format => _currentTournament?.format ?? 'dobles';
+  String get _modality => _currentTournament?.modality ?? 'masculino';
+  int get _playerCapacity => _currentTournament?.playerCapacity ?? 16;
+  List<TournamentPlayer> get _players =>
+      _currentTournament?.registeredPlayers ?? const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tournament = widget.tournament;
+    _loadTournament();
+  }
+
+  Future<void> _loadTournament() async {
+    final tournamentId = widget.tournament?.id;
+    if (tournamentId == null || tournamentId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final tournament = await TournamentService().getTournament(tournamentId);
+      if (!mounted) return;
+      setState(() {
+        _tournament = tournament;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _capitalize(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'Sin definir';
+    return '${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.SecondBlue,
-      appBar: AppBar(
-        backgroundColor: AppColors.SecondBlue,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Actividad',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
+    return PgoHeaderScaffold(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
       ),
-      body: SafeArea(
-        top: false,
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F3F5),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-          ),
+      title: const Text(
+        'Torneo',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      actions: const [PgoOptionsMenuButton()],
+      bottomNavigationBar: _buildBottomNavigation(context),
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFFF2F3F5),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        ),
+        child: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHero(),
+              _buildHero(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 14, 30, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTabs(context),
+                    const SizedBox(height: 16),
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_loadError != null)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(30, 14, 30, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildTabs(context),
-                            const SizedBox(height: 16),
-                            const Center(
-                              child: _HeroChip(text: '3 amigos inscritos'),
-                            ),
-                            const SizedBox(height: 14),
-                            _buildSelectedTeamCard(),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Jugadores',
-                              style: TextStyle(
-                                color: AppColors.SecondBlue,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            const _PlayerListTile(
-                              name: 'Tom',
-                              subtitle: 'Amigo',
-                              score: '#110',
-                            ),
-                            const _PlayerDivider(),
-                            const _PlayerListTile(
-                              name: 'Karo',
-                              score: '#105',
-                              showFollow: true,
-                            ),
-                            const _PlayerDivider(),
-                            const _PlayerListTile(
-                              name: 'Mafer',
-                              subtitle: 'Amiga',
-                              score: '#97',
-                            ),
-                            const _PlayerDivider(),
-                            const _PlayerListTile(
-                              name: 'Paula',
-                              score: '#90',
-                              showFollow: true,
-                            ),
-                            const _PlayerDivider(),
-                            const _PlayerListTile(
-                              name: 'Logan',
-                              subtitle: 'Amigo',
-                              score: '#12',
-                            ),
-                            const _PlayerDivider(),
-                            const _PlayerListTile(
-                              name: 'Yupi',
-                              score: '#89',
-                              showFollow: true,
-                            ),
-                            const SizedBox(height: 24),
-                          ],
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildInfoTile(
+                          icon: Icons.warning_amber_rounded,
+                          title: 'No pudimos actualizar los jugadores',
+                          subtitle: _loadError!,
                         ),
                       ),
-                    ],
-                  ),
+                    _buildOrganizerCard(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Jugadores',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoTile(
+                      icon: Icons.groups_2_outlined,
+                      title: 'Cupos disponibles',
+                      subtitle:
+                          '${_players.length} de $_playerCapacity jugadores inscritos.',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildInfoTile(
+                      icon: Icons.sports_tennis_outlined,
+                      title: 'Formato',
+                      subtitle:
+                          '${_capitalize(_format)} · ${_capitalize(_modality)}',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildInfoTile(
+                      icon: Icons.location_on_outlined,
+                      title: 'Sede',
+                      subtitle: '$_location · $_city',
+                    ),
+                    const SizedBox(height: 16),
+                    if (_players.isEmpty)
+                      _buildInfoTile(
+                        icon: Icons.person_off_outlined,
+                        title: 'Aun no hay jugadores visibles',
+                        subtitle:
+                            'Cuando existan inscripciones confirmadas apareceran aqui.',
+                      )
+                    else
+                      ..._players.map(
+                        (player) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _RegisteredPlayerTile(player: player),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              _buildBottomNavigation(context),
             ],
           ),
         ),
@@ -124,6 +192,7 @@ class TournamentProfileScreen extends StatelessWidget {
   }
 
   Widget _buildHero() {
+    final bytes = tryDecodeDataUrl(_photoUrl);
     return SizedBox(
       height: 240,
       child: Stack(
@@ -131,21 +200,38 @@ class TournamentProfileScreen extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-            child: Image.asset(
-              'assets/images/trigal_onepadel.png',
-              fit: BoxFit.cover,
-            ),
+            child: _photoUrl.isNotEmpty
+                ? _photoUrl.startsWith('http')
+                    ? Image.network(
+                        _photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/images/trigal_onepadel.png',
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : (bytes != null
+                        ? Image.memory(bytes, fit: BoxFit.cover)
+                        : Image.asset(
+                            'assets/images/trigal_onepadel.png',
+                            fit: BoxFit.cover,
+                          ))
+                : Image.asset(
+                    'assets/images/trigal_onepadel.png',
+                    fit: BoxFit.cover,
+                  ),
           ),
           Container(
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(34)),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(0.14),
-                  Colors.black.withOpacity(0.55),
+                  Colors.black.withValues(alpha: 0.14),
+                  Colors.black.withValues(alpha: 0.55),
                 ],
               ),
             ),
@@ -156,19 +242,19 @@ class TournamentProfileScreen extends StatelessWidget {
             bottom: 10,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Torneo PGO',
-                  style: TextStyle(
+                  _title,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  '4TA categoría',
-                  style: TextStyle(
+                  '${_category.toUpperCase()} categoria',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -197,15 +283,17 @@ class TournamentProfileScreen extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const TournamentDescriptionScreen(),
+                    builder: (context) => TournamentDescriptionScreen(
+                      tournament: _currentTournament,
+                    ),
                   ),
                 );
               },
               child: Center(
                 child: Text(
-                  'Descripción',
+                  'Descripcion',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -218,7 +306,8 @@ class TournamentProfileScreen extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const TournamentBracketScreen(),
+                    builder: (context) =>
+                        TournamentBracketScreen(tournament: _currentTournament),
                   ),
                 );
               },
@@ -226,7 +315,7 @@ class TournamentProfileScreen extends StatelessWidget {
                 child: Text(
                   'Bracket',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -239,7 +328,8 @@ class TournamentProfileScreen extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const TournamentLiveScreen(),
+                    builder: (context) =>
+                        TournamentLiveScreen(tournament: _currentTournament),
                   ),
                 );
               },
@@ -247,7 +337,7 @@ class TournamentProfileScreen extends StatelessWidget {
                 child: Text(
                   'En vivo',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -277,15 +367,15 @@ class TournamentProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectedTeamCard() {
+  Widget _buildOrganizerCard() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -299,18 +389,18 @@ class TournamentProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Romario / Arom',
-                  style: TextStyle(
+                Text(
+                  _createdByName,
+                  style: const TextStyle(
                     color: AppColors.SecondBlue,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
-                  'Arom | amigo',
+                  'Organizador del torneo',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.55),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.55),
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -318,154 +408,14 @@ class TournamentProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '#120',
-            style: TextStyle(
-              color: AppColors.SecondBlue.withOpacity(0.55),
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD7FF59),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Text(
-              '#111',
-              style: TextStyle(
-                color: AppColors.SecondBlue,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigation(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF7F7F8),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              IconButton(
-                onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                icon: const Icon(
-                  Icons.home,
-                  color: Color(0xFF7D8491),
-                  size: 34,
-                ),
-              ),
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: AppColors.SecondBlue.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(
-                  Icons.emoji_events,
-                  color: AppColors.SecondBlue,
-                  size: 34,
-                ),
-              ),
-              const Icon(
-                Icons.person,
-                color: Color(0xFF7D8491),
-                size: 34,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlayerListTile extends StatelessWidget {
-  final String name;
-  final String? subtitle;
-  final String score;
-  final bool showFollow;
-
-  const _PlayerListTile({
-    required this.name,
-    this.subtitle,
-    required this.score,
-    this.showFollow = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          const _AvatarCircle(),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    style: TextStyle(
-                      color: AppColors.SecondBlue.withOpacity(0.45),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (showFollow) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.SecondBlue,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text(
-                '+ Seguir',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0xFFD7FF59),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
-              score,
+              _category.toUpperCase(),
               style: const TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 10,
@@ -477,28 +427,80 @@ class _PlayerListTile extends StatelessWidget {
       ),
     );
   }
-}
 
-class _PlayerDivider extends StatelessWidget {
-  const _PlayerDivider();
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildInfoTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(left: 20),
-      width: double.infinity,
-      height: 1,
-      color: const Color(0xFFD7DDE5),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 22,
+            color: AppColors.SecondBlue.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.68),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigation(BuildContext context) {
+    return PgoBottomNav(
+      currentTab: PgoNavTab.tournaments,
+      onHomeTap: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      },
+      onTournamentsTap: () {},
+      onProfileTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+        );
+      },
     );
   }
 }
 
 class _AvatarCircle extends StatelessWidget {
-  final bool selected;
-
   const _AvatarCircle({
     this.selected = false,
   });
+
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -509,7 +511,7 @@ class _AvatarCircle extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? AppColors.PrimaryGreen : AppColors.PrimaryGreen,
+          color: AppColors.PrimaryGreen,
           width: 1.2,
         ),
       ),
@@ -523,36 +525,60 @@ class _AvatarCircle extends StatelessWidget {
   }
 }
 
-class _HeroChip extends StatelessWidget {
-  final String text;
-
-  const _HeroChip({
-    required this.text,
+class _RegisteredPlayerTile extends StatelessWidget {
+  const _RegisteredPlayerTile({
+    required this.player,
   });
+
+  final TournamentPlayer player;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.whatshot,
-            size: 14,
-            color: AppColors.primaryOrange,
+          const _AvatarCircle(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  player.name,
+                  style: const TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  player.category ?? 'Sin categoria',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD7FF59),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              '#${player.rankingPosition}',
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

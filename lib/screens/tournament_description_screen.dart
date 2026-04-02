@@ -1,127 +1,243 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import '../models/tournament_record.dart';
+import '../services/tournament_service.dart';
+import '../utils/data_url_image.dart';
+import '../widgets/pgo_bottom_nav.dart';
+import '../widgets/pgo_header_scaffold.dart';
+import '../widgets/pgo_options_menu.dart';
+import 'home_screen.dart';
+import 'profile_screen.dart';
 import 'tournament_bracket_screen.dart';
 import 'tournament_live_screen.dart';
 import 'tournament_profile_screen.dart';
 import 'tournament_register_screen.dart';
 
-class TournamentDescriptionScreen extends StatelessWidget {
+class TournamentDescriptionScreen extends StatefulWidget {
+  const TournamentDescriptionScreen({
+    super.key,
+    this.tournament,
+    this.isPaid = false,
+  });
+
+  final TournamentRecord? tournament;
   final bool isPaid;
 
-  const TournamentDescriptionScreen({
-    Key? key,
-    this.isPaid = false,
-  }) : super(key: key);
+  @override
+  State<TournamentDescriptionScreen> createState() =>
+      _TournamentDescriptionScreenState();
+}
+
+class _TournamentDescriptionScreenState extends State<TournamentDescriptionScreen> {
+  TournamentRecord? _tournament;
+  bool _isLoading = false;
+  String? _loadError;
+
+  TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
+  String get _title => _currentTournament?.title ?? 'Torneo PGO';
+  String get _category => _currentTournament?.category ?? '4TA';
+  String get _location => _currentTournament?.location ?? 'One Padel Trigal';
+  String get _prize => _currentTournament?.prize ?? 'S/ 250 en premios';
+  String get _entryFee =>
+      _currentTournament != null ? 'S/.${_currentTournament!.entryFee}' : 'S/.60';
+  String get _photoUrl => _currentTournament?.photoUrl ?? '';
+  int get _playerCapacity => _currentTournament?.playerCapacity ?? 16;
+  int get _registrationsCount => _currentTournament?.registrationsCount ?? 0;
+  String get _format => _currentTournament?.format ?? 'dobles';
+  List<TournamentPlayer> get _players =>
+      _currentTournament?.registeredPlayers ?? const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tournament = widget.tournament;
+    _loadTournament();
+  }
+
+  Future<void> _loadTournament() async {
+    final tournamentId = widget.tournament?.id;
+    if (tournamentId == null || tournamentId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final tournament = await TournamentService().getTournament(tournamentId);
+      if (!mounted) return;
+      setState(() {
+        _tournament = tournament;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String get _formattedDate {
+    if (_currentTournament == null) return 'Lunes 19 Dic';
+
+    const weekDays = [
+      'Lunes',
+      'Martes',
+      'Miercoles',
+      'Jueves',
+      'Viernes',
+      'Sabado',
+      'Domingo',
+    ];
+    const months = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
+
+    final date = _currentTournament!.startsAt.toLocal();
+    final weekday = weekDays[date.weekday - 1];
+    final month = months[date.month - 1];
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$weekday ${date.day} $month - $hour:$minute';
+  }
+
+  String get _statusChipText {
+    switch (_currentTournament?.status) {
+      case 'DRAFT':
+        return 'borrador';
+      case 'PUBLISHED':
+        return 'inscripciones abiertas';
+      case 'COMPLETED':
+        return 'torneo finalizado';
+      case 'CANCELED':
+        return 'torneo cancelado';
+      default:
+        return 'torneo activo';
+    }
+  }
+
+  String _capitalize(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'Sin definir';
+    return '${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.SecondBlue,
-      appBar: AppBar(
-        backgroundColor: AppColors.SecondBlue,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Actividad',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
+    return PgoHeaderScaffold(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
       ),
-      body: SafeArea(
-        top: false,
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F3F5),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-          ),
+      title: const Text(
+        'Torneo',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      actions: const [PgoOptionsMenuButton()],
+      bottomNavigationBar: _buildBottomNavigation(context),
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFFF2F3F5),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        ),
+        child: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHero(),
+              _buildHero(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 14, 30, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTabs(context),
+                    const SizedBox(height: 16),
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_loadError != null)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(30, 14, 30, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildTabs(context),
-                            const SizedBox(height: 22),
-                            _buildLocationRow(),
-                            const SizedBox(height: 14),
-                            _buildDivider(),
-                            const SizedBox(height: 16),
-                            _buildPlayersProgress(),
-                            const SizedBox(height: 18),
-                            _buildSimpleRow(
-                              icon: Icons.emoji_events_outlined,
-                              text: 'S/ 250 en premios',
-                            ),
-                            const SizedBox(height: 12),
-                            _buildSimpleRow(
-                              icon: Icons.monetization_on_outlined,
-                              text: 'S/.60',
-                            ),
-                            const SizedBox(height: 22),
-                            _buildPlayersPreview(),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  if (isPaid) {
-                                    return;
-                                  }
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const TournamentRegisterScreen(),
-                                    ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD7FF59),
-                                  foregroundColor: AppColors.SecondBlue,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(28),
-                                  ),
-                                ),
-                                child: Text(
-                                  isPaid ? 'IR AL PARTIDO' : 'UNIRME',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildMessageCard(
+                          icon: Icons.warning_amber_rounded,
+                          title: 'No pudimos actualizar el torneo',
+                          subtitle: _loadError!,
                         ),
                       ),
-                    ],
-                  ),
+                    const SizedBox(height: 6),
+                    _buildLocationRow(),
+                    const SizedBox(height: 14),
+                    _buildDivider(),
+                    const SizedBox(height: 16),
+                    _buildPlayersProgress(),
+                    const SizedBox(height: 18),
+                    _buildSimpleRow(
+                      icon: Icons.emoji_events_outlined,
+                      text: _prize,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSimpleRow(
+                      icon: Icons.monetization_on_outlined,
+                      text: _entryFee,
+                    ),
+                    const SizedBox(height: 22),
+                    _buildPlayersPreview(),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (widget.isPaid) return;
+                          _handleRegisterTap(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD7FF59),
+                          foregroundColor: AppColors.SecondBlue,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: Text(
+                          widget.isPaid ? 'IR AL PARTIDO' : 'UNIRME',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              _buildBottomNavigation(context),
             ],
           ),
         ),
@@ -129,7 +245,40 @@ class TournamentDescriptionScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _handleRegisterTap(BuildContext context) async {
+    final currentTournament = _currentTournament;
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => TournamentRegisterScreen(
+          tournament: currentTournament,
+        ),
+      ),
+    );
+
+    if (result != true || currentTournament == null || !context.mounted) {
+      return;
+    }
+
+    try {
+      final refreshed = await TournamentService().getTournament(currentTournament.id);
+      if (!mounted) return;
+      setState(() {
+        _tournament = refreshed;
+      });
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La inscripcion se registro, pero no pudimos refrescar el torneo.',
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildHero() {
+    final bytes = tryDecodeDataUrl(_photoUrl);
     return SizedBox(
       height: 240,
       child: Stack(
@@ -137,21 +286,38 @@ class TournamentDescriptionScreen extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-            child: Image.asset(
-              'assets/images/trigal_onepadel.png',
-              fit: BoxFit.cover,
-            ),
+            child: _photoUrl.isNotEmpty
+                ? _photoUrl.startsWith('http')
+                    ? Image.network(
+                        _photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/images/trigal_onepadel.png',
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : (bytes != null
+                        ? Image.memory(bytes, fit: BoxFit.cover)
+                        : Image.asset(
+                            'assets/images/trigal_onepadel.png',
+                            fit: BoxFit.cover,
+                          ))
+                : Image.asset(
+                    'assets/images/trigal_onepadel.png',
+                    fit: BoxFit.cover,
+                  ),
           ),
           Container(
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(34)),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(0.14),
-                  Colors.black.withOpacity(0.55),
+                  Colors.black.withValues(alpha: 0.14),
+                  Colors.black.withValues(alpha: 0.55),
                 ],
               ),
             ),
@@ -162,30 +328,30 @@ class TournamentDescriptionScreen extends StatelessWidget {
             bottom: 10,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Torneo PGO',
-                  style: TextStyle(
+                  _title,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  '4TA categoria',
-                  style: TextStyle(
+                  '${_category.toUpperCase()} categoria',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   children: [
-                    _HeroChip(text: '1 buscando dupla'),
-                    SizedBox(width: 10),
-                    _HeroChip(text: '3 amigos inscritos'),
+                    _HeroChip(text: _statusChipText),
+                    const SizedBox(width: 10),
+                    _HeroChip(text: _capitalize(_format)),
                   ],
                 ),
               ],
@@ -226,9 +392,10 @@ class TournamentDescriptionScreen extends StatelessWidget {
           Expanded(
             child: InkWell(
               onTap: () {
-                Navigator.of(context).push(
+                Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const TournamentBracketScreen(),
+                    builder: (context) =>
+                        TournamentBracketScreen(tournament: _currentTournament),
                   ),
                 );
               },
@@ -236,7 +403,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
                 child: Text(
                   'Bracket',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -247,9 +414,10 @@ class TournamentDescriptionScreen extends StatelessWidget {
           Expanded(
             child: InkWell(
               onTap: () {
-                Navigator.of(context).push(
+                Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const TournamentLiveScreen(),
+                    builder: (context) =>
+                        TournamentLiveScreen(tournament: _currentTournament),
                   ),
                 );
               },
@@ -257,7 +425,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
                 child: Text(
                   'En vivo',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -268,9 +436,10 @@ class TournamentDescriptionScreen extends StatelessWidget {
           Expanded(
             child: InkWell(
               onTap: () {
-                Navigator.of(context).push(
+                Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const TournamentProfileScreen(),
+                    builder: (context) =>
+                        TournamentProfileScreen(tournament: _currentTournament),
                   ),
                 );
               },
@@ -278,7 +447,7 @@ class TournamentDescriptionScreen extends StatelessWidget {
                 child: Text(
                   'Jugadores',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.84),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -294,29 +463,29 @@ class TournamentDescriptionScreen extends StatelessWidget {
   Widget _buildLocationRow() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Icon(
+      children: [
+        const Icon(
           Icons.location_on_outlined,
           size: 22,
           color: Color(0xFFA8B1C1),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'One Padel Trigal',
-                style: TextStyle(
+                _location,
+                style: const TextStyle(
                   color: AppColors.SecondBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
-                'Lunes 19 Dic',
-                style: TextStyle(
+                _formattedDate,
+                style: const TextStyle(
                   color: AppColors.SecondBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -330,6 +499,10 @@ class TournamentDescriptionScreen extends StatelessWidget {
   }
 
   Widget _buildPlayersProgress() {
+    final progress = _playerCapacity <= 0
+        ? 0.0
+        : (_registrationsCount / _playerCapacity).clamp(0.0, 1.0);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -343,9 +516,9 @@ class TournamentDescriptionScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '8 de 16 jugadores',
-                style: TextStyle(
+              Text(
+                '$_registrationsCount de $_playerCapacity jugadores',
+                style: const TextStyle(
                   color: AppColors.SecondBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -356,15 +529,14 @@ class TournamentDescriptionScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
                 child: SizedBox(
                   height: 10,
-                  child: Row(
-                    children: const [
-                      Expanded(
-                        flex: 8,
-                        child: ColoredBox(color: Color(0xFFD7FF59)),
-                      ),
-                      Expanded(
-                        flex: 8,
-                        child: ColoredBox(color: Color(0xFFAAB5CB)),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const ColoredBox(color: Color(0xFFAAB5CB)),
+                      FractionallySizedBox(
+                        widthFactor: progress,
+                        alignment: Alignment.centerLeft,
+                        child: const ColoredBox(color: AppColors.PrimaryGreen),
                       ),
                     ],
                   ),
@@ -402,71 +574,96 @@ class TournamentDescriptionScreen extends StatelessWidget {
   }
 
   Widget _buildPlayersPreview() {
+    if (_players.isEmpty) {
+      return _buildMessageCard(
+        icon: Icons.person_off_outlined,
+        title: 'Aun no hay jugadores inscritos',
+        subtitle: 'Los participantes apareceran aqui cuando se unan al torneo.',
+      );
+    }
+
+    final previewPlayers = _players.take(4).toList();
+    final remaining = _players.length - previewPlayers.length;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          _PreviewPlayer(label: 'Romario', image: true),
-          SizedBox(width: 8),
-          _PreviewPlayer(label: 'Jugador 2'),
-          SizedBox(width: 8),
-          _PreviewPlayer(label: 'Jugador 3'),
-          SizedBox(width: 8),
-          _PreviewPlayer(label: 'Jugador 4'),
-          SizedBox(width: 8),
-          _PreviewPlayer(label: 'Jugador 3'),
-          SizedBox(width: 8),
-          _PreviewMore(text: '+8 mas'),
+        children: [
+          ...previewPlayers.map(
+            (player) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _PreviewPlayer(
+                label: player.name,
+                photoUrl: player.photoUrl,
+              ),
+            ),
+          ),
+          if (remaining > 0) _PreviewMore(text: '+$remaining mas'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: AppColors.SecondBlue.withValues(alpha: 0.7)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.68),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildBottomNavigation(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF7F7F8),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              IconButton(
-                onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                icon: const Icon(
-                  Icons.home,
-                  color: Color(0xFF7D8491),
-                  size: 34,
-                ),
-              ),
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: AppColors.SecondBlue.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(
-                  Icons.emoji_events,
-                  color: AppColors.SecondBlue,
-                  size: 34,
-                ),
-              ),
-              const Icon(
-                Icons.person,
-                color: Color(0xFF7D8491),
-                size: 34,
-              ),
-            ],
-          ),
-        ),
-      ),
+    return PgoBottomNav(
+      currentTab: PgoNavTab.tournaments,
+      onHomeTap: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      },
+      onTournamentsTap: () {},
+      onProfileTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+        );
+      },
     );
   }
 
@@ -480,16 +677,19 @@ class TournamentDescriptionScreen extends StatelessWidget {
 }
 
 class _PreviewPlayer extends StatelessWidget {
-  final String label;
-  final bool image;
-
   const _PreviewPlayer({
     required this.label,
-    this.image = false,
+    this.photoUrl,
   });
+
+  final String label;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
+    final bytes = tryDecodeDataUrl(photoUrl);
+    final hasNetwork = photoUrl != null && photoUrl!.startsWith('http');
+
     return SizedBox(
       width: 42,
       child: Column(
@@ -506,12 +706,21 @@ class _PreviewPlayer extends StatelessWidget {
               ),
             ),
             child: ClipOval(
-              child: image
-                  ? Image.asset(
-                      'assets/images/Logo_Icono.png',
+              child: hasNetwork
+                  ? Image.network(
+                      photoUrl!,
                       fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        'assets/images/Logo_Icono.png',
+                        fit: BoxFit.cover,
+                      ),
                     )
-                  : Container(color: const Color(0xFFAAB5CB)),
+                  : (bytes != null
+                      ? Image.memory(bytes, fit: BoxFit.cover)
+                      : Image.asset(
+                          'assets/images/Logo_Icono.png',
+                          fit: BoxFit.cover,
+                        )),
             ),
           ),
           const SizedBox(height: 6),
@@ -533,11 +742,11 @@ class _PreviewPlayer extends StatelessWidget {
 }
 
 class _PreviewMore extends StatelessWidget {
-  final String text;
-
   const _PreviewMore({
     required this.text,
   });
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -562,18 +771,18 @@ class _PreviewMore extends StatelessWidget {
 }
 
 class _HeroChip extends StatelessWidget {
-  final String text;
-
   const _HeroChip({
     required this.text,
   });
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(

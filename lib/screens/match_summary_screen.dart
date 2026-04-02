@@ -1,113 +1,136 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
-import 'home_screen.dart';
+import '../models/match_record.dart';
+import '../models/selected_player.dart';
+import 'main_shell.dart';
+import '../widgets/pgo_bottom_nav.dart';
+import '../widgets/pgo_header_scaffold.dart';
+import '../widgets/pgo_options_menu.dart';
 
 class MatchSummaryScreen extends StatelessWidget {
-  final String matchDate;
-
   const MatchSummaryScreen({
-    Key? key,
+    super.key,
     required this.matchDate,
-  }) : super(key: key);
+    required this.match,
+    required this.players,
+    required this.winnerTeam,
+  });
+
+  final String matchDate;
+  final MatchRecord match;
+  final List<SelectedPlayer> players;
+  final int winnerTeam;
+
+  int get _team1Games => match.games.fold<int>(
+      0, (total, game) => total + ((game['team1'] as num?)?.toInt() ?? 0));
+
+  int get _team2Games => match.games.fold<int>(
+      0, (total, game) => total + ((game['team2'] as num?)?.toInt() ?? 0));
+
+  List<SelectedPlayer> get _winnerPlayers => winnerTeam == 1
+      ? players.take(2).toList()
+      : players.skip(2).take(2).toList();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.SecondBlue,
-      appBar: AppBar(
-        backgroundColor: AppColors.SecondBlue,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Actividad',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
+    return PgoHeaderScaffold(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
       ),
-      body: SafeArea(
-        top: false,
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F3F5),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 26),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeroCard(),
-                Transform.translate(
-                  offset: const Offset(0, -28),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 26),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildScoreCard(),
-                        const SizedBox(height: 18),
-                        _buildInfoCard(),
+      title: const Text(
+        'Actividad',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      actions: const [PgoOptionsMenuButton()],
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFFF2F3F5),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 26),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeroCard(),
+              Transform.translate(
+                offset: const Offset(0, -28),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 26),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildScoreCard(),
+                      const SizedBox(height: 18),
+                      _buildInfoCard(),
+                      if (match.description != null &&
+                          match.description!.trim().isNotEmpty) ...[
                         const SizedBox(height: 14),
                         const Text(
-                          'Jugadores',
+                          'Descripcion',
                           style: TextStyle(
                             color: AppColors.SecondBlue,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        _buildPlayersRow(),
-                        const SizedBox(height: 22),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder: (context) => const HomeScreen(),
-                                ),
-                                (route) => false,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFD7FF59),
-                              foregroundColor: AppColors.SecondBlue,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
+                        const SizedBox(height: 10),
+                        _buildDescriptionCard(),
+                      ],
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Jugadores',
+                        style: TextStyle(
+                          color: AppColors.SecondBlue,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPlayersRow(),
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            MainShell.openReplacement(
+                              context,
+                              initialTab: PgoNavTab.home,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD7FF59),
+                            foregroundColor: AppColors.SecondBlue,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
                             ),
-                            child: const Text(
-                              'REGRESAR AL INICIO',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          ),
+                          child: const Text(
+                            'REGRESAR AL INICIO',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -119,11 +142,10 @@ class MatchSummaryScreen extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-          child: Image.asset(
-            'assets/images/trigal_onepadel.png',
+          child: SizedBox(
             width: double.infinity,
             height: 330,
-            fit: BoxFit.cover,
+            child: _buildHeroImage(),
           ),
         ),
         Container(
@@ -136,7 +158,7 @@ class MatchSummaryScreen extends StatelessWidget {
               colors: [
                 Colors.transparent,
                 Colors.transparent,
-                Colors.black.withOpacity(0.42),
+                Colors.black.withValues(alpha: 0.42),
               ],
             ),
           ),
@@ -148,9 +170,11 @@ class MatchSummaryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Match competitivo',
-                style: TextStyle(
+              Text(
+                match.matchType == 'RANKED'
+                    ? 'Match competitivo'
+                    : 'Match amistoso',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -172,6 +196,33 @@ class MatchSummaryScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildHeroImage() {
+    final photoUrl = match.photoUrl;
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return Image.asset(
+        'assets/images/trigal_onepadel.png',
+        fit: BoxFit.cover,
+      );
+    }
+
+    final memoryBytes = _tryDecodeDataUrl(photoUrl);
+    if (memoryBytes != null) {
+      return Image.memory(
+        memoryBytes,
+        fit: BoxFit.cover,
+      );
+    }
+
+    return Image.network(
+      photoUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Image.asset(
+        'assets/images/trigal_onepadel.png',
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+
   Widget _buildScoreCard() {
     return Container(
       width: double.infinity,
@@ -181,7 +232,7 @@ class MatchSummaryScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.09),
+            color: Colors.black.withValues(alpha: 0.09),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -199,10 +250,10 @@ class MatchSummaryScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Center(
+          Center(
             child: Text(
-              '3 - 1',
-              style: TextStyle(
+              '$_team1Games - $_team2Games',
+              style: const TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 42,
                 fontWeight: FontWeight.w900,
@@ -225,15 +276,17 @@ class MatchSummaryScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Wrap(
+          Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              _GamePill(score: '6 - 2'),
-              _GamePill(score: '7 - 5'),
-              _GamePill(score: '5 - 7'),
-              _GamePill(score: '10 - 3'),
-            ],
+            children: match.games
+                .map(
+                  (game) => _GamePill(
+                    score:
+                        '${(game['team1'] as num?)?.toInt() ?? 0} - ${(game['team2'] as num?)?.toInt() ?? 0}',
+                  ),
+                )
+                .toList(),
           ),
         ],
       ),
@@ -241,13 +294,16 @@ class MatchSummaryScreen extends StatelessWidget {
   }
 
   Widget _buildInfoCard() {
+    final winnerReference =
+        _winnerPlayers.isNotEmpty ? _winnerPlayers.first : null;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -268,9 +324,9 @@ class MatchSummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  '4ta categoría',
+                  winnerReference?.category ?? 'Sin categoria',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.72),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.72),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -284,9 +340,9 @@ class MatchSummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '#188 (+2)',
+                  '#${winnerReference?.rankingPosition ?? 0}',
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.48),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.48),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -311,9 +367,9 @@ class MatchSummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'One Padel Olguín',
+                  match.clubName,
                   style: TextStyle(
-                    color: AppColors.SecondBlue.withOpacity(0.72),
+                    color: AppColors.SecondBlue.withValues(alpha: 0.72),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -325,20 +381,55 @@ class MatchSummaryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlayersRow() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _SummaryPlayer(
-          label: 'Romario',
-          imageAsset: 'assets/images/Logo_Icono.png',
-          selected: true,
+  Widget _buildDescriptionCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        match.description!.trim(),
+        style: TextStyle(
+          color: AppColors.SecondBlue.withValues(alpha: 0.8),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
-        _SummaryPlayer(label: 'Jugador 2'),
-        _SummaryPlayer(label: 'Jugador 3'),
-        _SummaryPlayer(label: 'Jugador 4'),
-      ],
+      ),
     );
+  }
+
+  Widget _buildPlayersRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: players
+          .map(
+            (player) => _SummaryPlayer(
+              label: player.name,
+              imageUrl: player.photoUrl,
+              selected: _winnerPlayers.any((winner) => winner.id == player.id),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Uint8List? _tryDecodeDataUrl(String value) {
+    if (!value.startsWith('data:image/')) {
+      return null;
+    }
+
+    final commaIndex = value.indexOf(',');
+    if (commaIndex == -1) {
+      return null;
+    }
+
+    try {
+      return base64Decode(value.substring(commaIndex + 1));
+    } catch (_) {
+      return null;
+    }
   }
 }
 
@@ -371,12 +462,12 @@ class _GamePill extends StatelessWidget {
 
 class _SummaryPlayer extends StatelessWidget {
   final String label;
-  final String? imageAsset;
+  final String? imageUrl;
   final bool selected;
 
   const _SummaryPlayer({
     required this.label,
-    this.imageAsset,
+    this.imageUrl,
     this.selected = false,
   });
 
@@ -402,12 +493,13 @@ class _SummaryPlayer extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: Color(0xFFAAB5CB),
               ),
-              child: imageAsset == null
+              child: imageUrl == null || imageUrl!.isEmpty
                   ? null
                   : ClipOval(
-                      child: Image.asset(
-                        imageAsset!,
+                      child: Image.network(
+                        imageUrl!,
                         fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
                     ),
             ),
