@@ -10,6 +10,7 @@ import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'profile_screen.dart';
+import 'tournament_admin_screen.dart';
 import 'tournament_create_flow_screen.dart';
 import 'tournament_description_screen.dart';
 
@@ -243,6 +244,16 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                                                         tournament,
                                                   ),
                                                 )
+                                              : _showMyTournaments &&
+                                                      _myTournamentTab ==
+                                                          _MyTournamentTab
+                                                              .created
+                                                  ? MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          TournamentAdminScreen(
+                                                        tournament: tournament,
+                                                      ),
+                                                    )
                                               : MaterialPageRoute(
                                                   builder: (context) =>
                                                       TournamentDescriptionScreen(

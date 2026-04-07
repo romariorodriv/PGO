@@ -122,6 +122,10 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
   }
 
   String get _statusChipText {
+    if (_currentTournament?.status == 'PUBLISHED' &&
+        _currentTournament?.registrationsOpen == false) {
+      return 'inscripciones cerradas';
+    }
     switch (_currentTournament?.status) {
       case 'DRAFT':
         return 'borrador';
@@ -215,7 +219,10 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
                       height: 56,
                       child: ElevatedButton(
                         onPressed: () {
-                          if (widget.isPaid) return;
+                          if (widget.isPaid ||
+                              _currentTournament?.registrationsOpen == false) {
+                            return;
+                          }
                           _handleRegisterTap(context);
                         },
                         style: ElevatedButton.styleFrom(
@@ -227,7 +234,11 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
                           ),
                         ),
                         child: Text(
-                          widget.isPaid ? 'IR AL PARTIDO' : 'UNIRME',
+                          widget.isPaid
+                              ? 'IR AL PARTIDO'
+                              : (_currentTournament?.registrationsOpen == false
+                                  ? 'INSCRIPCIONES CERRADAS'
+                                  : 'UNIRME'),
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,

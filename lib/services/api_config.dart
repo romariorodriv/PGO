@@ -5,6 +5,14 @@ class ApiConfig {
     'API_BASE_URL',
     defaultValue: '',
   );
+  static const String googleClientId = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+    defaultValue: '',
+  );
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '',
+  );
 
   static String get baseUrl {
     if (_overrideBaseUrl.isNotEmpty) {
@@ -22,4 +30,10 @@ class ApiConfig {
         return 'http://localhost:3001/api';
     }
   }
+
+  static String? get googleClientIdOrNull =>
+      googleClientId.isEmpty ? null : googleClientId;
+
+  static String? get googleServerClientIdOrNull =>
+      googleServerClientId.isEmpty ? null : googleServerClientId;
 }

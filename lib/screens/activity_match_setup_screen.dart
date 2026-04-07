@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
@@ -275,7 +277,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
     }
 
     try {
-      final users = await _communityService.searchCommunity(code.trim());
+      final qrQuery = _extractQrQuery(code.trim());
+      final users = await _communityService.searchCommunity(qrQuery);
       if (!mounted) return;
       if (users.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -284,7 +287,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
         return;
       }
 
-      final normalized = code.trim().toLowerCase();
+      final normalized = qrQuery.toLowerCase();
       final user = users.firstWhere(
         (item) =>
             item.id.toLowerCase() == normalized ||
@@ -301,6 +304,21 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
         ),
       );
     }
+  }
+
+  String _extractQrQuery(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        final id = decoded['id'] as String?;
+        final email = decoded['email'] as String?;
+        final name = decoded['name'] as String?;
+        if (id != null && id.trim().isNotEmpty) return id.trim();
+        if (email != null && email.trim().isNotEmpty) return email.trim();
+        if (name != null && name.trim().isNotEmpty) return name.trim();
+      }
+    } catch (_) {}
+    return raw;
   }
 
   @override

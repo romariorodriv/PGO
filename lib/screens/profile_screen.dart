@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -365,7 +367,12 @@ class _ProfileHeroCard extends StatelessWidget {
   }
 
   void _showProfileQr(BuildContext context) {
-    final qrValue = profile.id;
+    final qrValue = jsonEncode({
+      'type': 'player',
+      'id': profile.id,
+      'email': profile.email,
+      'name': profile.name,
+    });
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -451,7 +458,7 @@ class _ProfileHeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'ID: $qrValue',
+                  'ID: ${profile.id}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.SecondBlue.withValues(alpha: 0.52),

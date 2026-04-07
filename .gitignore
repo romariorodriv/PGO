@@ -96,6 +96,7 @@ app.*.map.json
 
 # Web
 lib/generated_plugin_registrant.dart
+package-lock.json
 
 # coverage
 coverage/

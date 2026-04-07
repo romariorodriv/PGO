@@ -9,6 +9,7 @@ import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'activity_screen.dart';
+import 'profile_history_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_description_screen.dart';
 import 'tournaments_screen.dart';
@@ -145,6 +146,48 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${weekDays[local.weekday - 1]} ${local.day} ${months[local.month - 1]}';
   }
 
+  Future<void> _openActivity() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ActivityScreen(),
+      ),
+    );
+    if (!mounted) return;
+    _loadProfile();
+  }
+
+  Future<void> _openHistory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ProfileHistoryScreen(),
+      ),
+    );
+    if (!mounted) return;
+    _loadProfile();
+  }
+
+  Future<void> _openRecommendedTournament() async {
+    final tournament = _recommendedTournament;
+    if (tournament == null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const TournamentsScreen(),
+        ),
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => TournamentDescriptionScreen(
+            tournament: tournament,
+          ),
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    _loadProfile();
+  }
+
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
@@ -187,24 +230,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Color(0xFFF2F3F5),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(30, 28, 30, 20),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.sizeOf(context).height -
-                        (topInset + AppColors.headerToolbarHeight) -
-                        96,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeaderSection(),
-                      const SizedBox(height: 46),
-                      _buildWeeklySummarySection(),
-                      const SizedBox(height: 18),
-                      _buildSuggestionsSection(),
-                      const SizedBox(height: 18),
-                    ],
+              child: RefreshIndicator(
+                onRefresh: _loadProfile,
+                color: AppColors.SecondBlue,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(30, 28, 30, 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.sizeOf(context).height -
+                          (topInset + AppColors.headerToolbarHeight) -
+                          96,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeaderSection(),
+                        const SizedBox(height: 46),
+                        _buildWeeklySummarySection(),
+                        const SizedBox(height: 18),
+                        _buildSuggestionsSection(),
+                        const SizedBox(height: 18),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -273,13 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 282,
                 height: 62,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const ActivityScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _openActivity,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD7FF59),
                     foregroundColor: AppColors.SecondBlue,
@@ -434,12 +476,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: Text(
-                        'Ver historial ->',
-                        style: TextStyle(
-                          color: AppColors.SecondBlue.withValues(alpha: 0.9),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                      child: TextButton(
+                        onPressed: _openHistory,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.SecondBlue,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          minimumSize: Size.zero,
+                        ),
+                        child: Text(
+                          'Ver historial ->',
+                          style: TextStyle(
+                            color: AppColors.SecondBlue.withValues(alpha: 0.9),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -513,43 +567,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               tournament?.title ?? 'Sin torneos recomendados',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 15,
+                                height: 1,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             SizedBox(
                               width: 118,
-                              height: 32,
+                              height: 28,
                               child: ElevatedButton(
-                                onPressed: () {
-                                  if (tournament != null) {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            TournamentDescriptionScreen(
-                                          tournament: tournament,
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const TournamentsScreen(),
-                                      ),
-                                    );
-                                  }
-                                },
+                                onPressed: _openRecommendedTournament,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFD7FF59),
                                   foregroundColor: AppColors.SecondBlue,
                                   elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(17),
                                   ),
@@ -557,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: const Text(
                                   'Ver mas torneos',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -576,7 +618,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? 'Sin recomendacion'
                                 : '${tournament.registrationsCount} inscritos',
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           _InfoChip(
                             icon: Icons.sports_tennis,
                             text: tournament == null
@@ -718,7 +760,7 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(12),
@@ -734,9 +776,11 @@ class _InfoChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: FontWeight.w700,
             ),
           ),

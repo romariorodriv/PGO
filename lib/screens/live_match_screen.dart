@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
@@ -36,28 +38,43 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   int _team1TieBreakPoints = 0;
   int _team2TieBreakPoints = 0;
   bool _isTieBreak = false;
-  bool _useGoldenPoint = true;
+  final bool _useGoldenPoint = true;
   bool _isSidesSwapped = false;
   bool _isSaving = false;
+  int? _tieBreakFirstServingTeam;
   final List<Map<String, int>> _completedSets = [];
   final List<_LiveScoreSnapshot> _history = [];
+  final Stopwatch _matchTimer = Stopwatch();
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
     _servingTeam = widget.initialServingTeam;
+    _matchTimer.start();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    _matchTimer.stop();
+    super.dispose();
   }
 
   String get _team1PointsLabel => _buildPointLabel(1);
   String get _team2PointsLabel => _buildPointLabel(2);
+
   int? get _matchWinnerTeam {
-    if (_team1Sets == _team2Sets) return null;
-    if (_completedSets.isEmpty) return null;
-    return _team1Sets > _team2Sets ? 1 : 2;
+    if (_team1Sets >= 2) return 1;
+    if (_team2Sets >= 2) return 2;
+    return null;
   }
 
   bool get _canFinish => _matchWinnerTeam != null && !_isTieBreak;
-
   int get _leftTeam => _isSidesSwapped ? 2 : 1;
   int get _rightTeam => _isSidesSwapped ? 1 : 2;
 
@@ -66,10 +83,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
       'Domingo',
       'Lunes',
       'Martes',
-      'Miercoles',
+      'Miércoles',
       'Jueves',
       'Viernes',
-      'Sabado',
+      'Sábado',
     ];
     const months = [
       'Enero',
@@ -128,6 +145,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
         servingTeam: _servingTeam,
         isTieBreak: _isTieBreak,
         isSidesSwapped: _isSidesSwapped,
+        tieBreakFirstServingTeam: _tieBreakFirstServingTeam,
         completedSets: _completedSets
             .map((item) => {'team1': item['team1']!, 'team2': item['team2']!})
             .toList(),
@@ -154,6 +172,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
         } else {
           _team2TieBreakPoints += 1;
         }
+        _applyTieBreakFlowRules();
         _tryCompleteTieBreakSet();
         return;
       }
@@ -213,6 +232,30 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     }
   }
 
+  void _applyTieBreakFlowRules() {
+    final totalPoints = _team1TieBreakPoints + _team2TieBreakPoints;
+    if (totalPoints <= 0 || _tieBreakFirstServingTeam == null) {
+      return;
+    }
+
+    if (totalPoints % 6 == 0) {
+      _isSidesSwapped = !_isSidesSwapped;
+    }
+
+    _servingTeam =
+        _resolveTieBreakServingTeam(totalPoints, _tieBreakFirstServingTeam!);
+  }
+
+  int _resolveTieBreakServingTeam(int totalPointsPlayed, int firstServingTeam) {
+    if (totalPointsPlayed <= 0) {
+      return firstServingTeam;
+    }
+
+    final secondServingTeam = firstServingTeam == 1 ? 2 : 1;
+    final block = (totalPointsPlayed - 1) ~/ 2;
+    return block.isEven ? secondServingTeam : firstServingTeam;
+  }
+
   void _winGame(int team) {
     if (team == 1) {
       _team1Games += 1;
@@ -223,11 +266,15 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     _team1Points = 0;
     _team2Points = 0;
     _servingTeam = _servingTeam == 1 ? 2 : 1;
+    if ((_team1Games + _team2Games).isOdd) {
+      _isSidesSwapped = !_isSidesSwapped;
+    }
 
     if (_team1Games == 6 && _team2Games == 6) {
       _isTieBreak = true;
       _team1TieBreakPoints = 0;
       _team2TieBreakPoints = 0;
+      _tieBreakFirstServingTeam = _servingTeam;
       return;
     }
 
@@ -259,6 +306,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     _team1TieBreakPoints = 0;
     _team2TieBreakPoints = 0;
     _isTieBreak = false;
+    _tieBreakFirstServingTeam = null;
   }
 
   void _undo() {
@@ -277,6 +325,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
       _servingTeam = previous.servingTeam;
       _isTieBreak = previous.isTieBreak;
       _isSidesSwapped = previous.isSidesSwapped;
+      _tieBreakFirstServingTeam = previous.tieBreakFirstServingTeam;
       _completedSets
         ..clear()
         ..addAll(
@@ -294,31 +343,11 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   }
 
   void _toggleSides() {
-    setState(() {
-      _pushHistory();
-      _isSidesSwapped = !_isSidesSwapped;
-    });
-  }
-
-  void _toggleGoldenPoint() {
-    if (_team1Points > 0 ||
-        _team2Points > 0 ||
-        _team1Games > 0 ||
-        _team2Games > 0 ||
-        _completedSets.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Solo puedes cambiar la regla de deuce antes de iniciar el partido.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _useGoldenPoint = !_useGoldenPoint;
-    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('El cambio de lado ahora es automatico.'),
+      ),
+    );
   }
 
   Future<void> _finishLiveMatch() async {
@@ -326,7 +355,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     if (winnerTeam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Completa al menos un set valido antes de finalizar'),
+          content: Text('Completa al menos un set válido antes de finalizar'),
         ),
       );
       return;
@@ -380,6 +409,30 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     }
   }
 
+  List<SelectedPlayer> get _team1Players => widget.players.take(2).toList();
+  List<SelectedPlayer> get _team2Players => widget.players.skip(2).take(2).toList();
+  List<SelectedPlayer> get _leftTeamPlayers =>
+      _leftTeam == 1 ? _team1Players : _team2Players;
+  List<SelectedPlayer> get _rightTeamPlayers =>
+      _rightTeam == 1 ? _team1Players : _team2Players;
+
+  String get _setsLabel => '$_team1Sets - $_team2Sets';
+  String get _gamesLabel => '$_team1Games - $_team2Games';
+  String get _serviceLabel => 'Equipo $_servingTeam';
+  String get _modeLabel => _useGoldenPoint ? 'Golden point' : 'Ventaja';
+
+  String get _smallCenterTopText {
+    final elapsed = _matchTimer.elapsed;
+    final minutes = elapsed.inMinutes;
+    final seconds = elapsed.inSeconds % 60;
+    if (minutes > 0) {
+      return '$minutes:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${seconds.toString().padLeft(2, '0')}s';
+  }
+
+  String get _smallCenterBottomText => '$_team1Sets-$_team2Sets';
+
   @override
   Widget build(BuildContext context) {
     return PgoHeaderScaffold(
@@ -387,12 +440,12 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: Text(
-        widget.match.clubName,
-        style: const TextStyle(
+      title: const Text(
+        'Cancha 2',
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
         ),
       ),
       bottomNavigationBar: PgoBottomNav(
@@ -415,202 +468,186 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
             color: Color(0xFFF4F5F7),
             borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(26, 12, 26, 28),
-            child: Column(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD01111),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'LIVE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: Stack(
-                    alignment: Alignment.topCenter,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 18),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _leftTeam == 1
-                                    ? _team1PointsLabel
-                                    : _team2PointsLabel,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.SecondBlue,
-                                  fontSize: 78,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1,
-                                ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD81414),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.10),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
                               ),
-                            ),
-                            const SizedBox(width: 94),
-                            Expanded(
-                              child: Text(
-                                _rightTeam == 1
-                                    ? _team1PointsLabel
-                                    : _team2PointsLabel,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.SecondBlue,
-                                  fontSize: 78,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      _buildCenterScoreCard(),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: _displayedPlayers
-                      .map(
-                        (player) => _ScorePlayer(
-                          label: player.name,
-                          imageUrl: player.photoUrl,
-                          selected: player.id == _leftTeamPlayers.first.id,
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 22),
-                _buildInfoCard(),
-                const SizedBox(height: 28),
-                _ActionPill(
-                  label:
-                      '+ Punto ${_leftTeamPlayers[0].name} / ${_leftTeamPlayers[1].name}',
-                  filled: true,
-                  onTap: () => _addPointToTeam(_leftTeam),
-                ),
-                const SizedBox(height: 14),
-                _ActionPill(
-                  label:
-                      '+ Punto ${_rightTeamPlayers[0].name} / ${_rightTeamPlayers[1].name}',
-                  onTap: () => _addPointToTeam(_rightTeam),
-                ),
-                const SizedBox(height: 22),
-                _SmallPill(
-                  label: 'Deshacer',
-                  onTap: _history.isEmpty ? null : _undo,
-                  width: 130,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _SmallPill(
-                      label: 'Cambiar servicio',
-                      onTap: _toggleService,
-                      width: 130,
-                    ),
-                    _SmallPill(
-                      label: 'Cambiar lado',
-                      onTap: _toggleSides,
-                      width: 130,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: 138,
-                  height: 38,
-                  child: ElevatedButton(
-                    onPressed: _isSaving || !_canFinish ? null : _finishLiveMatch,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD7FF59),
-                      foregroundColor: AppColors.SecondBlue,
-                      disabledBackgroundColor:
-                          const Color(0xFFD7FF59).withValues(alpha: 0.45),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Finalizar',
+                            ],
+                          ),
+                          child: const Text(
+                            'LIVE',
                             style: TextStyle(
+                              color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 10),
+                        _TopScoreSection(
+                          leftScore: _leftTeam == 1
+                              ? _team1PointsLabel
+                              : _team2PointsLabel,
+                          rightScore: _rightTeam == 1
+                              ? _team1PointsLabel
+                              : _team2PointsLabel,
+                          gamesLabel: _gamesLabel,
+                          topText: _smallCenterTopText,
+                          bottomText: _smallCenterBottomText,
+                          leftPlayers: _leftTeamPlayers,
+                          rightPlayers: _rightTeamPlayers,
+                        ),
+                        const SizedBox(height: 18),
+                        _CompactInfoCard(
+                          sets: _setsLabel,
+                          games: _gamesLabel,
+                          servingTeam: _serviceLabel,
+                          mode: _modeLabel,
+                        ),
+                        const SizedBox(height: 18),
+                        _ActionPill(
+                          label:
+                              '+ Punto ${_leftTeamPlayers[0].name} / ${_leftTeamPlayers[1].name}',
+                          filled: true,
+                          onTap: () => _addPointToTeam(_leftTeam),
+                        ),
+                        const SizedBox(height: 12),
+                        _ActionPill(
+                          label:
+                              '+ Punto ${_rightTeamPlayers[0].name} / ${_rightTeamPlayers[1].name}',
+                          onTap: () => _addPointToTeam(_rightTeam),
+                        ),
+                        const SizedBox(height: 18),
+                        _SmallPill(
+                          label: 'Deshacer',
+                          onTap: _history.isEmpty ? null : _undo,
+                          width: 128,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _SmallPill(
+                              label: 'Cambiar servicio',
+                              onTap: _toggleService,
+                              width: 142,
+                            ),
+                            _SmallPill(
+                              label: 'Cambiar lado',
+                              onTap: _toggleSides,
+                              width: 142,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: 126,
+                          height: 36,
+                          child: ElevatedButton(
+                            onPressed:
+                                _isSaving || !_canFinish ? null : _finishLiveMatch,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD7FF59),
+                              foregroundColor: AppColors.SecondBlue,
+                              disabledBackgroundColor:
+                                  const Color(0xFFD7FF59).withValues(alpha: 0.45),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child:
+                                        CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text(
+                                    'Finalizar',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
     );
   }
+}
 
-  List<SelectedPlayer> get _team1Players => widget.players.take(2).toList();
-  List<SelectedPlayer> get _team2Players => widget.players.skip(2).take(2).toList();
-  List<SelectedPlayer> get _leftTeamPlayers =>
-      _leftTeam == 1 ? _team1Players : _team2Players;
-  List<SelectedPlayer> get _rightTeamPlayers =>
-      _rightTeam == 1 ? _team1Players : _team2Players;
-  List<SelectedPlayer> get _displayedPlayers => [
-        ..._leftTeamPlayers,
-        ..._rightTeamPlayers,
-      ];
+class _CenterScoreCard extends StatelessWidget {
+  const _CenterScoreCard({
+    required this.gamesLabel,
+    required this.topText,
+    required this.bottomText,
+  });
 
-  Widget _buildCenterScoreCard() {
+  final String gamesLabel;
+  final String topText;
+  final String bottomText;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          width: 52,
+          height: 20,
           decoration: BoxDecoration(
             color: AppColors.SecondBlue,
             borderRadius: BorderRadius.circular(10),
           ),
+          alignment: Alignment.center,
           child: Text(
-            _isTieBreak ? 'TIE-BREAK' : 'LIVE',
+            topText,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Container(
-          width: 104,
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+          width: 98,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
-                blurRadius: 10,
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -618,19 +655,53 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
           child: Column(
             children: [
               Text(
-                '$_team1Games / $_team2Games',
+                gamesLabel,
                 style: const TextStyle(
                   color: AppColors.SecondBlue,
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              const SizedBox(height: 3),
+              Container(
+                width: double.infinity,
+                height: 1,
+                color: const Color(0xFFD8DEE8),
+              ),
+              const SizedBox(height: 3),
               Text(
-                'Games',
+                _latestSetText(bottomText, 1),
                 style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.68),
-                  fontSize: 12,
+                  color: AppColors.SecondBlue.withValues(alpha: 0.8),
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _latestSetText(bottomText, 2),
+                style: TextStyle(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: 52,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.SecondBlue,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  bottomText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
@@ -640,12 +711,30 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     );
   }
 
-  Widget _buildInfoCard() {
-    final deuceText = _useGoldenPoint ? 'Punto de oro' : 'Ventaja';
+  String _latestSetText(String fallback, int row) {
+    if (row == 1) return fallback == '0-0' ? '6-4' : fallback;
+    return fallback == '0-0' ? '5-7' : fallback;
+  }
+}
 
+class _CompactInfoCard extends StatelessWidget {
+  const _CompactInfoCard({
+    required this.sets,
+    required this.games,
+    required this.servingTeam,
+    required this.mode,
+  });
+
+  final String sets;
+  final String games;
+  final String servingTeam;
+  final String mode;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -659,29 +748,28 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
       ),
       child: Column(
         children: [
-          _InfoRow(label: 'Sets', value: '$_team1Sets - $_team2Sets'),
+          _CompactInfoRow(label: 'Sets', value: sets),
           const SizedBox(height: 8),
-          _InfoRow(label: 'Games', value: '$_team1Games - $_team2Games'),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: const Color(0xFFD8DEE8),
+          ),
           const SizedBox(height: 8),
-          _InfoRow(label: 'Modo', value: _isTieBreak ? 'Tie-break' : deuceText),
+          _CompactInfoRow(label: 'Games', value: games),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Deuce',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              _SmallPill(
-                label: _useGoldenPoint ? 'Punto de oro' : 'Ventaja',
-                onTap: _isTieBreak ? null : _toggleGoldenPoint,
-                width: 132,
-              ),
-            ],
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: const Color(0xFFD8DEE8),
+          ),
+          const SizedBox(height: 8),
+          _CompactInfoRow(label: 'Modo', value: mode),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: const Color(0xFFD8DEE8),
           ),
           const SizedBox(height: 8),
           Row(
@@ -691,21 +779,22 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
                   'Servicio',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
-                    fontSize: 16,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
               const Icon(
                 Icons.sports_tennis,
                 color: Color(0xFFB7D56A),
-                size: 22,
+                size: 20,
               ),
               const SizedBox(width: 6),
               Text(
-                'Equipo $_servingTeam',
+                servingTeam,
                 style: const TextStyle(
                   color: AppColors.SecondBlue,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -713,6 +802,187 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TopScoreSection extends StatelessWidget {
+  const _TopScoreSection({
+    required this.leftScore,
+    required this.rightScore,
+    required this.gamesLabel,
+    required this.topText,
+    required this.bottomText,
+    required this.leftPlayers,
+    required this.rightPlayers,
+  });
+
+  final String leftScore;
+  final String rightScore;
+  final String gamesLabel;
+  final String topText;
+  final String bottomText;
+  final List<SelectedPlayer> leftPlayers;
+  final List<SelectedPlayer> rightPlayers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 26),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      leftScore,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 76,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 108),
+                  Expanded(
+                    child: Text(
+                      rightScore,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 76,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _CenterScoreCard(
+              gamesLabel: gamesLabel,
+              topText: topText,
+              bottomText: bottomText,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: const [
+            Expanded(
+              child: Divider(
+                color: Color(0xFFD4DBE6),
+                thickness: 1,
+                height: 1,
+              ),
+            ),
+            SizedBox(width: 42),
+            Expanded(
+              child: Divider(
+                color: Color(0xFFD4DBE6),
+                thickness: 1,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _TeamPreviewRow(
+                players: leftPlayers,
+                alignStart: true,
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 42,
+              color: const Color(0xFFD4DBE6),
+            ),
+            Expanded(
+              child: _TeamPreviewRow(
+                players: rightPlayers,
+                alignStart: false,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TeamPreviewRow extends StatelessWidget {
+  const _TeamPreviewRow({
+    required this.players,
+    required this.alignStart,
+  });
+
+  final List<SelectedPlayer> players;
+  final bool alignStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment:
+          alignStart ? MainAxisAlignment.start : MainAxisAlignment.end,
+      children: players
+          .map(
+            (player) => Padding(
+              padding: EdgeInsets.only(
+                left: alignStart ? 0 : 8,
+                right: alignStart ? 8 : 0,
+              ),
+              child: _ScorePlayer(
+                label: player.name,
+                imageUrl: player.photoUrl,
+                selected: players.first == player,
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _CompactInfoRow extends StatelessWidget {
+  const _CompactInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -731,12 +1001,12 @@ class _ScorePlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 70,
+      width: 52,
       child: Column(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: const Color(0xFFD4DEED),
               shape: BoxShape.circle,
@@ -753,17 +1023,17 @@ class _ScorePlayer extends StatelessWidget {
                       errorBuilder: (_, __, ___) => const Icon(
                         Icons.person,
                         color: Colors.white,
-                        size: 26,
+                        size: 20,
                       ),
                     )
                   : const Icon(
                       Icons.person,
                       color: Colors.white,
-                      size: 26,
+                      size: 20,
                     ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             label,
             maxLines: 1,
@@ -771,47 +1041,12 @@ class _ScorePlayer extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontSize: 8,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 16,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.SecondBlue,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -831,7 +1066,7 @@ class _ActionPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 48,
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
@@ -840,7 +1075,7 @@ class _ActionPill extends StatelessWidget {
           elevation: filled ? 0 : 3,
           shadowColor: Colors.black.withValues(alpha: 0.14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(26),
           ),
         ),
         child: Text(
@@ -909,6 +1144,7 @@ class _LiveScoreSnapshot {
     required this.servingTeam,
     required this.isTieBreak,
     required this.isSidesSwapped,
+    required this.tieBreakFirstServingTeam,
     required this.completedSets,
   });
 
@@ -923,5 +1159,6 @@ class _LiveScoreSnapshot {
   final int servingTeam;
   final bool isTieBreak;
   final bool isSidesSwapped;
+  final int? tieBreakFirstServingTeam;
   final List<Map<String, int>> completedSets;
 }

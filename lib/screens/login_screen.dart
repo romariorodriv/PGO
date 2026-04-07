@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberUser = false;
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
 
   @override
   void initState() {
@@ -65,6 +66,33 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() {
           _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() {
+      _isGoogleSubmitting = true;
+    });
+
+    try {
+      await AuthService().loginWithGoogle();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MainShell.route(),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleSubmitting = false;
         });
       }
     }
@@ -339,18 +367,39 @@ class _LoginScreenState extends State<LoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildSocialButton('assets/icons/facebook.png'),
+        _buildSocialButton(
+          label: 'F',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Facebook aun no esta disponible')),
+            );
+          },
+        ),
         const SizedBox(width: 20),
-        _buildSocialButton('assets/icons/apple.png'),
+        _buildSocialButton(
+          label: 'A',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Apple aun no esta disponible')),
+            );
+          },
+        ),
         const SizedBox(width: 20),
-        _buildSocialButton('assets/icons/google.png'),
+        _buildSocialButton(
+          label: _isGoogleSubmitting ? '...' : 'G',
+          onTap: _isSubmitting || _isGoogleSubmitting ? null : _handleGoogleLogin,
+        ),
       ],
     );
   }
 
-  Widget _buildSocialButton(String iconPath) {
-    return GestureDetector(
-      onTap: () {},
+  Widget _buildSocialButton({
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(25),
       child: Container(
         width: 50,
         height: 50,
@@ -361,10 +410,14 @@ class _LoginScreenState extends State<LoginScreen> {
             color: AppColors.SecondBlue.withValues(alpha: 0.2),
           ),
         ),
-        child: const Center(
-          child: Icon(
-            Icons.share,
-            color: AppColors.blue,
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.blue,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

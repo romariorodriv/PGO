@@ -4,6 +4,7 @@ import '../constants/colors.dart';
 import '../models/match_record.dart';
 import '../models/selected_player.dart';
 import '../services/match_service.dart';
+import '../utils/padel_rules.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'finish_match_screen.dart';
@@ -24,10 +25,9 @@ class MatchScoreScreen extends StatefulWidget {
 
 class _MatchScoreScreenState extends State<MatchScoreScreen> {
   late DateTime _selectedDate;
-  int? _selectedTeam;
   bool _isSaving = false;
   final List<List<int>> _games = [
-    [6, 2],
+    [0, 0],
   ];
 
   @override
@@ -66,11 +66,14 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     return '$dayName ${_selectedDate.day} de $monthName';
   }
 
-  int get _team1Games => _games.fold<int>(0, (total, game) => total + game[0]);
+  PadelMatchValidationResult get _matchValidation =>
+      PadelRules.validateBestOfThreeMatch(_games);
 
-  int get _team2Games => _games.fold<int>(0, (total, game) => total + game[1]);
+  int get _team1SetsWon => _matchValidation.team1SetsWon;
+  int get _team2SetsWon => _matchValidation.team2SetsWon;
+  int? get _selectedTeam => _matchValidation.winnerTeam;
 
-  bool get _canContinue => _selectedTeam != null;
+  bool get _canContinue => _matchValidation.isValid && _selectedTeam != null;
 
   Future<void> _changeDate() async {
     final result = await showDatePicker(
@@ -96,7 +99,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Editar game ${index + 1}'),
+          title: Text('Editar set ${index + 1}'),
           content: Row(
             children: [
               Expanded(
@@ -125,6 +128,17 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
               onPressed: () {
                 final team1 = int.tryParse(controller1.text) ?? 0;
                 final team2 = int.tryParse(controller2.text) ?? 0;
+                final validation =
+                    PadelRules.validateCompletedSetScore(team1, team2);
+                if (!validation.isValid) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text(validation.error ?? 'Set invalido para padel'),
+                    ),
+                  );
+                  return;
+                }
                 setState(() {
                   _games[index] = [team1, team2];
                 });
@@ -139,6 +153,15 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   }
 
   Future<void> _addGame() async {
+    if (_games.length >= PadelRules.maxSets) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Un partido al mejor de 3 no puede tener mas de 3 sets'),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _games.add([0, 0]);
     });
@@ -146,9 +169,14 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   }
 
   Future<void> _handleContinue() async {
-    if (_selectedTeam == null) {
+    if (!_matchValidation.isValid || _selectedTeam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debes seleccionar el equipo ganador')),
+        SnackBar(
+          content: Text(
+            _matchValidation.error ??
+                'El partido debe tener una pareja ganadora valida.',
+          ),
+        ),
       );
       return;
     }
@@ -231,7 +259,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
               _buildScoreCard(),
               const SizedBox(height: 18),
               const Text(
-                'Ganadores',
+                'Pareja ganadora',
                 style: TextStyle(
                   color: AppColors.SecondBlue,
                   fontSize: 16,
@@ -378,7 +406,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           const SizedBox(height: 2),
           Center(
             child: Text(
-              '$_team1Games - $_team2Games',
+              '$_team1SetsWon - $_team2SetsWon',
               style: const TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 44,
@@ -394,7 +422,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Games',
+            'Sets registrados',
             style: TextStyle(
               color: AppColors.SecondBlue,
               fontSize: 16,
@@ -428,11 +456,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           child: _TeamTab(
             label: 'Equipo 1',
             selected: _selectedTeam == 1,
-            onTap: () {
-              setState(() {
-                _selectedTeam = 1;
-              });
-            },
+            onTap: () {},
           ),
         ),
         const SizedBox(width: 10),
@@ -440,11 +464,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           child: _TeamTab(
             label: 'Equipo 2',
             selected: _selectedTeam == 2,
-            onTap: () {
-              setState(() {
-                _selectedTeam = 2;
-              });
-            },
+            onTap: () {},
           ),
         ),
       ],

@@ -15,11 +15,13 @@ class TournamentRecord {
     required this.entryFee,
     required this.category,
     required this.status,
+    required this.registrationsOpen,
     required this.description,
     required this.photoUrl,
     required this.createdById,
     required this.createdByName,
     required this.registrationsCount,
+    required this.registrationEntries,
     required this.registeredPlayers,
     required this.registrationUserIds,
   });
@@ -39,11 +41,13 @@ class TournamentRecord {
   final int entryFee;
   final String category;
   final String status;
+  final bool registrationsOpen;
   final String? description;
   final String? photoUrl;
   final String? createdById;
   final String? createdByName;
   final int registrationsCount;
+  final List<TournamentRegistrationEntry> registrationEntries;
   final List<TournamentPlayer> registeredPlayers;
   final List<String> registrationUserIds;
 
@@ -52,11 +56,20 @@ class TournamentRecord {
             ?.map((item) => Map<String, dynamic>.from(item as Map))
             .toList() ??
         const <Map<String, dynamic>>[];
-    final registeredPlayers = _extractRegisteredPlayers(rawRegistrations);
-    final registrationUserIds = _extractRegistrationUserIds(rawRegistrations);
+    final activeRegistrations = rawRegistrations
+        .where(
+          (registration) =>
+              (registration['status'] as String? ?? 'PENDING') != 'CANCELED',
+        )
+        .toList();
+    final registrationEntries = activeRegistrations
+        .map(TournamentRegistrationEntry.fromJson)
+        .toList();
+    final registeredPlayers = _extractRegisteredPlayers(activeRegistrations);
+    final registrationUserIds = _extractRegistrationUserIds(activeRegistrations);
     final registrationsCount = registeredPlayers.isNotEmpty
         ? registeredPlayers.length
-        : rawRegistrations.length;
+        : activeRegistrations.length;
 
     return TournamentRecord(
       id: json['id'] as String,
@@ -74,12 +87,14 @@ class TournamentRecord {
       entryFee: (json['entryFee'] as num?)?.toInt() ?? 0,
       category: json['category'] as String? ?? '',
       status: json['status'] as String? ?? '',
+      registrationsOpen: json['registrationsOpen'] as bool? ?? true,
       description: json['description'] as String?,
       photoUrl: json['photoUrl'] as String?,
       createdById: (json['createdBy'] as Map<String, dynamic>?)?['id'] as String?,
       createdByName:
           (json['createdBy'] as Map<String, dynamic>?)?['name'] as String?,
       registrationsCount: registrationsCount,
+      registrationEntries: registrationEntries,
       registeredPlayers: registeredPlayers,
       registrationUserIds: registrationUserIds,
     );
@@ -130,6 +145,53 @@ class TournamentRecord {
     }
 
     return playersById.values.toList();
+  }
+}
+
+class TournamentRegistrationEntry {
+  const TournamentRegistrationEntry({
+    required this.id,
+    required this.mode,
+    required this.status,
+    required this.createdAt,
+    required this.preferredSide,
+    required this.availability,
+    required this.user,
+    required this.partnerUser,
+  });
+
+  final String id;
+  final String mode;
+  final String status;
+  final DateTime? createdAt;
+  final String? preferredSide;
+  final String? availability;
+  final TournamentPlayer user;
+  final TournamentPlayer? partnerUser;
+
+  bool get hasPartner => partnerUser != null;
+
+  String get statusLabel => hasPartner ? 'Dupla completa' : 'Buscando dupla';
+
+  factory TournamentRegistrationEntry.fromJson(Map<String, dynamic> json) {
+    return TournamentRegistrationEntry(
+      id: json['id'] as String? ?? '',
+      mode: json['mode'] as String? ?? 'SOLO',
+      status: json['status'] as String? ?? 'PENDING',
+      createdAt: (json['createdAt'] as String?) != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
+      preferredSide: json['preferredSide'] as String?,
+      availability: json['availability'] as String?,
+      user: TournamentPlayer.fromJson(
+        (json['user'] as Map<String, dynamic>?) ?? const {},
+      ),
+      partnerUser: (json['partnerUser'] as Map<String, dynamic>?) != null
+          ? TournamentPlayer.fromJson(
+              json['partnerUser'] as Map<String, dynamic>,
+            )
+          : null,
+    );
   }
 }
 
