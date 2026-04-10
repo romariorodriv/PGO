@@ -295,9 +295,9 @@ class _HomeScreenState extends State<HomeScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 39,
+              fontSize: 28,
               fontWeight: FontWeight.w900,
-              height: 1,
+              height: 1.1,
             ),
           ),
         ),
@@ -307,8 +307,9 @@ class _HomeScreenState extends State<HomeScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.SecondBlue.withValues(alpha: 0.45),
-            fontSize: 18,
+            fontSize: 11,
             fontWeight: FontWeight.w500,
+            height: 1.2,
           ),
         ),
         const SizedBox(height: 28),
@@ -333,8 +334,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const Text(
                     'REGISTRAR MATCH',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
                     ),
                   ),
                 ),

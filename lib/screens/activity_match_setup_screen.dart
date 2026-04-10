@@ -856,25 +856,6 @@ class _CommunityUserCard extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: alreadySelected
-                    ? const Color(0xFFCED5E2)
-                    : const Color(0xFFD7FF59),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                alreadySelected ? 'OK' : '#${user.rankingPosition}',
-                style: const TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
           ],
         ),
       ),
