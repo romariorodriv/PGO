@@ -4,6 +4,7 @@ import '../constants/colors.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
 import '../widgets/pgo_header_scaffold.dart';
+import 'tournament_registration_result_screen.dart';
 
 class TournamentRegisterSoloScreen extends StatefulWidget {
   const TournamentRegisterSoloScreen({
@@ -75,9 +76,19 @@ class _TournamentRegisterSoloScreenState
         availability: _availability,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inscripcion pendiente registrada.')),
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => TournamentRegistrationResultScreen(
+            tournament: tournament,
+            title: 'Solicitud registrada',
+            message:
+                'Tu inscripcion quedo pendiente mientras encontramos la dupla ideal para este torneo.',
+            badge: 'Solicitud registrada',
+            primaryLabel: 'Volver al torneo',
+          ),
+        ),
       );
+      if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +9,8 @@ import '../models/tournament_record.dart';
 import '../services/community_service.dart';
 import '../services/tournament_service.dart';
 import '../widgets/pgo_header_scaffold.dart';
+import 'qr_scanner_screen.dart';
+import 'tournament_registration_result_screen.dart';
 
 class TournamentRegisterPartnerScreen extends StatefulWidget {
   const TournamentRegisterPartnerScreen({
@@ -33,6 +36,7 @@ class _TournamentRegisterPartnerScreenState
   Timer? _debounce;
   bool _isSearching = false;
   bool _isSubmitting = false;
+  bool _isScanningQr = false;
 
   TournamentRecord? get _tournament => widget.tournament;
   String get _title => _tournament?.title ?? 'Torneo PGO';
@@ -135,13 +139,19 @@ class _TournamentRegisterPartnerScreenState
         partnerUserId: partner.id,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Inscripcion confirmada con ${partner.name}.',
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => TournamentRegistrationResultScreen(
+            tournament: tournament,
+            title: 'Inscripcion confirmada',
+            message:
+                'Tu dupla con ${partner.name} ya quedo confirmada y su cupo esta reservado en el torneo.',
+            badge: 'Dupla confirmada',
+            primaryLabel: 'Volver al torneo',
           ),
         ),
       );
+      if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
@@ -152,6 +162,72 @@ class _TournamentRegisterPartnerScreenState
       if (mounted) {
         setState(() {
           _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  String _extractQueryFromQr(String rawValue) {
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) return '';
+
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic>) {
+        final id = decoded['id']?.toString().trim() ?? '';
+        final email = decoded['email']?.toString().trim() ?? '';
+        final name = decoded['name']?.toString().trim() ?? '';
+        return [id, email, name].firstWhere(
+          (value) => value.isNotEmpty,
+          orElse: () => trimmed,
+        );
+      }
+    } catch (_) {}
+
+    return trimmed;
+  }
+
+  Future<void> _scanPartnerQr() async {
+    final rawValue = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const QrScannerScreen()),
+    );
+
+    if (!mounted || rawValue == null || rawValue.trim().isEmpty) {
+      return;
+    }
+
+    final query = _extractQueryFromQr(rawValue);
+    setState(() {
+      _isScanningQr = true;
+    });
+
+    try {
+      final results = await _communityService.searchCommunity(query);
+      if (!mounted) return;
+      if (results.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No encontramos un jugador para ese QR')),
+        );
+        return;
+      }
+
+      final player = results.first;
+      setState(() {
+        _selectedPartner = player;
+        _results = const [];
+        _searchController.text = player.name;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanningQr = false;
         });
       }
     }
@@ -430,6 +506,34 @@ class _TournamentRegisterPartnerScreenState
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 42,
+                        child: OutlinedButton.icon(
+                          onPressed: _isScanningQr ? null : _scanPartnerQr,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.SecondBlue,
+                            side: BorderSide(
+                              color: AppColors.SecondBlue.withValues(alpha: 0.18),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: _isScanningQr
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.qr_code_scanner_rounded),
+                          label: const Text(
+                            'Agregar pareja por QR',
+                            style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                       ),

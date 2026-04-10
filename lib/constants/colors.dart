@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary colors - white oscuro (como en el diseño PGO)
-  static const Color primary = Color(0xFFf7f8fa);
-  static const Color primaryDark = Color(0xFFf1f3f6);
-  static const Color primaryLight = Color(0xFFe5e7eb);
+  static const Color primary = Color(0xFFF7F8FA);
+  static const Color primaryDark = Color(0xFFF1F3F6);
+  static const Color primaryLight = Color(0xFFE5E7EB);
 
-  static const Color gray = Color(0xFF6b7280);
+  static const Color gray = Color(0xFF6B7280);
 
-  // Secondary colors - Verde lima (como en el diseño PGO)
-  static const Color PrimaryGreen = Color(0xFFa9c93e); // Verde lima
-  static const Color secondaryGreen = Color(0xFF9fbe2e); //verde oscuro
-  static const Color primaryOrange = Color(0xFFf49705); //naranja
+  static const Color PrimaryGreen = Color(0xFFD8FF59);
+  static const Color secondaryGreen = Color(0xFFB6D735);
+  static const Color homeGreen = Color(0xFFD8FF59);
+  static const Color loginGreen = Color(0xFFC3E23A);
+  static const Color primaryOrange = Color(0xFFF49705);
 
-  // Neutral colors
   static const Color brown = Color(0xFF898675);
   static const Color brownLight = Color(0xFF999682);
-  static const Color brownDark = Color(0xFFdbd8b9);
+  static const Color brownDark = Color(0xFFDBD8B9);
 
-  // Header colors
   static const Color headerBlueStart = Color(0xFF3D659A);
   static const Color headerBlueEnd = Color(0xFF1C2A3A);
 
@@ -33,13 +31,25 @@ class AppColors {
     ],
   );
 
+  static const LinearGradient secondaryGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [
+      Color(0xFF4972A8),
+      headerBlueEnd,
+    ],
+  );
+
   static const BoxDecoration headerGradientDecoration = BoxDecoration(
     gradient: headerGradient,
   );
 
+  static const BoxDecoration secondaryGradientDecoration = BoxDecoration(
+    gradient: secondaryGradient,
+  );
+
   static const double headerToolbarHeight = 88;
 
-  // Status colors
   static const Color blue = headerBlueStart;
   static const Color SecondBlue = headerBlueEnd;
 }

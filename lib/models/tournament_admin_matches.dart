@@ -38,6 +38,7 @@ class TournamentAdminMatch {
     required this.teamOne,
     required this.teamTwo,
     required this.scheduledAt,
+    required this.startedAt,
     required this.status,
     required this.score,
     required this.winnerLabel,
@@ -49,6 +50,7 @@ class TournamentAdminMatch {
   final String teamOne;
   final String teamTwo;
   final DateTime scheduledAt;
+  final DateTime? startedAt;
   final String status;
   final String? score;
   final String? winnerLabel;
@@ -63,6 +65,9 @@ class TournamentAdminMatch {
       scheduledAt: DateTime.parse(
         json['scheduledAt'] as String? ?? DateTime.now().toIso8601String(),
       ),
+      startedAt: json['startedAt'] != null
+          ? DateTime.tryParse(json['startedAt'] as String)
+          : null,
       status: json['status'] as String? ?? 'PENDING',
       score: json['score'] as String?,
       winnerLabel: json['winnerLabel'] as String?,

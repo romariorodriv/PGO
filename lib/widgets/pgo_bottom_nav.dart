@@ -37,17 +37,17 @@ class PgoBottomNav extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavIcon(
-                icon: Icons.home,
+                icon: Icons.home_rounded,
                 selected: currentTab == PgoNavTab.home,
                 onTap: onHomeTap,
               ),
               _NavIcon(
-                icon: Icons.emoji_events,
+                icon: Icons.workspace_premium_rounded,
                 selected: currentTab == PgoNavTab.tournaments,
                 onTap: onTournamentsTap,
               ),
               _NavIcon(
-                icon: Icons.person,
+                icon: Icons.person_rounded,
                 selected: currentTab == PgoNavTab.profile,
                 onTap: onProfileTap,
               ),
@@ -76,8 +76,8 @@ class _NavIcon extends StatelessWidget {
       onTap: onTap,
       child: Icon(
         icon,
-        color: selected ? AppColors.SecondBlue : const Color(0xFF7D8491),
-        size: 38,
+        color: selected ? AppColors.SecondBlue : const Color(0xFF8A93A1),
+        size: 34,
       ),
     );
   }

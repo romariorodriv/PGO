@@ -840,7 +840,7 @@ class _TournamentCreateFlowScreenState
       onNext: _handleNextStep,
       onBack: () => _submitTournament('DRAFT'),
       nextLabel: 'Publicar',
-      backLabel: 'Guardar borrador',
+      backLabel: 'Guardar',
       nextAction: () => _submitTournament('PUBLISHED'),
       isSubmitting: _isSubmitting,
     );
@@ -1327,8 +1327,10 @@ class _PrimaryActionButton extends StatelessWidget {
               )
             : Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 16,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: label.length > 12 ? 14 : 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -1368,8 +1370,10 @@ class _SecondaryActionButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontSize: 16,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: label.length > 12 ? 13 : 16,
             fontWeight: FontWeight.w800,
           ),
         ),

@@ -426,7 +426,7 @@ class _TournamentAdminRegistrationsScreenState
                     child: Text(
                       _currentTournament.registrationsOpen
                           ? 'Cerrar inscripciones'
-                          : 'Abrir inscripciones',
+                          : 'Abrir cupos',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -502,17 +502,45 @@ class _AdminHeroCard extends StatelessWidget {
             Positioned(
               left: 18,
               right: 18,
-              bottom: 18,
+              bottom: 22,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    tournament.title.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tournament.title.toUpperCase(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            height: 1.05,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4E58C),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          tournament.registrationsOpen ? 'Pendiente' : 'Cerrado',
+                          style: const TextStyle(
+                            color: AppColors.SecondBlue,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
                     '${tournament.category.toUpperCase()} categoria',
@@ -667,7 +695,8 @@ class _AdminTabButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            gradient: selected ? AppColors.secondaryGradient : null,
+            color: selected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
@@ -747,7 +776,8 @@ class _FilterButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            gradient: selected ? AppColors.secondaryGradient : null,
+            color: selected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(15),
           ),
           alignment: Alignment.center,
@@ -858,7 +888,7 @@ class _RegistrationCard extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _Avatar(photoUrl: entry.user.photoUrl),
               const SizedBox(width: 12),
@@ -867,6 +897,8 @@ class _RegistrationCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       text: TextSpan(
                         children: [
                           TextSpan(
@@ -881,7 +913,8 @@ class _RegistrationCard extends StatelessWidget {
                             TextSpan(
                               text: ' / ${entry.partnerUser?.name ?? ''}',
                               style: TextStyle(
-                                color: AppColors.SecondBlue.withValues(alpha: 0.55),
+                                color:
+                                    AppColors.SecondBlue.withValues(alpha: 0.55),
                                 fontSize: 18,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -909,14 +942,26 @@ class _RegistrationCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: onView,
-                icon: const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.SecondBlue,
+              const SizedBox(width: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: onView,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.SecondBlue,
+                    size: 30,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: const Color(0xFFDCE2EB),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1066,7 +1111,7 @@ class _CardActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 38,
+      height: 36,
       child: ElevatedButton.icon(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
@@ -1075,6 +1120,8 @@ class _CardActionButton extends StatelessWidget {
           foregroundColor: AppColors.SecondBlue,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 10),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
@@ -1082,8 +1129,10 @@ class _CardActionButton extends StatelessWidget {
         icon: Icon(icon, size: 16),
         label: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
           ),
         ),

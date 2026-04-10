@@ -307,7 +307,7 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _currentTournament.registrationsOpen
-                            ? 'Se cerrara al completar cupos'
+                            ? 'Se cierra al completar cupos'
                             : 'Las inscripciones estan cerradas',
                         style: TextStyle(
                           color: AppColors.SecondBlue.withValues(alpha: 0.58),
@@ -334,7 +334,7 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
                       _ActionButton(
                         label: _currentTournament.registrationsOpen
                             ? 'Cerrar inscripciones'
-                            : 'Abrir inscripciones',
+                            : 'Abrir cupos',
                         filled: false,
                         enabled: !_isUpdatingRegistrations,
                         onTap: _toggleRegistrations,
@@ -365,7 +365,7 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
                         value: _currentTournament.format,
                       ),
                       const _SummaryLine(
-                        label: 'Modo de inscripcion',
+                        label: 'Inscripcion',
                         value: 'Con o sin pareja',
                       ),
                       _SummaryLine(
@@ -426,7 +426,7 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.SecondBlue,
+                gradient: AppColors.secondaryGradient,
                 borderRadius: BorderRadius.circular(14),
               ),
               alignment: Alignment.center,
@@ -570,39 +570,48 @@ class _AdminHeroCard extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: 16,
-              right: 16,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF4E58C),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  tournament.registrationsOpen ? 'Pendiente' : 'Cerrado',
-                  style: const TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
               left: 18,
               right: 18,
-              bottom: 18,
+              bottom: 22,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    tournament.title.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tournament.title.toUpperCase(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            height: 1.05,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4E58C),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          tournament.registrationsOpen ? 'Pendiente' : 'Cerrado',
+                          style: const TextStyle(
+                            color: AppColors.SecondBlue,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 3),
                   Text(

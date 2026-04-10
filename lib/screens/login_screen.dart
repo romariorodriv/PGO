@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Text(
                       'No tienes una cuenta? ',
-                      style: TextStyle(color: AppColors.PrimaryGreen),
+                      style: TextStyle(color: AppColors.loginGreen),
                     ),
                     GestureDetector(
                       onTap: () {
@@ -286,8 +286,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildRememberAndForgot() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      runSpacing: 4,
       children: [
         GestureDetector(
           onTap: () {
@@ -295,25 +297,31 @@ class _LoginScreenState extends State<LoginScreen> {
               _rememberUser = !_rememberUser;
             });
           },
-          child: Row(
-            children: [
-              Checkbox(
-                value: _rememberUser,
-                onChanged: (value) {
-                  setState(() {
-                    _rememberUser = value ?? false;
-                  });
-                },
-                activeColor: AppColors.blue,
-              ),
-              Text(
-                'Recordar usuario',
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.7),
-                  fontSize: 12,
+          child: SizedBox(
+            width: 170,
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _rememberUser,
+                  onChanged: (value) {
+                    setState(() {
+                      _rememberUser = value ?? false;
+                    });
+                  },
+                  activeColor: AppColors.blue,
                 ),
-              ),
-            ],
+                Expanded(
+                  child: Text(
+                    'Recordar usuario',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         GestureDetector(
@@ -322,11 +330,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const SnackBar(content: Text('Ir a Recuperar Contrasena')),
             );
           },
-          child: Text(
-            'Olvidaste tu contrasena?',
-            style: TextStyle(
-              color: AppColors.SecondBlue.withValues(alpha: 0.7),
-              fontSize: 12,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              'Olvidaste tu contrasena?',
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
             ),
           ),
         ),
@@ -340,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 50,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.PrimaryGreen,
+          backgroundColor: AppColors.loginGreen,
           shape: const StadiumBorder(),
           elevation: 0,
         ),

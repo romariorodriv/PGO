@@ -323,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ElevatedButton(
                   onPressed: _openActivity,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD7FF59),
+                    backgroundColor: AppColors.homeGreen,
                     foregroundColor: AppColors.SecondBlue,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -586,7 +586,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: ElevatedButton(
                                 onPressed: _openRecommendedTournament,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD7FF59),
+                                  backgroundColor: AppColors.homeGreen,
                                   foregroundColor: AppColors.SecondBlue,
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(

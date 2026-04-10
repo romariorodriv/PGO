@@ -412,7 +412,8 @@ class _TabButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            gradient: selected ? AppColors.secondaryGradient : null,
+            color: selected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
@@ -497,7 +498,8 @@ class _StageButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            gradient: selected ? AppColors.secondaryGradient : null,
+            color: selected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(15),
           ),
           alignment: Alignment.center,

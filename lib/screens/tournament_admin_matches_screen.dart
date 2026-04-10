@@ -505,7 +505,8 @@ class _TabButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            gradient: selected ? AppColors.secondaryGradient : null,
+            color: selected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
@@ -590,7 +591,8 @@ class _FilterButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            gradient: selected ? AppColors.secondaryGradient : null,
+            color: selected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(15),
           ),
           alignment: Alignment.center,
@@ -646,9 +648,10 @@ class _AdminMatchCard extends StatelessWidget {
     final actionFilled = match.status != 'FINISHED';
 
     return Container(
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: const Color(0xFF142743),
-        borderRadius: BorderRadius.circular(22),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -657,131 +660,107 @@ class _AdminMatchCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-            child: Row(
-              children: [
-                Text(
-                  match.courtLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '· ${match.stageLabel}',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    statusText,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF142743),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              child: Row(
+                children: [
+                  Text(
+                    match.courtLabel,
                     style: const TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Text(
+                    '? ${match.stageLabel}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                _TeamRow(label: match.teamOne, score: match.score),
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFD9E0EB)),
-                const SizedBox(height: 10),
-                _TeamRow(label: match.teamTwo),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (match.status == 'LIVE')
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF3D4A),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'LIVE',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
+            const SizedBox(height: 8),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          match.teamOne,
+                          style: const TextStyle(
+                            color: AppColors.SecondBlue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
-                    if (match.status == 'LIVE') const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        match.status == 'FINISHED'
-                            ? match.winnerLabel ?? _formatDate(match.scheduledAt)
-                            : _formatDate(match.scheduledAt),
-                        style: TextStyle(
-                          color: AppColors.SecondBlue.withValues(alpha: 0.78),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      height: 34,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (match.status == 'PENDING') {
-                            showDialog<void>(
-                              context: context,
-                              barrierDismissible: true,
-                              builder: (context) => _StartMatchDialog(
-                                match: match,
-                                onConfirm: onStart,
-                              ),
-                            );
-                            return;
-                          }
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        height: 34,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (match.status == 'PENDING') {
+                              showDialog<void>(
+                                context: context,
+                                barrierDismissible: true,
+                                builder: (context) => _StartMatchDialog(
+                                  match: match,
+                                  onConfirm: onStart,
+                                ),
+                              );
+                              return;
+                            }
 
-                          if (match.status == 'LIVE') {
-                            showDialog<void>(
-                              context: context,
-                              barrierDismissible: true,
-                              builder: (context) => _RegisterWinnerDialog(
-                                match: match,
-                                onConfirm: onFinish,
-                              ),
-                            );
-                            return;
-                          }
+                            if (match.status == 'LIVE') {
+                              showDialog<void>(
+                                context: context,
+                                barrierDismissible: true,
+                                builder: (context) => _RegisterWinnerDialog(
+                                  match: match,
+                                  onConfirm: onFinish,
+                                ),
+                              );
+                              return;
+                            }
 
-                          if (match.status == 'FINISHED') {
                             showDialog<void>(
                               context: context,
                               barrierDismissible: true,
@@ -790,44 +769,118 @@ class _AdminMatchCard extends StatelessWidget {
                                 onCorrectResult: onCorrectResult,
                               ),
                             );
-                            return;
-                          }
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Aqui iniciaras el partido de ${match.courtLabel}',
-                              ),
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: actionFilled
+                                ? const Color(0xFFD7FF59)
+                                : const Color(0xFF8C94A4),
+                            foregroundColor: actionFilled
+                                ? AppColors.SecondBlue
+                                : Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: actionFilled
-                              ? const Color(0xFFD7FF59)
-                              : const Color(0xFFE7EBF0),
-                          foregroundColor: AppColors.SecondBlue,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
                           ),
-                        ),
-                        child: Text(
-                          actionLabel,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
+                          child: Text(
+                            actionLabel,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFD9E0EB)),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      match.teamTwo,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              child: _AdminMatchCardFooter(match: match),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminMatchCardFooter extends StatelessWidget {
+  const _AdminMatchCardFooter({
+    required this.match,
+  });
+
+  final TournamentAdminMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    if (match.status == 'LIVE') {
+      return Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF3D4A),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'LIVE',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(width: 8),
+          _LiveElapsedText(start: match.startedAt ?? match.scheduledAt),
         ],
+      );
+    }
+
+    if (match.status == 'FINISHED') {
+      final winner = (match.winnerLabel ?? '').replaceFirst('Ganador: ', '').trim();
+      return RichText(
+        text: TextSpan(
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.92),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          children: [
+            const TextSpan(
+              text: 'Ganador: ',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            TextSpan(text: winner.isNotEmpty ? winner : match.teamOne),
+          ],
+        ),
+      );
+    }
+
+    return Text(
+      _formatDate(match.scheduledAt),
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.92),
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
@@ -859,7 +912,64 @@ class _AdminMatchCard extends StatelessWidget {
     final local = date.toLocal();
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
-    return '${weekDays[local.weekday - 1]} ${local.day} ${months[local.month - 1]} · $hour:$minute';
+    return '${weekDays[local.weekday - 1]} ${local.day} ${months[local.month - 1]} ? $hour:$minute';
+  }
+}
+
+class _LiveElapsedText extends StatefulWidget {
+  const _LiveElapsedText({
+    required this.start,
+  });
+
+  final DateTime start;
+
+  @override
+  State<_LiveElapsedText> createState() => _LiveElapsedTextState();
+}
+
+class _LiveElapsedTextState extends State<_LiveElapsedText> {
+  late final ValueNotifier<DateTime> _now;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = ValueNotifier<DateTime>(DateTime.now());
+    _loop();
+  }
+
+  void _loop() async {
+    while (mounted) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      _now.value = DateTime.now();
+    }
+  }
+
+  @override
+  void dispose() {
+    _now.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _now,
+      builder: (context, now, _) {
+        final elapsed = now.difference(widget.start.toLocal());
+        final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+        final minutes = safeElapsed.inMinutes.toString().padLeft(2, '0');
+        final seconds = (safeElapsed.inSeconds % 60).toString().padLeft(2, '0');
+        return Text(
+          '$minutes:$seconds',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1670,43 +1780,6 @@ class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TeamRow extends StatelessWidget {
-  const _TeamRow({
-    required this.label,
-    this.score,
-  });
-
-  final String label;
-  final String? score;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        if (score != null)
-          Text(
-            score!,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-      ],
     );
   }
 }

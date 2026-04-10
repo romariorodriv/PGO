@@ -51,6 +51,9 @@ class TournamentRecord {
   final List<TournamentPlayer> registeredPlayers;
   final List<String> registrationUserIds;
 
+  int get soloRegistrationsCount =>
+      registrationEntries.where((entry) => !entry.hasPartner).length;
+
   factory TournamentRecord.fromJson(Map<String, dynamic> json) {
     final rawRegistrations = (json['registrations'] as List<dynamic>?)
             ?.map((item) => Map<String, dynamic>.from(item as Map))

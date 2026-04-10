@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
@@ -9,6 +10,7 @@ import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'profile_public_preview_screen.dart';
 import 'tournament_bracket_screen.dart';
 import 'tournament_description_screen.dart';
 import 'tournament_live_screen.dart';
@@ -29,6 +31,7 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   TournamentRecord? _tournament;
   bool _isLoading = false;
   String? _loadError;
+  final Set<String> _followingIds = <String>{};
 
   TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
   String get _title => _currentTournament?.title ?? 'Torneo PGO';
@@ -85,6 +88,47 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return 'Sin definir';
     return '${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}';
+  }
+
+  void _toggleFollow(TournamentPlayer player) {
+    setState(() {
+      if (_followingIds.contains(player.id)) {
+        _followingIds.remove(player.id);
+      } else {
+        _followingIds.add(player.id);
+      }
+    });
+  }
+
+  Future<void> _openPlayerProfile(TournamentPlayer player) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfilePublicPreviewScreen(
+          profile: ProfileSummary(
+            id: player.id,
+            name: player.name,
+            email: player.email ?? '',
+            photoUrl: player.photoUrl,
+            experiencePoints: 0,
+            category: player.category,
+            preferredClub: player.preferredClub,
+            preferredSide: null,
+            racketModel: null,
+            experienceLevel: null,
+            rankingPosition: player.rankingPosition,
+            matchesPlayed: 0,
+            wins: 0,
+            winRate: 0,
+            weeklyStreak: 0,
+            friendsCount: 0,
+            followersCount: 0,
+            followingCount: 0,
+            socialNotificationsCount: 0,
+            matchHistory: const [],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -178,7 +222,12 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
                       ..._players.map(
                         (player) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _RegisteredPlayerTile(player: player),
+                          child: _RegisteredPlayerTile(
+                            player: player,
+                            isFollowing: _followingIds.contains(player.id),
+                            onFollowTap: () => _toggleFollow(player),
+                            onProfileTap: () => _openPlayerProfile(player),
+                          ),
                         ),
                       ),
                   ],
@@ -528,9 +577,15 @@ class _AvatarCircle extends StatelessWidget {
 class _RegisteredPlayerTile extends StatelessWidget {
   const _RegisteredPlayerTile({
     required this.player,
+    required this.isFollowing,
+    required this.onFollowTap,
+    required this.onProfileTap,
   });
 
   final TournamentPlayer player;
+  final bool isFollowing;
+  final VoidCallback onFollowTap;
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -540,46 +595,99 @@ class _RegisteredPlayerTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Column(
         children: [
-          const _AvatarCircle(),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  player.name,
+          Row(
+            children: [
+              const _AvatarCircle(),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      player.name,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      player.category ?? 'Sin categoria',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD7FF59),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  '#${player.rankingPosition}',
                   style: const TextStyle(
                     color: AppColors.SecondBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                Text(
-                  player.category ?? 'Sin categoria',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD7FF59),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              '#${player.rankingPosition}',
-              style: const TextStyle(
-                color: AppColors.SecondBlue,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: onFollowTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isFollowing
+                          ? const Color(0xFFE7EBF0)
+                          : AppColors.PrimaryGreen,
+                      foregroundColor: AppColors.SecondBlue,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      isFollowing ? 'Siguiendo' : 'Seguir',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: OutlinedButton(
+                    onPressed: onProfileTap,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.SecondBlue,
+                      side: BorderSide(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.18),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Perfil',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
