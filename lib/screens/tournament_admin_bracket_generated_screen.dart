@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/tournament_record.dart';
@@ -24,9 +25,9 @@ class TournamentAdminBracketGeneratedScreen extends StatelessWidget {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: const Text(
+      title: Text(
         'Cruces generados',
-        style: TextStyle(
+        style: GoogleFonts.inter(
           color: Colors.white,
           fontSize: 22,
           fontWeight: FontWeight.w800,
@@ -57,12 +58,12 @@ class TournamentAdminBracketGeneratedScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Cruces generados',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   color: AppColors.SecondBlue,
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -70,9 +71,9 @@ class TournamentAdminBracketGeneratedScreen extends StatelessWidget {
               Text(
                 'El cuadro del torneo ya fue generado y todo esta listo para iniciar.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   color: AppColors.SecondBlue.withValues(alpha: 0.72),
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                   height: 1.4,
                 ),
@@ -209,20 +210,20 @@ class _SummaryCard extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.whatshot,
                         size: 12,
                         color: AppColors.primaryOrange,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         'Cruces generados',
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
                           color: AppColors.SecondBlue,
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -241,7 +242,7 @@ class _SummaryCard extends StatelessWidget {
                       tournament.title.toUpperCase(),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
@@ -251,7 +252,7 @@ class _SummaryCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       _formatDate(tournament.startsAt),
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -259,7 +260,7 @@ class _SummaryCard extends StatelessWidget {
                     ),
                     Text(
                       tournament.location,
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
@@ -268,7 +269,7 @@ class _SummaryCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '$duplas parejas listas',
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
@@ -276,15 +277,15 @@ class _SummaryCard extends StatelessWidget {
                     ),
                     Text(
                       'Formato: ${_capitalize(tournament.format)}',
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Estado: Listo para iniciar',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
@@ -366,8 +367,8 @@ class _ActionButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontSize: 16,
+          style: GoogleFonts.inter(
+            fontSize: 15,
             fontWeight: FontWeight.w900,
           ),
         ),

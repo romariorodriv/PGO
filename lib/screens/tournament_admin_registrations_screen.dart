@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/tournament_record.dart';
@@ -46,8 +47,9 @@ class _TournamentAdminRegistrationsScreenState
     }
   }
 
-  int get _soloCount =>
-      _currentTournament.registrationEntries.where((entry) => !entry.hasPartner).length;
+  int get _soloCount => _currentTournament.registrationEntries
+      .where((entry) => !entry.hasPartner)
+      .length;
 
   @override
   void initState() {
@@ -89,8 +91,14 @@ class _TournamentAdminRegistrationsScreenState
         context: context,
         barrierDismissible: true,
         builder: (context) => _CloseRegistrationsDialog(
-          isComplete:
-              _currentTournament.registrationsCount >= _currentTournament.playerCapacity,
+          isComplete: _currentTournament.registrationsCount >=
+              _currentTournament.playerCapacity,
+          registrationsCount: _currentTournament.registrationsCount,
+          playerCapacity: _currentTournament.playerCapacity,
+          pendingPairs: _currentTournament.registrationEntries
+              .where((entry) => !entry.hasPartner)
+              .length,
+          canGenerate: _currentTournament.registrationsCount >= 8,
           onGenerateBrackets: () async {
             Navigator.of(context).pop(true);
           },
@@ -117,8 +125,10 @@ class _TournamentAdminRegistrationsScreenState
     try {
       late TournamentRecord updated;
       if (goToBracket) {
-        await TournamentService().closeAndGenerateBracket(_currentTournament.id);
-        updated = await TournamentService().getTournament(_currentTournament.id);
+        await TournamentService()
+            .closeAndGenerateBracket(_currentTournament.id);
+        updated =
+            await TournamentService().getTournament(_currentTournament.id);
       } else {
         updated = await TournamentService().updateTournament(
           tournamentId: _currentTournament.id,
@@ -135,7 +145,9 @@ class _TournamentAdminRegistrationsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            open ? 'Inscripciones abiertas nuevamente' : 'Inscripciones cerradas',
+            open
+                ? 'Inscripciones abiertas nuevamente'
+                : 'Inscripciones cerradas',
           ),
         ),
       );
@@ -279,7 +291,8 @@ class _TournamentAdminRegistrationsScreenState
       builder: (context) => _PairRegistrationSheet(
         currentEntry: entry,
         availableEntries: _currentTournament.registrationEntries
-            .where((candidate) => !candidate.hasPartner && candidate.id != entry.id)
+            .where((candidate) =>
+                !candidate.hasPartner && candidate.id != entry.id)
             .toList(),
       ),
     );
@@ -402,8 +415,9 @@ class _TournamentAdminRegistrationsScreenState
                         onPair: entry.hasPartner || _isUpdating
                             ? null
                             : () => _pairRegistration(entry),
-                        onRemove:
-                            _isUpdating ? null : () => _removeRegistration(entry),
+                        onRemove: _isUpdating
+                            ? null
+                            : () => _removeRegistration(entry),
                       ),
                     ),
                   ),
@@ -532,7 +546,9 @@ class _AdminHeroCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(
-                          tournament.registrationsOpen ? 'Pendiente' : 'Cerrado',
+                          tournament.registrationsOpen
+                              ? 'Pendiente'
+                              : 'Cerrado',
                           style: const TextStyle(
                             color: AppColors.SecondBlue,
                             fontSize: 10,
@@ -913,8 +929,8 @@ class _RegistrationCard extends StatelessWidget {
                             TextSpan(
                               text: ' / ${entry.partnerUser?.name ?? ''}',
                               style: TextStyle(
-                                color:
-                                    AppColors.SecondBlue.withValues(alpha: 0.55),
+                                color: AppColors.SecondBlue.withValues(
+                                    alpha: 0.55),
                                 fontSize: 18,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -1002,7 +1018,6 @@ class _RegistrationCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _PairRegistrationSheet extends StatelessWidget {
@@ -1282,92 +1297,228 @@ class _DetailLine extends StatelessWidget {
 class _CloseRegistrationsDialog extends StatelessWidget {
   const _CloseRegistrationsDialog({
     required this.isComplete,
+    this.registrationsCount = 0,
+    this.playerCapacity = 0,
+    this.pendingPairs = 0,
+    this.canGenerate = false,
     required this.onGenerateBrackets,
   });
 
   final bool isComplete;
+  final int registrationsCount;
+  final int playerCapacity;
+  final int pendingPairs;
+  final bool canGenerate;
   final Future<void> Function() onGenerateBrackets;
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isComplete ? 'Cupos completos' : 'Cerrar inscripciones',
-              style: const TextStyle(
-                color: AppColors.SecondBlue,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              isComplete
-                  ? 'El torneo ya completo sus cupos.\nTodos los inscritos tienen pareja\nYa puedes generar los cruces del torneo'
-                  : 'Al cerrar las inscripciones ya no entraran mas jugadores.\nLuego podras generar los cruces del torneo.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.SecondBlue.withValues(alpha: 0.78),
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE7EBF0),
-                        foregroundColor: AppColors.SecondBlue,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Volver',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isComplete && pendingPairs == 0) ...[
+                Text(
+                  'Cupos completos',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: onGenerateBrackets,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD7FF59),
-                        foregroundColor: AppColors.SecondBlue,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Generar cruces',
-                        style: TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
+                const SizedBox(height: 12),
+                Text(
+                  'El torneo ya completo sus cupos.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Todos los inscritos tienen pareja',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Ya puedes generar los cruces del torneo',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  'Cerrar inscripciones',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Ya no podran registrarse mas jugadores\n'
+                  'en el torneo',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '$registrationsCount de $playerCapacity jugadores inscritos',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (pendingPairs > 0) ...[
+                  const SizedBox(height: 4),
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: GoogleFonts.inter(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.78),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                      children: [
+                        TextSpan(text: '$pendingPairs buscando pareja \u00b7 '),
+                        const TextSpan(
+                          text: 'emparejar antes de\n',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const TextSpan(
+                          text: 'generar cruces',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (pendingPairs > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    height: 1,
+                    color: const Color(0xFFD3DAE3),
+                  ),
+                  const SizedBox(height: 8),
+                ] else
+                  const SizedBox(height: 12),
+                Text(
+                  'El torneo continuara con los jugadores\n'
+                  'actualmente confirmados',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (pendingPairs > 0) ...[
+                  Text(
+                    'Debes emparejar a los jugadores pendientes\n'
+                    'antes de generar los cruces.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
               ],
-            ),
-          ],
+            const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDDE1E6),
+                          foregroundColor: AppColors.SecondBlue,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: Text(
+                          'Volver',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: (isComplete && !canGenerate)
+                            ? null
+                            : onGenerateBrackets,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD7FF59),
+                          foregroundColor: AppColors.SecondBlue,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: Text(
+                          isComplete
+                              ? 'Generar cruces'
+                              : 'Cerrar inscripciones',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

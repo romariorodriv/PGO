@@ -38,7 +38,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   int _team1TieBreakPoints = 0;
   int _team2TieBreakPoints = 0;
   bool _isTieBreak = false;
-  final bool _useGoldenPoint = true;
+  final bool _useGoldenPoint = false;
   bool _isSidesSwapped = false;
   bool _isSaving = false;
   int? _tieBreakFirstServingTeam;
@@ -83,10 +83,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
       'Domingo',
       'Lunes',
       'Martes',
-      'Miércoles',
+      'Miercoles',
       'Jueves',
       'Viernes',
-      'Sábado',
+      'Sabado',
     ];
     const months = [
       'Enero',
@@ -355,7 +355,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     if (winnerTeam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Completa al menos un set válido antes de finalizar'),
+          content: Text('Completa al menos un set valido antes de finalizar'),
         ),
       );
       return;
@@ -419,7 +419,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   String get _setsLabel => '$_team1Sets - $_team2Sets';
   String get _gamesLabel => '$_team1Games - $_team2Games';
   String get _serviceLabel => 'Equipo $_servingTeam';
-  String get _modeLabel => _useGoldenPoint ? 'Golden point' : 'Ventaja';
+  String get _modeLabel => _useGoldenPoint ? 'Punto de oro' : 'Ventaja';
 
   String get _smallCenterTopText {
     final elapsed = _matchTimer.elapsed;

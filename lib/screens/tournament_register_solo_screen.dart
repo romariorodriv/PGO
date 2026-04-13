@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
 import '../widgets/pgo_header_scaffold.dart';
@@ -82,9 +83,11 @@ class _TournamentRegisterSoloScreenState
             tournament: tournament,
             title: 'Solicitud registrada',
             message:
-                'Tu inscripcion quedo pendiente mientras encontramos la dupla ideal para este torneo.',
-            badge: 'Solicitud registrada',
-            primaryLabel: 'Volver al torneo',
+                'Estamos buscando una pareja para ti.\nTu participación será confirmada\ncuando completemos tu dupla',
+            badge: 'Pendiente de pareja',
+            primaryLabel: 'VER TORNEO',
+            secondaryLabel: 'IR A MIS TORNEOS',
+            statusTitle: 'Buscando dupla',
           ),
         ),
       );
@@ -206,7 +209,7 @@ class _TournamentRegisterSoloScreenState
               children: [
                 Text(
                   _title,
-                  style: const TextStyle(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -215,7 +218,7 @@ class _TournamentRegisterSoloScreenState
                 const SizedBox(height: 4),
                 Text(
                   _formattedDate,
-                  style: const TextStyle(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -223,7 +226,7 @@ class _TournamentRegisterSoloScreenState
                 ),
                 Text(
                   _location,
-                  style: const TextStyle(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -237,10 +240,10 @@ class _TournamentRegisterSoloScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Center(
+                Center(
                   child: Text(
-                    'Participaras sin pareja',
-                    style: TextStyle(
+                    'Participarás sin pareja',
+                    style: GoogleFonts.inter(
                       color: AppColors.SecondBlue,
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -250,7 +253,7 @@ class _TournamentRegisterSoloScreenState
                 const SizedBox(height: 12),
                 Text(
                   'Te ayudamos a encontrar una dupla para este torneo.',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue.withValues(alpha: 0.8),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -263,9 +266,9 @@ class _TournamentRegisterSoloScreenState
                   color: const Color(0xFFD3DAE3),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Tu lado preferido',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -282,9 +285,9 @@ class _TournamentRegisterSoloScreenState
                   },
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Disponibilidad',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -309,19 +312,21 @@ class _TournamentRegisterSoloScreenState
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: RichText(
-                    text: const TextSpan(
-                      style: TextStyle(
+                    text: TextSpan(
+                      style: GoogleFonts.inter(
                         color: AppColors.SecondBlue,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                       children: [
-                        TextSpan(text: 'Tu participacion sera '),
+                        const TextSpan(text: 'Tu participación será '),
                         TextSpan(
                           text: 'confirmada',
-                          style: TextStyle(fontWeight: FontWeight.w900),
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                        TextSpan(
+                        const TextSpan(
                           text: ' cuando completemos tu dupla.',
                         ),
                       ],
@@ -346,22 +351,24 @@ class _TournamentRegisterSoloScreenState
                         padding: const EdgeInsets.only(top: 12),
                         child: RichText(
                           text: TextSpan(
-                            style: TextStyle(
+                            style: GoogleFonts.inter(
                               color: AppColors.SecondBlue.withValues(alpha: 0.8),
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
-                            children: const [
-                              TextSpan(
-                                text: 'Entiendo que mi inscripcion queda ',
+                            children: [
+                              const TextSpan(
+                                text: 'Entiendo que mi inscripción queda ',
                               ),
                               TextSpan(
                                 text: 'pendiente',
-                                style: TextStyle(fontWeight: FontWeight.w900),
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                              TextSpan(
+                              const TextSpan(
                                 text:
-                                    ' de confirmacion hasta encontrar pareja',
+                                    ' de confirmación hasta encontrar pareja',
                               ),
                             ],
                           ),
@@ -395,9 +402,9 @@ class _TournamentRegisterSoloScreenState
                             height: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
+                        : Text(
                             'CONFIRMAR',
-                            style: TextStyle(
+                            style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                             ),
@@ -440,7 +447,7 @@ class _TournamentRegisterSoloScreenState
                     alignment: Alignment.center,
                     child: Text(
                       option,
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         color: selected == option
                             ? Colors.white
                             : AppColors.SecondBlue,

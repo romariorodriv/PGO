@@ -113,13 +113,6 @@ class PadelRules {
         team2SetsWon += 1;
       }
 
-      if (index < sets.length - 1 &&
-          (team1SetsWon >= setsToWin || team2SetsWon >= setsToWin)) {
-        return const PadelMatchValidationResult(
-          isValid: false,
-          error: 'Si una pareja gana 2 sets, el partido ya debe terminar.',
-        );
-      }
     }
 
     if (team1SetsWon == team2SetsWon) {

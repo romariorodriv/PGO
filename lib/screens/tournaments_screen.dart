@@ -119,6 +119,10 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       }
     } else {
       items = items.where((item) => item.status != 'DRAFT');
+      if (_profile != null) {
+        final userId = _profile!.id;
+        items = items.where((item) => item.createdById != userId);
+      }
     }
 
     if (query.isNotEmpty) {

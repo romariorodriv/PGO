@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import 'tournament_register_partner_screen.dart';
@@ -58,9 +59,9 @@ class TournamentRegisterScreen extends StatelessWidget {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: const Text(
+      title: Text(
         'Torneo',
-        style: TextStyle(
+        style: GoogleFonts.inter(
           color: Colors.white,
           fontSize: 22,
           fontWeight: FontWeight.w800,
@@ -94,10 +95,10 @@ class TournamentRegisterScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 34),
-              const Center(
+              Center(
                 child: Text(
-                  'Inscripcion torneo',
-                  style: TextStyle(
+                  'Inscripción torneo',
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -145,7 +146,7 @@ class TournamentRegisterScreen extends StatelessWidget {
                         children: [
                           Text(
                             _title,
-                            style: const TextStyle(
+                            style: GoogleFonts.inter(
                               color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
@@ -154,7 +155,7 @@ class TournamentRegisterScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             _formattedDate,
-                            style: const TextStyle(
+                            style: GoogleFonts.inter(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -162,7 +163,7 @@ class TournamentRegisterScreen extends StatelessWidget {
                           ),
                           Text(
                             _location,
-                            style: const TextStyle(
+                            style: GoogleFonts.inter(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -175,9 +176,9 @@ class TournamentRegisterScreen extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
                       child: Column(
                         children: [
-                          const Text(
-                            'Como quieres inscribirte?',
-                            style: TextStyle(
+                          Text(
+                            '¿Cómo quieres inscribirte?',
+                            style: GoogleFonts.inter(
                               color: AppColors.SecondBlue,
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
@@ -188,7 +189,7 @@ class TournamentRegisterScreen extends StatelessWidget {
                             icon: Icons.groups,
                             title: 'Con pareja',
                             subtitle:
-                                'Inscribete con tu dupla y confirma tu cupo al instante.',
+                                'Inscríbete con tu dupla y confirma tu cupo al instante.',
                             onTap: () {
                               Navigator.of(context).push<bool>(
                                 MaterialPageRoute(
@@ -236,9 +237,9 @@ class TournamentRegisterScreen extends StatelessWidget {
                 color: const Color(0xFFD3DAE3),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Costo de inscripcion:',
-                style: TextStyle(
+              Text(
+                'Costo de inscripción:',
+                style: GoogleFonts.inter(
                   color: AppColors.SecondBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -268,7 +269,7 @@ class TournamentRegisterScreen extends StatelessWidget {
                   ),
                   child: Text(
                     'Pagar S/$totalSolo',
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
                     ),
@@ -276,10 +277,10 @@ class TournamentRegisterScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              const Center(
+              Center(
                 child: Text(
-                  'Cambiar metodo de pago >',
-                  style: TextStyle(
+                  'Cambiar método de pago >',
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -333,7 +334,7 @@ class _RegisterOptionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       color: AppColors.SecondBlue,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -342,7 +343,7 @@ class _RegisterOptionTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       color: AppColors.SecondBlue.withValues(alpha: 0.7),
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -388,7 +389,7 @@ class _PriceCard extends StatelessWidget {
         children: [
           _PriceRow(label: 'Torneo', value: tournament),
           const SizedBox(height: 10),
-          _PriceRow(label: 'Comision PGO', value: fee),
+          _PriceRow(label: 'Comisión PGO', value: fee),
           const SizedBox(height: 10),
           _PriceRow(label: 'Total', value: total, bold: true),
         ],
@@ -415,7 +416,7 @@ class _PriceRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.inter(
             color: AppColors.SecondBlue,
             fontSize: 16,
             fontWeight: fontWeight,
@@ -424,7 +425,7 @@ class _PriceRow extends StatelessWidget {
         const Spacer(),
         Text(
           value,
-          style: TextStyle(
+          style: GoogleFonts.inter(
             color: AppColors.SecondBlue,
             fontSize: 16,
             fontWeight: fontWeight,

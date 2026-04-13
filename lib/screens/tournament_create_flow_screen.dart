@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
@@ -436,10 +437,10 @@ class _TournamentCreateFlowScreenState
       ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: GoogleFonts.inter(
           color: Colors.white,
           fontSize: 22,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
         ),
       ),
       actions: const [PgoOptionsMenuButton()],
@@ -468,26 +469,32 @@ class _TournamentCreateFlowScreenState
     return Padding(
       padding: const EdgeInsets.only(top: 22),
       child: Center(
-        child: _WhiteCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Crea tu torneo en pocos pasos',
-                style: TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: _WhiteCard(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Crea tu torneo en pocos pasos',
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const _IntroStep(text: '1. Define tipo y categoria'),
+                  const _IntroStep(text: '2. Agrega fecha, hora y sede'),
+                  const _IntroStep(text: '3. Configura inscripciones'),
+                  const _IntroStep(text: '4. Revisa y publica'),
+                  const SizedBox(height: 18),
+                  _PrimaryActionButton(label: 'Empezar', onTap: _handleNextStep),
+                ],
               ),
-              const SizedBox(height: 18),
-              const _IntroStep(text: '1. Define tipo y categoria'),
-              const _IntroStep(text: '2. Agrega fecha, hora y sede'),
-              const _IntroStep(text: '3. Configura inscripciones'),
-              const _IntroStep(text: '4. Revisa y publica'),
-              const SizedBox(height: 24),
-              _PrimaryActionButton(label: 'Empezar', onTap: _handleNextStep),
-            ],
+            ),
           ),
         ),
       ),
@@ -497,7 +504,7 @@ class _TournamentCreateFlowScreenState
   Widget _buildBasic() {
     return _StepScaffold(
       currentStep: 1,
-      title: 'Informacion basica',
+      title: 'Información básica',
       card: _WhiteCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -806,7 +813,7 @@ class _TournamentCreateFlowScreenState
           ),
           const SizedBox(height: 18),
           _ReviewSectionCard(
-            title: 'Informacion basica',
+            title: 'Información básica',
             onTap: () => setState(() => _step = _TournamentCreateStep.basic),
             lines: [
               'Tipo: $_tournamentType',
@@ -816,7 +823,7 @@ class _TournamentCreateFlowScreenState
           ),
           const SizedBox(height: 14),
           _ReviewSectionCard(
-            title: 'Configuracion',
+            title: 'Configuración',
             onTap: () => setState(() => _step = _TournamentCreateStep.settings),
             lines: [
               'Cupos: ${_slotsController.text}',
@@ -959,24 +966,38 @@ class _StepScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Column(
-        children: [
-          Text(
-            'Paso $currentStep de 4',
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
+        child: Column(
+          children: [
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Paso $currentStep ',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                TextSpan(
+                  text: 'de 4',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           _ProgressIndicatorRow(currentStep: currentStep),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           Text(
             title,
-            style: const TextStyle(
+            style: GoogleFonts.inter(
               color: AppColors.SecondBlue,
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1003,34 +1024,39 @@ class _ProgressIndicatorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(7, (index) {
-        if (index.isOdd) {
-          final lineStep = (index ~/ 2) + 1;
-          final active = lineStep < currentStep;
-          return Expanded(
-            child: Container(
-              height: 3,
-              color: active
-                  ? AppColors.SecondBlue
-                  : AppColors.SecondBlue.withValues(alpha: 0.38),
-            ),
-          );
-        }
+    return Center(
+      child: SizedBox(
+        width: 220,
+        child: Row(
+          children: List.generate(7, (index) {
+            if (index.isOdd) {
+              final lineStep = (index ~/ 2) + 1;
+              final active = lineStep < currentStep;
+              return Expanded(
+                child: Container(
+                  height: 2,
+                  color: active
+                      ? AppColors.SecondBlue
+                      : AppColors.SecondBlue.withValues(alpha: 0.38),
+                ),
+              );
+            }
 
-        final dotStep = (index ~/ 2) + 1;
-        final active = dotStep <= currentStep;
-        return Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.SecondBlue
-                : AppColors.SecondBlue.withValues(alpha: 0.45),
-            shape: BoxShape.circle,
-          ),
-        );
-      }),
+            final dotStep = (index ~/ 2) + 1;
+            final active = dotStep <= currentStep;
+            return Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: active
+                    ? AppColors.SecondBlue
+                    : AppColors.SecondBlue.withValues(alpha: 0.45),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        ),
+      ),
     );
   }
 }
@@ -1329,9 +1355,10 @@ class _PrimaryActionButton extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: label.length > 12 ? 14 : 16,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: 0.2,
                 ),
               ),
       ),
@@ -1372,9 +1399,10 @@ class _SecondaryActionButton extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: GoogleFonts.inter(
             fontSize: label.length > 12 ? 13 : 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.2,
           ),
         ),
       ),
@@ -1560,18 +1588,18 @@ class _ReviewSectionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         color: AppColors.SecondBlue,
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                     const Spacer(),
                     Text(
                       'Editar',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         color: AppColors.SecondBlue.withValues(alpha: 0.78),
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -1582,21 +1610,21 @@ class _ReviewSectionCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
                   height: 1,
                   color: const Color(0xFFD8DEE7),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 ...lines.map(
                   (line) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       line,
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         color: AppColors.SecondBlue.withValues(alpha: 0.72),
-                        fontSize: 14,
+                        fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1618,15 +1646,39 @@ class _IntroStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final parts = text.split('.');
+    final number = parts.isNotEmpty ? parts.first : '';
+    final label = parts.length > 1 ? parts.sublist(1).join('.').trim() : text;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.SecondBlue,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 18,
+            child: Text(
+              number.isNotEmpty ? '$number.' : '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../constants/lima_padel_clubs.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
 import '../services/profile_service.dart';
@@ -37,6 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<TournamentRecord> _tournaments = const [];
   bool _isLoadingProfile = true;
   String? _profileError;
+  bool _isUpdatingProfile = false;
+  bool _hasShownProfileComplete = false;
 
   @override
   void initState() {
@@ -58,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _tournaments = tournaments;
         _profileError = null;
       });
+      _checkProfileCompletion();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -81,13 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return 'No se pudo cargar tu perfil';
     }
 
-    final profile = _profile;
-    if (profile == null) {
-      return 'Completa tu perfil para continuar';
-    }
-
-    final category = profile.category ?? 'Sin categoria';
-    return '$category - ${profile.matchesPlayed} partidos - ${profile.wins} victorias';
+    return 'Estas a 1 partido de subir de categoria';
   }
 
   String _buildGreetingName() {
@@ -164,6 +163,160 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (!mounted) return;
     _loadProfile();
+  }
+
+  Future<void> _openSidePicker() async {
+    if (_profile == null || _isUpdatingProfile) return;
+
+    final selected = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _SidePickerDialog(
+        initial: _profile?.preferredSide,
+      ),
+    );
+
+    if (!mounted || selected == null) return;
+    if (selected == 'omit') return;
+
+    setState(() {
+      _isUpdatingProfile = true;
+    });
+
+    try {
+      final updated = await ProfileService().updateMyProfile(
+        name: _profile?.name ?? '',
+        preferredSide: selected,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+      });
+      _checkProfileCompletion();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo actualizar tu lado de juego.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfile = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openSchedulePicker() async {
+    if (_profile == null || _isUpdatingProfile) return;
+
+    final selected = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _SchedulePickerDialog(
+        initial: _profile?.experienceLevel,
+      ),
+    );
+
+    if (!mounted || selected == null) return;
+    if (selected == 'omit') return;
+
+    setState(() {
+      _isUpdatingProfile = true;
+    });
+
+    try {
+      final updated = await ProfileService().updateMyProfile(
+        name: _profile?.name ?? '',
+        experienceLevel: selected,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+      });
+      _checkProfileCompletion();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo actualizar tu horario habitual.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfile = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openClubPicker() async {
+    if (_profile == null || _isUpdatingProfile) return;
+
+    final selected = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _ClubPickerDialog(
+        initial: _profile?.preferredClub,
+      ),
+    );
+
+    if (!mounted || selected == null) return;
+    if (selected == 'omit') return;
+
+    setState(() {
+      _isUpdatingProfile = true;
+    });
+
+    try {
+      final updated = await ProfileService().updateMyProfile(
+        name: _profile?.name ?? '',
+        preferredClub: selected,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+      });
+      _checkProfileCompletion();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo actualizar tu club habitual.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfile = false;
+        });
+      }
+    }
+  }
+
+  bool get _isProfileComplete {
+    final profile = _profile;
+    if (profile == null) return false;
+    final side = profile.preferredSide?.trim() ?? '';
+    final schedule = profile.experienceLevel?.trim() ?? '';
+    final club = profile.preferredClub?.trim() ?? '';
+    return side.isNotEmpty && schedule.isNotEmpty && club.isNotEmpty;
+  }
+
+  void _checkProfileCompletion() {
+    if (!_isProfileComplete || _hasShownProfileComplete) return;
+    _hasShownProfileComplete = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => const _ProfileCompleteDialog(),
+      );
+    });
   }
 
   Future<void> _openRecommendedTournament() async {
@@ -247,7 +400,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         _buildHeaderSection(),
                         const SizedBox(height: 46),
-                        _buildWeeklySummarySection(),
+                        _isProfileComplete
+                            ? _buildProfileReadySection()
+                            : _buildCompleteProfileSection(),
                         const SizedBox(height: 18),
                         _buildSuggestionsSection(),
                         const SizedBox(height: 18),
@@ -293,11 +448,12 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Text(
             'Hola ${_buildGreetingName()},',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: GoogleFonts.inter(
               color: AppColors.SecondBlue,
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: FontWeight.w900,
-              height: 1.1,
+              height: 1.0,
+              letterSpacing: -0.6,
             ),
           ),
         ),
@@ -319,8 +475,8 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.bottomCenter,
             children: [
               SizedBox(
-                width: 282,
-                height: 62,
+                width: 292,
+                height: 58,
                 child: ElevatedButton(
                   onPressed: _openActivity,
                   style: ElevatedButton.styleFrom(
@@ -328,15 +484,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     foregroundColor: AppColors.SecondBlue,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(31),
+                      borderRadius: BorderRadius.circular(29),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'REGISTRAR MATCH',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.4,
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ),
@@ -358,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   child: Text(
-                    'Ranking #${_profile?.rankingPosition ?? 0}',
+                    'Progreso a ${_profile?.category ?? '4ta'} categoria',
                     style: const TextStyle(
                       color: AppColors.SecondBlue,
                       fontSize: 11,
@@ -374,138 +530,196 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildWeeklySummarySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Resumen semanal',
-          style: TextStyle(
-            color: AppColors.SecondBlue,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
+  Widget _buildCompleteProfileSection() {
+    final side = _profile?.preferredSide?.trim().isNotEmpty == true
+        ? _profile!.preferredSide!
+        : 'pendiente';
+    final club = _profile?.preferredClub?.trim().isNotEmpty == true
+        ? _profile!.preferredClub!
+        : 'pendiente';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2F4E7A),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8EBF1),
-            borderRadius: BorderRadius.circular(24),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Completa tu perfil',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      'assets/images/trigal_onepadel.png',
-                      width: 78,
-                      height: 78,
-                      fit: BoxFit.cover,
+          const SizedBox(height: 4),
+          Text(
+            'Te podremos recomendar mejores torneos y jugadores',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _ProfileHintRow(
+            icon: Icons.sports_tennis,
+            label: 'Lado de juego',
+            value: side,
+            onTap: _openSidePicker,
+          ),
+          const SizedBox(height: 8),
+          _ProfileHintRow(
+            icon: Icons.schedule,
+            label: 'Horario habitual',
+            value: 'pendiente',
+            onTap: _openSchedulePicker,
+          ),
+          const SizedBox(height: 8),
+          _ProfileHintRow(
+            icon: Icons.place,
+            label: 'Club habitual',
+            value: club,
+            onTap: _openClubPicker,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileReadySection() {
+    final profile = _profile;
+    final category = profile?.category?.isNotEmpty == true
+        ? profile!.category!
+        : '4ta categoria';
+    final side = profile?.preferredSide?.isNotEmpty == true
+        ? profile!.preferredSide!
+        : 'Drive';
+    final schedule = profile?.experienceLevel?.isNotEmpty == true
+        ? profile!.experienceLevel!
+        : 'Noche';
+    final club = profile?.preferredClub?.isNotEmpty == true
+        ? profile!.preferredClub!
+        : 'One Padel Trigal';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2F4E7A),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Tu perfil esta listo',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Ya podemos recomendarte mejores torneos y jugadores',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7EBF2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$category | $side | $schedule | $club',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.SecondBlue,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Positioned(
-                    top: -8,
-                    left: -8,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryOrange,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${_profile?.weeklyStreak ?? 0}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: SizedBox(
+              width: 170,
+              height: 36,
+              child: ElevatedButton(
+                onPressed: _openRecommendedTournament,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _DayBadge(day: 'L', value: '3'),
-                        _DayBadge(day: 'M', value: '15'),
-                        _DayBadge(day: 'M', value: '15'),
-                        _DayBadge(day: 'J', value: '16'),
-                        _DayBadge(day: 'V', value: '17'),
-                        _DayBadge(day: 'S', value: '18'),
-                        _DayBadge(day: 'D', value: '19'),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Nivel actual: ${_profile?.category ?? 'Sin categoria'}',
-                      style: TextStyle(
-                        color: AppColors.SecondBlue.withValues(alpha: 0.55),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Racha semanal: ${_profile?.weeklyStreak ?? 0}',
-                      style: TextStyle(
-                        color: AppColors.SecondBlue.withValues(alpha: 0.55),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Ranking local: #${_profile?.rankingPosition ?? 0}',
-                      style: TextStyle(
-                        color: AppColors.SecondBlue.withValues(alpha: 0.55),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _openHistory,
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.SecondBlue,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          minimumSize: Size.zero,
-                        ),
-                        child: Text(
-                          'Ver historial ->',
-                          style: TextStyle(
-                            color: AppColors.SecondBlue.withValues(alpha: 0.9),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                ),
+                child: const Text(
+                  'Ver torneos',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (context) => const ProfileScreen()),
+                );
+              },
+              style: TextButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
+                padding: EdgeInsets.zero,
+              ),
+              child: Text(
+                'Editar perfil',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -746,6 +960,587 @@ class _DayBadge extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileHintRow extends StatelessWidget {
+  const _ProfileHintRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F4F8),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: AppColors.SecondBlue,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.65),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: content,
+    );
+  }
+}
+
+class _ProfileCompleteDialog extends StatelessWidget {
+  const _ProfileCompleteDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Tu perfil esta listo',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Ya podemos recomendarte mejores torneos y jugadores',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'Entendido',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SidePickerDialog extends StatefulWidget {
+  const _SidePickerDialog({
+    this.initial,
+  });
+
+  final String? initial;
+
+  @override
+  State<_SidePickerDialog> createState() => _SidePickerDialogState();
+}
+
+class _SidePickerDialogState extends State<_SidePickerDialog> {
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial?.toLowerCase();
+    if (initial == 'drive' || initial == 'reves') {
+      _selected = initial;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Tu lado de juego',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Juegas de drive o reves?',
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SideOptionPill(
+              label: 'Drive',
+              selected: _selected == 'drive',
+              onTap: () => setState(() => _selected = 'drive'),
+            ),
+            const SizedBox(height: 10),
+            _SideOptionPill(
+              label: 'Reves',
+              selected: _selected == 'reves',
+              onTap: () => setState(() => _selected = 'reves'),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton(
+                onPressed: _selected == null
+                    ? null
+                    : () => Navigator.of(context).pop(_selected),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  disabledBackgroundColor:
+                      const Color(0xFFD7FF59).withValues(alpha: 0.5),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'Confirmar',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('omit'),
+              style: TextButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
+                padding: EdgeInsets.zero,
+              ),
+              child: Text(
+                'Omitir',
+                style: TextStyle(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SideOptionPill extends StatelessWidget {
+  const _SideOptionPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        height: 36,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.SecondBlue : const Color(0xFFE7EBF2),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : AppColors.SecondBlue,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SchedulePickerDialog extends StatefulWidget {
+  const _SchedulePickerDialog({
+    this.initial,
+  });
+
+  final String? initial;
+
+  @override
+  State<_SchedulePickerDialog> createState() => _SchedulePickerDialogState();
+}
+
+class _SchedulePickerDialogState extends State<_SchedulePickerDialog> {
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial?.toLowerCase();
+    if (initial == 'flexible' || initial == 'tarde' || initial == 'noche') {
+      _selected = initial;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Tu lado de juego',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'En que horario sueles jugar',
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ScheduleOptionRow(
+              options: const ['Flexible', 'Tarde', 'Noche'],
+              selected: _selected,
+              onSelected: (value) => setState(() => _selected = value),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton(
+                onPressed: _selected == null
+                    ? null
+                    : () => Navigator.of(context).pop(_selected),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  disabledBackgroundColor:
+                      const Color(0xFFD7FF59).withValues(alpha: 0.5),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'Confirmar',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('omit'),
+              style: TextButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
+                padding: EdgeInsets.zero,
+              ),
+              child: Text(
+                'Omitir',
+                style: TextStyle(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleOptionRow extends StatelessWidget {
+  const _ScheduleOptionRow({
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> options;
+  final String? selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7EBF2),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: options
+            .map(
+              (label) => Expanded(
+                child: _ScheduleOptionPill(
+                  label: label,
+                  selected: selected == label.toLowerCase(),
+                  onTap: () => onSelected(label.toLowerCase()),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _ScheduleOptionPill extends StatelessWidget {
+  const _ScheduleOptionPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.SecondBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : AppColors.SecondBlue,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClubPickerDialog extends StatefulWidget {
+  const _ClubPickerDialog({
+    this.initial,
+  });
+
+  final String? initial;
+
+  @override
+  State<_ClubPickerDialog> createState() => _ClubPickerDialogState();
+}
+
+class _ClubPickerDialogState extends State<_ClubPickerDialog> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial?.trim();
+    _selected =
+        initial != null && initial.isNotEmpty ? initial : limaPadelClubs.first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Tu lado de juego',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Selecciona tu club preferido',
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7EBF2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selected,
+                  isExpanded: true,
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                  items: limaPadelClubs
+                      .map(
+                        (club) => DropdownMenuItem(
+                          value: club,
+                          child: Text(
+                            club,
+                            style: const TextStyle(
+                              color: AppColors.SecondBlue,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _selected = value;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(_selected),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'Confirmar',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('omit'),
+              style: TextButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
+                padding: EdgeInsets.zero,
+              ),
+              child: Text(
+                'Omitir',
+                style: TextStyle(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

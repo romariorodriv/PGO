@@ -1,0 +1,15 @@
+const List<String> limaPadelClubs = [
+  'One Padel Olguin',
+  'One Padel Trigal',
+  'One Padel Naval',
+  'Los Inkas Padel',
+  'Pro Padel',
+  'Padel 360',
+  'Padel House',
+  'Arena Padel',
+  'Padel Zone',
+  'Padel Point',
+  'Padel Surco',
+  'Padel La Molina',
+  'Club Terrazas Padel',
+];

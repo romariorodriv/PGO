@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import '../constants/lima_padel_clubs.dart';
 import '../models/community_user.dart';
 import '../models/profile_summary.dart';
 import '../models/selected_player.dart';
@@ -48,6 +49,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   bool _isLoadingCommunity = true;
   bool _isSearching = false;
   bool _isSubmitting = false;
+  String? _selectedClubName;
   String? _profileError;
   String? _communityError;
 
@@ -77,6 +79,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
       if (!mounted) return;
       setState(() {
         _profile = profile;
+        _selectedClubName ??=
+            profile.preferredClub ?? _fallbackClubName;
         _selectedPlayers[0] = SelectedPlayer(
           id: profile.id,
           name: profile.name,
@@ -225,7 +229,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
 
     try {
       final match = await MatchService().createMatch(
-        clubName: _profile?.preferredClub ?? _fallbackClubName,
+        clubName: _clubName,
         playedAt: DateTime.now(),
         matchType: widget.isCompetitive ? 'RANKED' : 'FRIENDLY',
         participantIds: _selectedPlayers
@@ -260,12 +264,31 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
     }
   }
 
-  String get _clubName => _profile?.preferredClub ?? _fallbackClubName;
+  String get _clubName =>
+      _selectedClubName ??
+      _profile?.preferredClub ??
+      _fallbackClubName;
 
   List<CommunityUser> get _displayUsers =>
       _searchController.text.trim().isEmpty ? _communityUsers : _searchResults;
   bool get _canContinue =>
       !_isSubmitting && _selectedPlayers.every((player) => player != null);
+
+  Future<void> _pickClub() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ClubPickerSheet(
+        current: _clubName,
+        clubs: limaPadelClubs,
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() {
+      _selectedClubName = selected;
+    });
+  }
 
   Future<void> _handleQrScan() async {
     final code = await Navigator.of(context).push<String>(
@@ -549,12 +572,20 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                             ),
                           ),
                         ),
-                        const Text(
-                          'Desde perfil',
-                          style: TextStyle(
-                            color: AppColors.PrimaryGreen,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                        TextButton(
+                          onPressed: _pickClub,
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 0),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Cambiar',
+                            style: TextStyle(
+                              color: AppColors.PrimaryGreen,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -896,6 +927,75 @@ class _InlineInfoCard extends StatelessWidget {
           color: AppColors.SecondBlue.withValues(alpha: 0.75),
           fontSize: 13,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _ClubPickerSheet extends StatelessWidget {
+  const _ClubPickerSheet({
+    required this.current,
+    required this.clubs,
+  });
+
+  final String current;
+  final List<String> clubs;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.7;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Selecciona club',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView.separated(
+                itemCount: clubs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final club = clubs[index];
+                  return ListTile(
+                    onTap: () => Navigator.of(context).pop(club),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    tileColor: club == current
+                        ? const Color(0xFFD7FF59)
+                        : const Color(0xFFF2F4F8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: Text(
+                      club,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    trailing: club == current
+                        ? const Icon(Icons.check, color: AppColors.SecondBlue)
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

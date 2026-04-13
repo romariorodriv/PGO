@@ -16,18 +16,20 @@ class LiveMatchSetupScreen extends StatefulWidget {
     required this.isCompetitive,
     required this.profile,
     required this.players,
+    this.clubName,
   });
 
   final bool isCompetitive;
   final ProfileSummary profile;
   final List<SelectedPlayer> players;
+  final String? clubName;
 
   @override
   State<LiveMatchSetupScreen> createState() => _LiveMatchSetupScreenState();
 }
 
 class _LiveMatchSetupScreenState extends State<LiveMatchSetupScreen> {
-  static const _fallbackClubName = 'One Padel Olguín';
+  static const _fallbackClubName = 'One Padel Olguin';
 
   bool _isSubmitting = false;
   int? _servingTeam;
@@ -48,7 +50,9 @@ class _LiveMatchSetupScreenState extends State<LiveMatchSetupScreen> {
 
     try {
       final match = await MatchService().createMatch(
-        clubName: widget.profile.preferredClub ?? _fallbackClubName,
+        clubName: widget.clubName ??
+            widget.profile.preferredClub ??
+            _fallbackClubName,
         playedAt: DateTime.now(),
         matchType: widget.isCompetitive ? 'RANKED' : 'FRIENDLY',
         participantIds: widget.players.map((player) => player.id).toList(),

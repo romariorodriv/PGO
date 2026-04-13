@@ -29,6 +29,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   final List<List<int>> _games = [
     [0, 0],
   ];
+  int? _finalTeam1Sets;
+  int? _finalTeam2Sets;
 
   @override
   void initState() {
@@ -66,14 +68,59 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     return '$dayName ${_selectedDate.day} de $monthName';
   }
 
-  PadelMatchValidationResult get _matchValidation =>
-      PadelRules.validateBestOfThreeMatch(_games);
+  PadelMatchValidationResult get _matchValidation {
+    final base = PadelRules.validateBestOfThreeMatch(_games);
+    if (!base.isValid) {
+      return base;
+    }
+
+    if (_games.length < 2 || _games.length > PadelRules.maxSets) {
+      return PadelMatchValidationResult(
+        isValid: false,
+        error: 'Debes registrar 2 o 3 sets del partido.',
+        team1SetsWon: base.team1SetsWon,
+        team2SetsWon: base.team2SetsWon,
+      );
+    }
+
+    if (!_isFinalSetsValid) {
+      return PadelMatchValidationResult(
+        isValid: false,
+        error: 'Debes registrar el resultado final 2-1, 1-2, 2-0 o 0-2 en sets.',
+        team1SetsWon: base.team1SetsWon,
+        team2SetsWon: base.team2SetsWon,
+      );
+    }
+
+    if (base.team1SetsWon != _finalTeam1Sets ||
+        base.team2SetsWon != _finalTeam2Sets) {
+      return PadelMatchValidationResult(
+        isValid: false,
+        error:
+            'El resultado final en sets no coincide con los sets registrados.',
+        team1SetsWon: base.team1SetsWon,
+        team2SetsWon: base.team2SetsWon,
+      );
+    }
+
+    return base;
+  }
 
   int get _team1SetsWon => _matchValidation.team1SetsWon;
   int get _team2SetsWon => _matchValidation.team2SetsWon;
-  int? get _selectedTeam => _matchValidation.winnerTeam;
+  int? get _selectedTeam =>
+      _finalWinnerTeam ?? (_matchValidation.isValid ? _matchValidation.winnerTeam : null);
 
   bool get _canContinue => _matchValidation.isValid && _selectedTeam != null;
+  bool get _isFinalSetsValid =>
+      (_finalTeam1Sets == 2 && _finalTeam2Sets == 1) ||
+      (_finalTeam1Sets == 1 && _finalTeam2Sets == 2) ||
+      (_finalTeam1Sets == 2 && _finalTeam2Sets == 0) ||
+      (_finalTeam1Sets == 0 && _finalTeam2Sets == 2);
+  int? get _finalWinnerTeam {
+    if (!_isFinalSetsValid) return null;
+    return _finalTeam1Sets! > _finalTeam2Sets! ? 1 : 2;
+  }
 
   Future<void> _changeDate() async {
     final result = await showDatePicker(
@@ -132,15 +179,81 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                     PadelRules.validateCompletedSetScore(team1, team2);
                 if (!validation.isValid) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content:
-                          Text(validation.error ?? 'Set invalido para padel'),
+                    const SnackBar(
+                      content: Text(
+                        'Set invalido. Ingresa el marcador final del set: 6-0 a 6-4, 7-5 o 7-6.',
+                      ),
                     ),
                   );
                   return;
                 }
                 setState(() {
                   _games[index] = [team1, team2];
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _editFinalSets() async {
+    final controller1 =
+        TextEditingController(text: _finalTeam1Sets?.toString() ?? '');
+    final controller2 =
+        TextEditingController(text: _finalTeam2Sets?.toString() ?? '');
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar resultado final'),
+          content: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller1,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Equipo 1'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: controller2,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Equipo 2'),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final team1 = int.tryParse(controller1.text);
+                final team2 = int.tryParse(controller2.text);
+                if (!((team1 == 2 && team2 == 1) ||
+                    (team1 == 1 && team2 == 2) ||
+                    (team1 == 2 && team2 == 0) ||
+                    (team1 == 0 && team2 == 2))) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Resultado invalido. Usa 2-1, 1-2, 2-0 o 0-2.'),
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  _finalTeam1Sets = team1;
+                  _finalTeam2Sets = team2;
                 });
                 Navigator.of(context).pop();
               },
@@ -170,14 +283,9 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
 
   Future<void> _handleContinue() async {
     if (!_matchValidation.isValid || _selectedTeam == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _matchValidation.error ??
-                'El partido debe tener una pareja ganadora valida.',
-          ),
-        ),
-      );
+      final message = _matchValidation.error ??
+          'El partido debe tener una pareja ganadora valida.';
+      await _showValidationError(message);
       return;
     }
 
@@ -225,6 +333,25 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         });
       }
     }
+  }
+
+  Future<void> _showValidationError(String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('No puedes continuar'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -275,15 +402,14 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed:
-                      _isSaving || !_canContinue ? null : _handleContinue,
+                  onPressed: _isSaving ? null : _handleContinue,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD7FF59),
-                    disabledBackgroundColor:
-                        const Color(0xFFD7FF59).withValues(alpha: 0.45),
-                    foregroundColor: AppColors.SecondBlue,
-                    disabledForegroundColor:
-                        AppColors.SecondBlue.withValues(alpha: 0.55),
+                    backgroundColor: _canContinue
+                        ? const Color(0xFFD7FF59)
+                        : const Color(0xFFD9DEE7),
+                    foregroundColor: _canContinue
+                        ? AppColors.SecondBlue
+                        : AppColors.SecondBlue.withValues(alpha: 0.55),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(28),
@@ -377,7 +503,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'Sets',
+                  'Resultado en sets',
                   style: TextStyle(
                     color: AppColors.SecondBlue,
                     fontSize: 16,
@@ -386,7 +512,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: _addGame,
+                onTap: _editFinalSets,
                 child: Container(
                   width: 28,
                   height: 28,
@@ -406,7 +532,9 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           const SizedBox(height: 2),
           Center(
             child: Text(
-              '$_team1SetsWon - $_team2SetsWon',
+              _finalTeam1Sets != null && _finalTeam2Sets != null
+                  ? '$_finalTeam1Sets - $_finalTeam2Sets'
+                  : '--',
               style: const TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 44,
@@ -456,7 +584,11 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           child: _TeamTab(
             label: 'Equipo 1',
             selected: _selectedTeam == 1,
-            onTap: () {},
+            onTap: () {
+              _showValidationError(
+                'El ganador se define por el resultado en sets. Usa el lapiz para editarlo.',
+              );
+            },
           ),
         ),
         const SizedBox(width: 10),
@@ -464,7 +596,11 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           child: _TeamTab(
             label: 'Equipo 2',
             selected: _selectedTeam == 2,
-            onTap: () {},
+            onTap: () {
+              _showValidationError(
+                'El ganador se define por el resultado en sets. Usa el lapiz para editarlo.',
+              );
+            },
           ),
         ),
       ],
@@ -535,7 +671,7 @@ class _AddGamePill extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
         ),
         child: const Text(
-          '+ game',
+          '+ set',
           style: TextStyle(
             color: AppColors.SecondBlue,
             fontSize: 15,

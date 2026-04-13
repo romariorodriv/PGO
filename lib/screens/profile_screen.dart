@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../constants/colors.dart';
@@ -108,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
                         child: Column(
-                          children: [
+                      children: [
                             _ProfileHeroCard(
                               profile: profile,
                               onPreview: () {
@@ -392,81 +393,91 @@ class _ProfileHeroCard extends StatelessWidget {
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD8DDE5),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Mi QR de jugador',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Compártelo para que te agreguen rápido a un match o torneo.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.62),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: const Color(0xFFE2E7EE),
+            child: Builder(
+              builder: (context) {
+                final maxHeight = MediaQuery.of(context).size.height * 0.75;
+                return ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxHeight),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD8DDE5),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Mi QR de jugador',
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Compartelo para que te agreguen rapido a un match o torneo.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: const Color(0xFFE2E7EE),
+                            ),
+                          ),
+                          child: QrImageView(
+                            data: qrValue,
+                            version: QrVersions.auto,
+                            size: 200,
+                            backgroundColor: Colors.white,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: AppColors.SecondBlue,
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: AppColors.SecondBlue,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          profile.name,
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID: ${profile.id}',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue.withValues(alpha: 0.52),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: QrImageView(
-                    data: qrValue,
-                    version: QrVersions.auto,
-                    size: 220,
-                    backgroundColor: Colors.white,
-                    eyeStyle: const QrEyeStyle(
-                      eyeShape: QrEyeShape.square,
-                      color: AppColors.SecondBlue,
-                    ),
-                    dataModuleStyle: const QrDataModuleStyle(
-                      dataModuleShape: QrDataModuleShape.square,
-                      color: AppColors.SecondBlue,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  profile.name,
-                  style: const TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ID: ${profile.id}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.52),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         );

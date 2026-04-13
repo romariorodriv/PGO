@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
@@ -153,12 +154,12 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: const Text(
-        'Torneo',
-        style: TextStyle(
+      title: Text(
+        'Actividad',
+        style: GoogleFonts.inter(
           color: Colors.white,
           fontSize: 22,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
         ),
       ),
       actions: const [PgoOptionsMenuButton()],
@@ -220,7 +221,10 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
                       child: ElevatedButton(
                         onPressed: () {
                           if (widget.isPaid ||
-                              _currentTournament?.registrationsOpen == false) {
+                              _currentTournament?.registrationsOpen == false ||
+                              (_currentTournament != null &&
+                                  _currentTournament!.registrationsCount >=
+                                      _currentTournament!.playerCapacity)) {
                             return;
                           }
                           _handleRegisterTap(context);
@@ -238,8 +242,13 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
                               ? 'IR AL PARTIDO'
                               : (_currentTournament?.registrationsOpen == false
                                   ? 'INSCRIPCIONES CERRADAS'
-                                  : 'UNIRME'),
-                          style: const TextStyle(
+                                  : (_currentTournament != null &&
+                                          _currentTournament!
+                                                  .registrationsCount >=
+                                              _currentTournament!.playerCapacity
+                                      ? 'CUPOS COMPLETOS'
+                                      : 'UNIRME')),
+                          style: GoogleFonts.inter(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                           ),
@@ -296,7 +305,7 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
         fit: StackFit.expand,
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            borderRadius: BorderRadius.circular(24),
             child: _photoUrl.isNotEmpty
                 ? _photoUrl.startsWith('http')
                     ? Image.network(
@@ -320,8 +329,7 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
           ),
           Container(
             decoration: BoxDecoration(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(34)),
+              borderRadius: BorderRadius.circular(24),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
