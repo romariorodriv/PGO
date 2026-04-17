@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
@@ -71,8 +73,8 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
         context: context,
         barrierDismissible: true,
         builder: (context) => _CloseRegistrationsDialog(
-          isComplete:
-              _currentTournament.registrationsCount >= _currentTournament.playerCapacity,
+          isComplete: _currentTournament.registrationsCount >=
+              _currentTournament.playerCapacity,
           onGenerateBrackets: () async {
             Navigator.of(context).pop(true);
           },
@@ -91,8 +93,10 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
     try {
       late TournamentRecord updated;
       if (_currentTournament.registrationsOpen) {
-        await TournamentService().closeAndGenerateBracket(_currentTournament.id);
-        updated = await TournamentService().getTournament(_currentTournament.id);
+        await TournamentService()
+            .closeAndGenerateBracket(_currentTournament.id);
+        updated =
+            await TournamentService().getTournament(_currentTournament.id);
       } else {
         updated = await TournamentService().updateTournament(
           tournamentId: _currentTournament.id,
@@ -175,7 +179,8 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
   List<String> get _recentActivity {
     final entries = [..._currentTournament.registrationEntries]
       ..sort((left, right) {
-        final leftDate = left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final leftDate =
+            left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final rightDate =
             right.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         return rightDate.compareTo(leftDate);
@@ -203,209 +208,212 @@ class _TournamentAdminScreenState extends State<TournamentAdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Panel de torneo',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [PgoOptionsMenuButton()],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: Text(
+          'Panel de torneo',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        child: RefreshIndicator(
-          onRefresh: _loadTournament,
-          color: AppColors.SecondBlue,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _AdminHeroCard(
-                  tournament: _currentTournament,
-                  formattedDate: _formattedHeroDate,
-                ),
-                const SizedBox(height: 12),
-                _buildTabs(context),
-                const SizedBox(height: 16),
-                if (_isLoading)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 16),
-                    child: Center(child: CircularProgressIndicator()),
+        actions: const [PgoOptionsMenuButton()],
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: RefreshIndicator(
+            onRefresh: _loadTournament,
+            color: AppColors.SecondBlue,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AdminHeroCard(
+                    tournament: _currentTournament,
+                    formattedDate: _formattedHeroDate,
                   ),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _PanelCard(
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: AppColors.SecondBlue,
-                          fontWeight: FontWeight.w700,
+                  const SizedBox(height: 12),
+                  _buildTabs(context),
+                  const SizedBox(height: 16),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _PanelCard(
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(
+                            color: AppColors.SecondBlue,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                _PanelCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Inscripciones abiertas',
-                        style: TextStyle(
-                          color: AppColors.SecondBlue,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.groups_2_outlined,
-                            color: AppColors.SecondBlue.withValues(alpha: 0.65),
-                            size: 20,
+                  _PanelCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Inscripciones abiertas',
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_currentTournament.registrationsCount} de ${_currentTournament.playerCapacity} jugadores',
-                            style: const TextStyle(
-                              color: AppColors.SecondBlue,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.groups_2_outlined,
+                              color:
+                                  AppColors.SecondBlue.withValues(alpha: 0.65),
+                              size: 20,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: _currentTournament.playerCapacity <= 0
-                              ? 0
-                              : (_currentTournament.registrationsCount /
-                                      _currentTournament.playerCapacity)
-                                  .clamp(0.0, 1.0),
-                          minHeight: 10,
-                          backgroundColor: const Color(0xFFB8C1D3),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            AppColors.PrimaryGreen,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _currentTournament.registrationsOpen
-                            ? 'Se cierra al completar cupos'
-                            : 'Las inscripciones estan cerradas',
-                        style: TextStyle(
-                          color: AppColors.SecondBlue.withValues(alpha: 0.58),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _ActionButton(
-                        label: 'Ver inscritos',
-                        filled: true,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  TournamentAdminRegistrationsScreen(
-                                tournament: _currentTournament,
+                            const SizedBox(width: 6),
+                            Text(
+                              '${_currentTournament.registrationsCount} de ${_currentTournament.playerCapacity} jugadores',
+                              style: const TextStyle(
+                                color: AppColors.SecondBlue,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _ActionButton(
-                        label: _currentTournament.registrationsOpen
-                            ? 'Cerrar inscripciones'
-                            : 'Abrir cupos',
-                        filled: false,
-                        enabled: !_isUpdatingRegistrations,
-                        onTap: _toggleRegistrations,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _PanelCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Resumen del torneo',
-                        style: TextStyle(
-                          color: AppColors.SecondBlue,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      _SummaryLine(
-                        label: 'Cupos',
-                        value: '${_currentTournament.playerCapacity}',
-                      ),
-                      _SummaryLine(
-                        label: 'Formato',
-                        value: _currentTournament.format,
-                      ),
-                      const _SummaryLine(
-                        label: 'Inscripcion',
-                        value: 'Con o sin pareja',
-                      ),
-                      _SummaryLine(
-                        label: 'Costo',
-                        value: 'S/${_currentTournament.entryFee} x persona',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _PanelCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Actividad reciente',
-                        style: TextStyle(
-                          color: AppColors.SecondBlue,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ..._recentActivity.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            item,
-                            style: TextStyle(
-                              color: AppColors.SecondBlue.withValues(alpha: 0.82),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: _currentTournament.playerCapacity <= 0
+                                ? 0
+                                : (_currentTournament.registrationsCount /
+                                        _currentTournament.playerCapacity)
+                                    .clamp(0.0, 1.0),
+                            minHeight: 10,
+                            backgroundColor: const Color(0xFFB8C1D3),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.PrimaryGreen,
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          _currentTournament.registrationsOpen
+                              ? 'Se cierra al completar cupos'
+                              : 'Las inscripciones estan cerradas',
+                          style: TextStyle(
+                            color: AppColors.SecondBlue.withValues(alpha: 0.58),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ActionButton(
+                          label: 'Ver inscritos',
+                          filled: true,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    TournamentAdminRegistrationsScreen(
+                                  tournament: _currentTournament,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _ActionButton(
+                          label: _currentTournament.registrationsOpen
+                              ? 'Cerrar inscripciones'
+                              : 'Abrir cupos',
+                          filled: false,
+                          enabled: !_isUpdatingRegistrations,
+                          onTap: _toggleRegistrations,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  _PanelCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Resumen del torneo',
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _SummaryLine(
+                          label: 'Cupos',
+                          value: '${_currentTournament.playerCapacity}',
+                        ),
+                        _SummaryLine(
+                          label: 'Formato',
+                          value: _currentTournament.format,
+                        ),
+                        const _SummaryLine(
+                          label: 'Inscripcion',
+                          value: 'Con o sin pareja',
+                        ),
+                        _SummaryLine(
+                          label: 'Costo',
+                          value: 'S/${_currentTournament.entryFee} x persona',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _PanelCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Actividad reciente',
+                          style: GoogleFonts.inter(
+                            color: AppColors.SecondBlue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ..._recentActivity.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _RecentActivityText(text: item),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -541,19 +549,19 @@ class _AdminHeroCard extends StatelessWidget {
                       tournament.photoUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/InkaPadel.png',
+                        AppAssets.defaultTournamentImage,
                         fit: BoxFit.cover,
                       ),
                     )
                   : (bytes != null
                       ? Image.memory(bytes, fit: BoxFit.cover)
                       : Image.asset(
-                          'assets/images/InkaPadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ))
             else
               Image.asset(
-                'assets/images/InkaPadel.png',
+                AppAssets.defaultTournamentImage,
                 fit: BoxFit.cover,
               ),
             Container(
@@ -584,7 +592,7 @@ class _AdminHeroCard extends StatelessWidget {
                           tournament.title.toUpperCase(),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: GoogleFonts.inter(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
@@ -603,7 +611,9 @@ class _AdminHeroCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(
-                          tournament.registrationsOpen ? 'Pendiente' : 'Cerrado',
+                          tournament.registrationsOpen
+                              ? 'Pendiente'
+                              : 'Cerrado',
                           style: const TextStyle(
                             color: AppColors.SecondBlue,
                             fontSize: 10,
@@ -706,6 +716,69 @@ class _PanelCard extends StatelessWidget {
       ),
       child: child,
     );
+  }
+}
+
+class _RecentActivityText extends StatelessWidget {
+  const _RecentActivityText({
+    required this.text,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = GoogleFonts.inter(
+      color: AppColors.SecondBlue.withValues(alpha: 0.82),
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+    );
+    final boldStyle = GoogleFonts.inter(
+      color: AppColors.SecondBlue.withValues(alpha: 0.92),
+      fontSize: 13,
+      fontWeight: FontWeight.w900,
+    );
+
+    final cuposMatch = RegExp(r'^(\d+ de \d+ cupos)(.*)$').firstMatch(text);
+    if (cuposMatch != null) {
+      return RichText(
+        text: TextSpan(
+          style: baseStyle,
+          children: [
+            TextSpan(text: cuposMatch.group(1), style: boldStyle),
+            TextSpan(text: cuposMatch.group(2) ?? ''),
+          ],
+        ),
+      );
+    }
+
+    final splitText = text.split(' se ');
+    if (splitText.length == 2) {
+      return RichText(
+        text: TextSpan(
+          style: baseStyle,
+          children: [
+            TextSpan(text: splitText.first, style: boldStyle),
+            TextSpan(text: ' se ${splitText.last}'),
+          ],
+        ),
+      );
+    }
+
+    final searchingText = text.split(' esta ');
+    if (searchingText.length == 2) {
+      return RichText(
+        text: TextSpan(
+          style: baseStyle,
+          children: [
+            TextSpan(text: searchingText.first, style: boldStyle),
+            TextSpan(text: ' esta ${searchingText.last}'),
+          ],
+        ),
+      );
+    }
+
+    return Text(text, style: baseStyle);
   }
 }
 

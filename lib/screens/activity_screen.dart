@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
@@ -36,82 +37,91 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Actividad',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [
-        PgoOptionsMenuButton(),
-      ],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: Text(
+          'Actividad',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 56, 22, 30),
-          child: Column(
-            children: [
-              const SizedBox(height: 88),
-              Text(
-                '${_buildFirstName()},',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 27,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
+        actions: const [
+          PgoOptionsMenuButton(),
+        ],
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 56, 22, 30),
+            child: Column(
+              children: [
+                const SizedBox(height: 88),
+                Text(
+                  '${_buildFirstName()},',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 27,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '¿listo para un nuevo partido?',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.62),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                const SizedBox(height: 6),
+                Text(
+                  '¿listo para un nuevo partido?',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 48),
-              _ActionButton(
-                label: 'Registrar actividad',
-                filled: true,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ActivityMatchSetupScreen(
-                        isCompetitive: true,
+                const SizedBox(height: 48),
+                _ActionButton(
+                  label: 'Registrar actividad',
+                  filled: true,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const ActivityMatchSetupScreen(
+                          isCompetitive: true,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              _ActionButton(
-                label: 'Registrar en vivo',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const LiveMatchPlayersScreen(
-                        isCompetitive: true,
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                _ActionButton(
+                  label: 'Registrar en vivo',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const LiveMatchPlayersScreen(
+                          isCompetitive: true,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-              const Spacer(),
-            ],
+                    );
+                  },
+                ),
+                const Spacer(),
+              ],
+            ),
           ),
         ),
       ),
@@ -132,12 +142,10 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.filled = false,
-    this.enabled = true,
   });
 
   final String label;
   final bool filled;
-  final bool enabled;
   final VoidCallback onTap;
 
   @override
@@ -146,17 +154,11 @@ class _ActionButton extends StatelessWidget {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: enabled ? onTap : null,
+        onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: enabled
-              ? (filled ? const Color(0xFFD7FF59) : Colors.white)
-              : const Color(0xFFE6E9EF),
-          foregroundColor: enabled
-              ? AppColors.SecondBlue
-              : AppColors.SecondBlue.withValues(alpha: 0.45),
-          disabledBackgroundColor: const Color(0xFFE6E9EF),
-          disabledForegroundColor: AppColors.SecondBlue.withValues(alpha: 0.45),
-          elevation: enabled ? 5 : 0,
+          backgroundColor: filled ? const Color(0xFFD7FF59) : Colors.white,
+          foregroundColor: AppColors.SecondBlue,
+          elevation: 5,
           shadowColor: Colors.black.withValues(alpha: 0.14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(25),
@@ -164,12 +166,10 @@ class _ActionButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: enabled
-                ? AppColors.SecondBlue
-                : AppColors.SecondBlue.withValues(alpha: 0.45),
+            fontWeight: FontWeight.w900,
+            color: AppColors.SecondBlue,
           ),
         ),
       ),

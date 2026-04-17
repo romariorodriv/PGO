@@ -6,7 +6,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
+import '../constants/lima_padel_clubs.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
@@ -80,6 +82,13 @@ class _TournamentCreateFlowScreenState
   String get _displayPrize =>
       _createdTournament?.prize ?? _prizeController.text;
   int get _displayEntryFee => _createdTournament?.entryFee ?? _parseEntryFee();
+  List<String> get _clubOptions {
+    final currentClub = _clubController.text.trim();
+    if (currentClub.isEmpty || limaPadelClubs.contains(currentClub)) {
+      return limaPadelClubs;
+    }
+    return [currentClub, ...limaPadelClubs];
+  }
 
   @override
   void initState() {
@@ -94,6 +103,7 @@ class _TournamentCreateFlowScreenState
       final now = DateTime.now().add(const Duration(days: 7));
       _selectedDate = DateTime(now.year, now.month, now.day);
       _selectedTime = const TimeOfDay(hour: 21, minute: 30);
+      _applyClubDetails(limaPadelClubDetails.first);
     }
     _syncDateTimeControllers();
   }
@@ -153,6 +163,37 @@ class _TournamentCreateFlowScreenState
     );
     _selectedPhotoDataUrl = tournament.photoUrl;
     _selectedPhotoBytes = tryDecodeDataUrl(tournament.photoUrl);
+    _syncSelectedClubDetails();
+  }
+
+  void _syncSelectedClubDetails() {
+    final selectedClubName = _clubController.text.trim();
+    if (selectedClubName.isEmpty) return;
+
+    final matches = limaPadelClubDetails.where(
+      (club) => club.name.toLowerCase() == selectedClubName.toLowerCase(),
+    );
+    if (matches.isEmpty) return;
+
+    _applyClubDetails(matches.first);
+  }
+
+  void _applyClubDetails(LimaPadelClub club) {
+    _clubController.text = club.name;
+    _addressController.text = club.address;
+    _city = club.city;
+    _districtController.text = club.district;
+  }
+
+  void _handleClubChanged(String? value) {
+    if (value == null) return;
+
+    final matches = limaPadelClubDetails.where((club) => club.name == value);
+    if (matches.isEmpty) return;
+
+    setState(() {
+      _applyClubDetails(matches.first);
+    });
   }
 
   void _next() {
@@ -491,7 +532,8 @@ class _TournamentCreateFlowScreenState
                   const _IntroStep(text: '3. Configura inscripciones'),
                   const _IntroStep(text: '4. Revisa y publica'),
                   const SizedBox(height: 18),
-                  _PrimaryActionButton(label: 'Empezar', onTap: _handleNextStep),
+                  _PrimaryActionButton(
+                      label: 'Empezar', onTap: _handleNextStep),
                 ],
               ),
             ),
@@ -590,22 +632,26 @@ class _TournamentCreateFlowScreenState
             ),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Club/Sede'),
-            _TextFieldBox(controller: _clubController),
+            _DropdownBox(
+              value: _clubController.text,
+              items: _clubOptions,
+              onChanged: _handleClubChanged,
+            ),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Direccion'),
-            _TextFieldBox(controller: _addressController),
+            _TextFieldBox(
+              controller: _addressController,
+              readOnly: true,
+            ),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Ciudad'),
-            _DropdownBox(
-              value: _city,
-              items: const ['Lima', 'Trujillo', 'Arequipa'],
-              onChanged: (value) => setState(() => _city = value!),
-            ),
+            _StaticFieldBox(value: _city),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Distrito'),
             _TextFieldBox(
               controller: _districtController,
               hintText: 'Ej. Santiago de Surco',
+              readOnly: true,
               suffixIcon: IconButton(
                 icon: const Icon(
                   Icons.map_rounded,
@@ -966,8 +1012,8 @@ class _StepScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-        child: Column(
-          children: [
+      child: Column(
+        children: [
           RichText(
             text: TextSpan(
               children: [
@@ -1173,6 +1219,32 @@ class _TextFieldBox extends StatelessWidget {
             color: AppColors.SecondBlue.withValues(alpha: 0.4),
             fontSize: 13,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaticFieldBox extends StatelessWidget {
+  const _StaticFieldBox({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8EBF0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        value,
+        style: GoogleFonts.inter(
+          color: AppColors.SecondBlue,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -1443,7 +1515,7 @@ class _ReviewHeroCard extends StatelessWidget {
                       normalizedPhoto,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/InkaPadel.png',
+                        AppAssets.defaultTournamentImage,
                         fit: BoxFit.cover,
                       ),
                     )
@@ -1453,12 +1525,12 @@ class _ReviewHeroCard extends StatelessWidget {
                           fit: BoxFit.cover,
                         )
                       : Image.asset(
-                          'assets/images/InkaPadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ))
             else
               Image.asset(
-                'assets/images/InkaPadel.png',
+                AppAssets.defaultTournamentImage,
                 fit: BoxFit.cover,
               ),
             Container(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/tournament_admin_matches.dart';
 import '../models/tournament_record.dart';
@@ -284,19 +285,19 @@ class _HeroCard extends StatelessWidget {
                       tournament.photoUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/InkaPadel.png',
+                        AppAssets.defaultTournamentImage,
                         fit: BoxFit.cover,
                       ),
                     )
                   : (bytes != null
                       ? Image.memory(bytes, fit: BoxFit.cover)
                       : Image.asset(
-                          'assets/images/InkaPadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ))
             else
               Image.asset(
-                'assets/images/InkaPadel.png',
+                AppAssets.defaultTournamentImage,
                 fit: BoxFit.cover,
               ),
             Container(
@@ -856,7 +857,8 @@ class _AdminMatchCardFooter extends StatelessWidget {
     }
 
     if (match.status == 'FINISHED') {
-      final winner = (match.winnerLabel ?? '').replaceFirst('Ganador: ', '').trim();
+      final winner =
+          (match.winnerLabel ?? '').replaceFirst('Ganador: ', '').trim();
       return RichText(
         text: TextSpan(
           style: TextStyle(
@@ -1091,8 +1093,9 @@ class _StartMatchDialogState extends State<_StartMatchDialog> {
                   child: SizedBox(
                     height: 42,
                     child: ElevatedButton(
-                      onPressed:
-                          _submitting ? null : () => Navigator.of(context).pop(),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE7EBF0),
                         foregroundColor: AppColors.SecondBlue,
@@ -1234,13 +1237,15 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
             _WinnerOption(
               label: widget.match.teamOne,
               selected: _selectedWinner == widget.match.teamOne,
-              onTap: () => setState(() => _selectedWinner = widget.match.teamOne),
+              onTap: () =>
+                  setState(() => _selectedWinner = widget.match.teamOne),
             ),
             const SizedBox(height: 8),
             _WinnerOption(
               label: widget.match.teamTwo,
               selected: _selectedWinner == widget.match.teamTwo,
-              onTap: () => setState(() => _selectedWinner = widget.match.teamTwo),
+              onTap: () =>
+                  setState(() => _selectedWinner = widget.match.teamTwo),
             ),
             const SizedBox(height: 10),
             Text(
@@ -1259,8 +1264,9 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
                   child: SizedBox(
                     height: 42,
                     child: ElevatedButton(
-                      onPressed:
-                          _submitting ? null : () => Navigator.of(context).pop(),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE7EBF0),
                         foregroundColor: AppColors.SecondBlue,
@@ -1539,9 +1545,9 @@ class _MatchResultDialog extends StatelessWidget {
                           context: context,
                           barrierDismissible: true,
                           builder: (context) => _CorrectMatchResultDialog(
-                                match: match,
-                                onConfirm: onCorrectResult,
-                              ),
+                            match: match,
+                            onConfirm: onCorrectResult,
+                          ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
@@ -1606,9 +1612,8 @@ class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
     super.initState();
     final winner =
         widget.match.winnerLabel?.replaceFirst('Ganador: ', '').trim();
-    _selectedWinner = (winner != null && winner.isNotEmpty)
-        ? winner
-        : widget.match.teamOne;
+    _selectedWinner =
+        (winner != null && winner.isNotEmpty) ? winner : widget.match.teamOne;
   }
 
   @override

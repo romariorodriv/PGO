@@ -51,6 +51,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
   String? _selectedClubName;
   String? _profileError;
   String? _communityError;
+  bool _showAllSuggestions = false;
 
   @override
   void initState() {
@@ -79,8 +80,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _selectedClubName ??=
-            profile.preferredClub ?? _fallbackClubName;
+        _selectedClubName ??= profile.preferredClub ?? _fallbackClubName;
         _selectedPlayers[0] = SelectedPlayer(
           id: profile.id,
           name: profile.name,
@@ -155,6 +155,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
         setState(() {
           _searchResults = const [];
           _communityError = null;
+          _showAllSuggestions = false;
         });
         return;
       }
@@ -196,6 +197,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
       );
       _searchController.clear();
       _searchResults = const [];
+      _showAllSuggestions = false;
     });
   }
 
@@ -225,7 +227,8 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
       if (!mounted) return;
       if (users.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No encontramos un jugador para ese QR')),
+          const SnackBar(
+              content: Text('No encontramos un jugador para ese QR')),
         );
         return;
       }
@@ -296,13 +299,22 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
   List<CommunityUser> get _displayUsers =>
       _searchController.text.trim().isEmpty ? _communityUsers : _searchResults;
 
-  String get _clubName =>
-      _selectedClubName ??
-      _profile?.preferredClub ??
-      _fallbackClubName;
+  bool get _isShowingSuggestions => _searchController.text.trim().isEmpty;
 
-  bool get _canContinue =>
-      _selectedPlayers.every((player) => player != null);
+  List<CommunityUser> get _visibleUsers {
+    if (_isShowingSuggestions && !_showAllSuggestions) {
+      return _displayUsers.take(5).toList();
+    }
+    return _displayUsers;
+  }
+
+  bool get _canToggleSuggestions =>
+      _isShowingSuggestions && _displayUsers.length > 5;
+
+  String get _clubName =>
+      _selectedClubName ?? _profile?.preferredClub ?? _fallbackClubName;
+
+  bool get _canContinue => _selectedPlayers.every((player) => player != null);
 
   Future<void> _pickClub() async {
     final selected = await showModalBottomSheet<String>(
@@ -329,7 +341,8 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
     return Theme(
       data: baseTheme.copyWith(
         textTheme: interTextTheme,
-        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
       child: PgoHeaderScaffold(
         leading: IconButton(
@@ -509,8 +522,8 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                             ? 'Aun no tienes companeros con los que hayas jugado.'
                             : 'No encontramos jugadores con esa busqueda.',
                       )
-                    else
-                      ..._displayUsers.map(
+                    else ...[
+                      ..._visibleUsers.map(
                         (user) => Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: _CommunityUserCard(
@@ -520,6 +533,27 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                           ),
                         ),
                       ),
+                      if (_canToggleSuggestions) ...[
+                        const SizedBox(height: 2),
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _showAllSuggestions = !_showAllSuggestions;
+                              });
+                            },
+                            child: Text(
+                              _showAllSuggestions ? 'Ver menos' : 'Ver mas',
+                              style: GoogleFonts.inter(
+                                color: AppColors.SecondBlue,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 18),
                     const Text(
                       'Club de juego',

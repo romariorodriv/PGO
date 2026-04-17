@@ -8,6 +8,7 @@ import '../constants/colors.dart';
 import '../models/match_record.dart';
 import '../models/profile_summary.dart';
 import '../models/selected_player.dart';
+import '../services/match_service.dart';
 import '../services/profile_service.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_options_menu.dart';
@@ -41,6 +42,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   ProfileSummary? _profile;
   bool _isLoading = true;
+  bool _isOpeningMatchSummary = false;
   String? _error;
 
   @override
@@ -71,9 +73,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _openMatchSummary(HistoryItemData item) {
-    final summaryData = _buildMatchSummaryData(item.raw);
+  Future<void> _openMatchSummary(HistoryItemData item) async {
+    if (_isOpeningMatchSummary) return;
+
+    setState(() {
+      _isOpeningMatchSummary = true;
+    });
+
+    _MatchSummaryData? summaryData;
+
+    try {
+      final matchId = item.raw['id'] as String?;
+      if (matchId != null && matchId.isNotEmpty) {
+        final matches = await MatchService().getMyMatches();
+        final fullMatch = matches.cast<MatchRecord?>().firstWhere(
+              (match) => match?.id == matchId,
+              orElse: () => null,
+            );
+
+        if (fullMatch != null) {
+          summaryData = _buildMatchSummaryDataFromRecord(fullMatch);
+        }
+      }
+    } catch (_) {
+      summaryData = null;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningMatchSummary = false;
+        });
+      }
+    }
+
+    summaryData ??= _buildMatchSummaryData(item.raw);
+
     if (summaryData == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No hay suficiente informacion para abrir el resumen.'),
@@ -82,13 +117,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (!mounted) return;
+    final data = summaryData;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => MatchSummaryScreen(
-          matchDate: _formatHistoryDate(summaryData.match.playedAt),
-          match: summaryData.match,
-          players: summaryData.players,
-          winnerTeam: summaryData.match.winnerTeam ?? 1,
+          matchDate: _formatHistoryDate(data.match.playedAt),
+          match: data.match,
+          players: data.players,
+          winnerTeam: data.match.winnerTeam ?? 1,
         ),
       ),
     );
@@ -97,113 +134,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
+    final baseTheme = Theme.of(context);
 
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: widget.onBackTap ?? () => Navigator.of(context).pop(),
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Perfil',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w900,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: widget.onBackTap ?? () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [
-        PgoOptionsMenuButton(),
-      ],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF3F4F7),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: Text(
+          'Perfil',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? _ProfileErrorState(
-                    message: _error!,
-                    onRetry: _loadProfile,
-                  )
-                : profile == null
-                    ? _ProfileErrorState(
-                        message: 'No se encontro informacion del perfil.',
-                        onRetry: _loadProfile,
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
-                        child: Column(
-                      children: [
-                            _ProfileHeroCard(
-                              profile: profile,
-                              onPreview: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ProfilePublicPreviewScreen(
-                                      profile: profile,
+        actions: const [
+          PgoOptionsMenuButton(),
+        ],
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF3F4F7),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _ProfileErrorState(
+                      message: _error!,
+                      onRetry: _loadProfile,
+                    )
+                  : profile == null
+                      ? _ProfileErrorState(
+                          message: 'No se encontro informacion del perfil.',
+                          onRetry: _loadProfile,
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+                          child: Column(
+                            children: [
+                              _ProfileHeroCard(
+                                profile: profile,
+                                onPreview: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ProfilePublicPreviewScreen(
+                                        profile: profile,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              onEdit: () async {
-                                final updatedProfile =
-                                    await Navigator.of(context)
-                                        .push<ProfileSummary>(
-                                  MaterialPageRoute(
-                                    builder: (context) => ProfileEditScreen(
-                                      profile: profile,
+                                  );
+                                },
+                                onEdit: () async {
+                                  final updatedProfile =
+                                      await Navigator.of(context)
+                                          .push<ProfileSummary>(
+                                    MaterialPageRoute(
+                                      builder: (context) => ProfileEditScreen(
+                                        profile: profile,
+                                      ),
                                     ),
-                                  ),
-                                );
+                                  );
 
-                                if (updatedProfile != null && mounted) {
-                                  setState(() {
-                                    _profile = updatedProfile;
-                                  });
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 18),
-                            StatsStrip(profile: profile),
-                            const SizedBox(height: 16),
-                            RecentHistoryCard(
-                              history: buildHistoryItems(profile),
-                              onHistoryTap: _openMatchSummary,
-                              onViewAll: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ProfileHistoryScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            FriendsCard(profile: profile),
-                          ],
+                                  if (updatedProfile != null && mounted) {
+                                    setState(() {
+                                      _profile = updatedProfile;
+                                    });
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 18),
+                              StatsStrip(profile: profile),
+                              const SizedBox(height: 16),
+                              RecentHistoryCard(
+                                history: buildHistoryItems(profile),
+                                onHistoryTap: _openMatchSummary,
+                                onViewAll: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ProfileHistoryScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              FriendsCard(profile: profile),
+                            ],
+                          ),
                         ),
-                      ),
+        ),
+        bottomNavigationBar: widget.showBottomNav
+            ? widget.bottomNavigationBar ??
+                PgoBottomNav(
+                  currentTab: PgoNavTab.profile,
+                  onHomeTap:
+                      widget.onHomeTap ?? () => Navigator.of(context).pop(),
+                  onTournamentsTap: widget.onTournamentsTap ??
+                      () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const TournamentsScreen(),
+                          ),
+                        );
+                      },
+                  onProfileTap: () {},
+                )
+            : null,
       ),
-      bottomNavigationBar: widget.showBottomNav
-          ? widget.bottomNavigationBar ??
-              PgoBottomNav(
-                currentTab: PgoNavTab.profile,
-                onHomeTap:
-                    widget.onHomeTap ?? () => Navigator.of(context).pop(),
-                onTournamentsTap: widget.onTournamentsTap ??
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const TournamentsScreen(),
-                        ),
-                      );
-                    },
-                onProfileTap: () {},
-              )
-          : null,
     );
   }
 }
@@ -321,7 +366,7 @@ class _ProfileHeroCard extends StatelessWidget {
           Text(
             profile.name,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: GoogleFonts.inter(
               color: AppColors.SecondBlue,
               fontSize: 17,
               fontWeight: FontWeight.w900,
@@ -341,7 +386,7 @@ class _ProfileHeroCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             '${profile.experiencePoints} XP',
-            style: const TextStyle(
+            style: GoogleFonts.inter(
               color: AppColors.SecondBlue,
               fontSize: 28,
               fontWeight: FontWeight.w900,
@@ -599,7 +644,7 @@ class RecentHistoryCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               'Historial reciente',
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 color: AppColors.SecondBlue.withValues(alpha: 0.9),
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
@@ -761,6 +806,33 @@ class _MatchSummaryData {
   final List<SelectedPlayer> players;
 }
 
+_MatchSummaryData? _buildMatchSummaryDataFromRecord(MatchRecord match) {
+  final participants = match.participants.toList()
+    ..sort((a, b) => a.slot.compareTo(b.slot));
+
+  if (participants.length < 4) {
+    return null;
+  }
+
+  final players = participants.take(4).map((participant) {
+    final user = participant.user;
+    return SelectedPlayer(
+      id: user?.id ?? participant.userId,
+      name: (user?.name.trim().isNotEmpty ?? false)
+          ? user!.name
+          : 'Jugador ${participant.slot}',
+      photoUrl: user?.photoUrl,
+      category: user?.category,
+      rankingPosition: 0,
+    );
+  }).toList();
+
+  return _MatchSummaryData(
+    match: match,
+    players: players,
+  );
+}
+
 _MatchSummaryData? _buildMatchSummaryData(Map<String, dynamic> item) {
   final id = item['id'] as String?;
   final participantsJson = (item['participants'] as List?) ?? const [];
@@ -780,8 +852,7 @@ _MatchSummaryData? _buildMatchSummaryData(Map<String, dynamic> item) {
       .map((raw) => Map<String, dynamic>.from(raw))
       .toList()
     ..sort(
-      (a, b) =>
-          ((a['slot'] as num?)?.toInt() ?? 0).compareTo(
+      (a, b) => ((a['slot'] as num?)?.toInt() ?? 0).compareTo(
         (b['slot'] as num?)?.toInt() ?? 0,
       ),
     );
@@ -902,6 +973,7 @@ class HistoryItemData {
   final bool isWin;
   final Map<String, dynamic> raw;
 }
+
 class FriendsCard extends StatelessWidget {
   const FriendsCard({
     super.key,

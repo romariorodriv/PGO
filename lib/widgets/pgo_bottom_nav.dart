@@ -42,7 +42,7 @@ class PgoBottomNav extends StatelessWidget {
                 onTap: onHomeTap,
               ),
               _NavIcon(
-                icon: Icons.workspace_premium_rounded,
+                icon: Icons.emoji_events,
                 selected: currentTab == PgoNavTab.tournaments,
                 onTap: onTournamentsTap,
               ),
@@ -77,7 +77,7 @@ class _NavIcon extends StatelessWidget {
       child: Icon(
         icon,
         color: selected ? AppColors.SecondBlue : const Color(0xFF8A93A1),
-        size: 34,
+        size: 40,
       ),
     );
   }

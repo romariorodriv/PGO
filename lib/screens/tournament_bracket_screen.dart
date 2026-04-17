@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/tournament_record.dart';
 import '../utils/data_url_image.dart';
@@ -115,7 +116,7 @@ class TournamentBracketScreen extends StatelessWidget {
                         _photoUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/images/trigal_onepadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ),
                       )
@@ -125,11 +126,11 @@ class TournamentBracketScreen extends StatelessWidget {
                             fit: BoxFit.cover,
                           )
                         : Image.asset(
-                            'assets/images/trigal_onepadel.png',
+                            AppAssets.defaultTournamentImage,
                             fit: BoxFit.cover,
                           ))
                 : Image.asset(
-                    'assets/images/trigal_onepadel.png',
+                    AppAssets.defaultTournamentImage,
                     fit: BoxFit.cover,
                   ),
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
@@ -485,19 +486,19 @@ class _AdminHeroCard extends StatelessWidget {
                       tournament.photoUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/InkaPadel.png',
+                        AppAssets.defaultTournamentImage,
                         fit: BoxFit.cover,
                       ),
                     )
                   : (bytes != null
                       ? Image.memory(bytes, fit: BoxFit.cover)
                       : Image.asset(
-                          'assets/images/InkaPadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ))
             else
               Image.asset(
-                'assets/images/InkaPadel.png',
+                AppAssets.defaultTournamentImage,
                 fit: BoxFit.cover,
               ),
             Container(
@@ -1457,7 +1458,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                   const SizedBox(height: 6),
                 ],
               ],
-            const SizedBox(height: 18),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Expanded(

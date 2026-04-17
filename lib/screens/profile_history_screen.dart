@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../constants/colors.dart';
+import '../models/match_record.dart';
 import '../models/profile_history.dart';
+import '../models/selected_player.dart';
+import '../services/match_service.dart';
 import '../services/profile_service.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'main_shell.dart';
+import 'match_summary_screen.dart';
 import 'profile_screen.dart';
 
 enum _HistoryFilter {
@@ -26,6 +31,7 @@ class ProfileHistoryScreen extends StatefulWidget {
 class _ProfileHistoryScreenState extends State<ProfileHistoryScreen> {
   ProfileHistory? _history;
   bool _isLoading = true;
+  bool _isOpeningMatchSummary = false;
   String? _error;
   _HistoryFilter _selectedFilter = _HistoryFilter.all;
 
@@ -57,66 +63,137 @@ class _ProfileHistoryScreenState extends State<ProfileHistoryScreen> {
     }
   }
 
+  Future<void> _openMatchSummary(ProfileHistoryMatch historyMatch) async {
+    if (_isOpeningMatchSummary) return;
+
+    setState(() {
+      _isOpeningMatchSummary = true;
+    });
+
+    try {
+      final matches = await MatchService().getMyMatches();
+      final match = matches.cast<MatchRecord?>().firstWhere(
+            (item) => item?.id == historyMatch.id,
+            orElse: () => null,
+          );
+
+      if (!mounted) return;
+      if (match == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo cargar el detalle de este partido.'),
+          ),
+        );
+        return;
+      }
+
+      final players = _buildSummaryPlayers(match);
+      if (players.length < 4) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este partido no tiene jugadores suficientes.'),
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MatchSummaryScreen(
+            matchDate: _formatHistoryDate(match.playedAt),
+            match: match,
+            players: players,
+            winnerTeam: match.winnerTeam ?? 1,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningMatchSummary = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Historial',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w900,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [
-        PgoOptionsMenuButton(),
-      ],
-      body: ColoredBox(
-        color: const Color(0xFFF7F7F8),
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF3F4F7),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: Text(
+          'Historial',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
           ),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? _HistoryErrorState(
-                      message: _error!,
-                      onRetry: _loadHistory,
-                    )
-                  : _history == null
-                      ? _HistoryErrorState(
-                          message: 'No se encontro historial.',
-                          onRetry: _loadHistory,
-                        )
-                      : _HistoryContent(
-                          history: _history!,
-                          selectedFilter: _selectedFilter,
-                          onFilterChanged: (filter) {
-                            setState(() {
-                              _selectedFilter = filter;
-                            });
-                          },
-                        ),
         ),
-      ),
-      bottomNavigationBar: PgoBottomNav(
-        currentTab: PgoNavTab.profile,
-        onHomeTap: () {
-          MainShell.openReplacement(context, initialTab: PgoNavTab.home);
-        },
-        onTournamentsTap: () {
-          MainShell.openReplacement(context, initialTab: PgoNavTab.tournaments);
-        },
-        onProfileTap: () {
-          MainShell.openReplacement(context, initialTab: PgoNavTab.profile);
-        },
+        actions: const [
+          PgoOptionsMenuButton(),
+        ],
+        body: ColoredBox(
+          color: const Color(0xFFF7F7F8),
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF3F4F7),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? _HistoryErrorState(
+                        message: _error!,
+                        onRetry: _loadHistory,
+                      )
+                    : _history == null
+                        ? _HistoryErrorState(
+                            message: 'No se encontro historial.',
+                            onRetry: _loadHistory,
+                          )
+                        : _HistoryContent(
+                            history: _history!,
+                            selectedFilter: _selectedFilter,
+                            onFilterChanged: (filter) {
+                              setState(() {
+                                _selectedFilter = filter;
+                              });
+                            },
+                            onMatchTap: _openMatchSummary,
+                          ),
+          ),
+        ),
+        bottomNavigationBar: PgoBottomNav(
+          currentTab: PgoNavTab.profile,
+          onHomeTap: () {
+            MainShell.openReplacement(context, initialTab: PgoNavTab.home);
+          },
+          onTournamentsTap: () {
+            MainShell.openReplacement(context,
+                initialTab: PgoNavTab.tournaments);
+          },
+          onProfileTap: () {
+            MainShell.openReplacement(context, initialTab: PgoNavTab.profile);
+          },
+        ),
       ),
     );
   }
@@ -127,11 +204,13 @@ class _HistoryContent extends StatelessWidget {
     required this.history,
     required this.selectedFilter,
     required this.onFilterChanged,
+    required this.onMatchTap,
   });
 
   final ProfileHistory history;
   final _HistoryFilter selectedFilter;
   final ValueChanged<_HistoryFilter> onFilterChanged;
+  final ValueChanged<ProfileHistoryMatch> onMatchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +239,10 @@ class _HistoryContent extends StatelessWidget {
                 return [
                   _MonthHeader(label: entry.key),
                   const SizedBox(height: 10),
-                  _MonthHistoryCard(matches: entry.value),
+                  _MonthHistoryCard(
+                    matches: entry.value,
+                    onMatchTap: onMatchTap,
+                  ),
                   const SizedBox(height: 16),
                 ];
               }),
@@ -335,32 +417,89 @@ class _MonthHeader extends StatelessWidget {
   }
 }
 
-class _MonthHistoryCard extends StatelessWidget {
+class _MonthHistoryCard extends StatefulWidget {
   const _MonthHistoryCard({
     required this.matches,
+    required this.onMatchTap,
   });
 
   final List<ProfileHistoryMatch> matches;
+  final ValueChanged<ProfileHistoryMatch> onMatchTap;
+
+  @override
+  State<_MonthHistoryCard> createState() => _MonthHistoryCardState();
+}
+
+class _MonthHistoryCardState extends State<_MonthHistoryCard> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
+    final visibleMatches =
+        _expanded ? widget.matches : widget.matches.take(4).toList();
+    final canExpand = widget.matches.length > 4;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: profileCardDecoration(),
       child: Column(
-        children: matches
-            .asMap()
-            .entries
-            .map(
-              (entry) => Padding(
-                padding: EdgeInsets.only(
-                  top: entry.key == 0 ? 0 : 10,
-                  bottom: entry.key == matches.length - 1 ? 0 : 10,
-                ),
-                child: _HistoryMatchRow(match: entry.value),
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Toca un partido para ver su resumen',
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue.withValues(alpha: 0.42),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
               ),
-            )
-            .toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...visibleMatches.asMap().entries.map(
+                (entry) => Padding(
+                  padding: EdgeInsets.only(
+                    top: entry.key == 0 ? 0 : 10,
+                    bottom: entry.key == visibleMatches.length - 1 ? 0 : 10,
+                  ),
+                  child: _HistoryMatchRow(
+                    match: entry.value,
+                    onTap: () => widget.onMatchTap(entry.value),
+                  ),
+                ),
+              ),
+          if (canExpand) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _expanded = !_expanded;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD7FF59),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _expanded ? 'Ver menos' : 'Ver mas',
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -369,9 +508,11 @@ class _MonthHistoryCard extends StatelessWidget {
 class _HistoryMatchRow extends StatelessWidget {
   const _HistoryMatchRow({
     required this.match,
+    required this.onTap,
   });
 
   final ProfileHistoryMatch match;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -379,66 +520,79 @@ class _HistoryMatchRow extends StatelessWidget {
     final accentColor =
         isWin ? AppColors.PrimaryGreen : const Color(0xFFFF334B);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: accentColor,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            isWin ? Icons.check : Icons.close,
-            color: Colors.white,
-            size: 14,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                match.title,
-                style: const TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: accentColor,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 2),
-              Text(
-                _buildSubtitle(match),
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.68),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Icon(
+                isWin ? Icons.check : Icons.close,
+                color: Colors.white,
+                size: 14,
               ),
-              const SizedBox(height: 2),
-              Text(
-                DateFormat('d MMM yyyy', 'es').format(match.playedAt),
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.44),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    match.title,
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _buildSubtitle(match),
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.68),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    DateFormat('d MMM yyyy', 'es').format(match.playedAt),
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.44),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${match.xpDelta >= 0 ? '+' : ''}${match.xpDelta} XP',
+              style: GoogleFonts.inter(
+                color: accentColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.SecondBlue.withValues(alpha: 0.32),
+              size: 18,
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Text(
-          '${match.xpDelta >= 0 ? '+' : ''}${match.xpDelta} XP',
-          style: TextStyle(
-            color: accentColor,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -571,6 +725,52 @@ Map<String, List<ProfileHistoryMatch>> _groupHistoryByMonth(
   }
 
   return grouped;
+}
+
+List<SelectedPlayer> _buildSummaryPlayers(MatchRecord match) {
+  final participants = match.participants.toList()
+    ..sort((a, b) => a.slot.compareTo(b.slot));
+
+  return participants.take(4).map((participant) {
+    final user = participant.user;
+    return SelectedPlayer(
+      id: user?.id ?? participant.userId,
+      name: (user?.name.trim().isNotEmpty ?? false)
+          ? user!.name
+          : 'Jugador ${participant.slot}',
+      photoUrl: user?.photoUrl,
+      category: user?.category,
+      rankingPosition: 0,
+    );
+  }).toList();
+}
+
+String _formatHistoryDate(DateTime date) {
+  const weekdays = [
+    'Lunes',
+    'Martes',
+    'Miercoles',
+    'Jueves',
+    'Viernes',
+    'Sabado',
+    'Domingo',
+  ];
+  const months = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+
+  return '${weekdays[date.weekday - 1]} ${date.day} de ${months[date.month - 1]}';
 }
 
 extension on ProfileHistoryMatch {

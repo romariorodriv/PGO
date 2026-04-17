@@ -19,6 +19,47 @@ class MatchService {
   final http.Client _client;
   final SessionService _sessionService;
 
+  Future<List<MatchRecord>> getMyMatches() async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesion activa');
+    }
+
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/matches/my'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
+
+      final json = jsonDecode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = json is Map<String, dynamic>
+            ? json['message']
+            : 'No se pudo cargar tus matches';
+        throw Exception(message ?? 'No se pudo cargar tus matches');
+      }
+
+      final items =
+          json is List ? json : (json['matches'] as List? ?? const []);
+      return items
+          .map(
+            (item) => MatchRecord.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList();
+    } on TimeoutException {
+      throw Exception(
+          'La conexion con el backend expiro al cargar tus matches.');
+    } on http.ClientException {
+      throw Exception(
+          'No se pudo conectar al backend para cargar tus matches.');
+    }
+  }
+
   Future<MatchRecord> createMatch({
     required String clubName,
     required DateTime playedAt,

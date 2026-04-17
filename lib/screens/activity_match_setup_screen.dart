@@ -54,6 +54,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   String? _selectedClubName;
   String? _profileError;
   String? _communityError;
+  bool _showAllSuggestions = false;
 
   @override
   void initState() {
@@ -82,8 +83,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _selectedClubName ??=
-            profile.preferredClub ?? _fallbackClubName;
+        _selectedClubName ??= profile.preferredClub ?? _fallbackClubName;
         _selectedPlayers[0] = SelectedPlayer(
           id: profile.id,
           name: profile.name,
@@ -158,6 +158,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
         setState(() {
           _searchResults = const [];
           _communityError = null;
+          _showAllSuggestions = false;
         });
         return;
       }
@@ -199,6 +200,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
       );
       _searchController.clear();
       _searchResults = const [];
+      _showAllSuggestions = false;
     });
   }
 
@@ -272,12 +274,23 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   }
 
   String get _clubName =>
-      _selectedClubName ??
-      _profile?.preferredClub ??
-      _fallbackClubName;
+      _selectedClubName ?? _profile?.preferredClub ?? _fallbackClubName;
 
   List<CommunityUser> get _displayUsers =>
       _searchController.text.trim().isEmpty ? _communityUsers : _searchResults;
+
+  bool get _isShowingSuggestions => _searchController.text.trim().isEmpty;
+
+  List<CommunityUser> get _visibleUsers {
+    if (_isShowingSuggestions && !_showAllSuggestions) {
+      return _displayUsers.take(5).toList();
+    }
+    return _displayUsers;
+  }
+
+  bool get _canToggleSuggestions =>
+      _isShowingSuggestions && _displayUsers.length > 5;
+
   bool get _canContinue =>
       !_isSubmitting && _selectedPlayers.every((player) => player != null);
 
@@ -312,7 +325,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
       if (!mounted) return;
       if (users.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No encontramos un jugador para ese QR')),
+          const SnackBar(
+              content: Text('No encontramos un jugador para ese QR')),
         );
         return;
       }
@@ -360,7 +374,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
     return Theme(
       data: baseTheme.copyWith(
         textTheme: interTextTheme,
-        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
       child: PgoHeaderScaffold(
         leading: IconButton(
@@ -540,8 +555,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                             ? 'Aun no tienes companeros con los que hayas jugado.'
                             : 'No encontramos jugadores con esa busqueda.',
                       )
-                    else
-                      ..._displayUsers.map(
+                    else ...[
+                      ..._visibleUsers.map(
                         (user) => Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: _CommunityUserCard(
@@ -551,6 +566,27 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                           ),
                         ),
                       ),
+                      if (_canToggleSuggestions) ...[
+                        const SizedBox(height: 2),
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _showAllSuggestions = !_showAllSuggestions;
+                              });
+                            },
+                            child: Text(
+                              _showAllSuggestions ? 'Ver menos' : 'Ver mas',
+                              style: GoogleFonts.inter(
+                                color: AppColors.SecondBlue,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 18),
                     const Text(
                       'Club de juego',

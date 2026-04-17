@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
@@ -105,7 +106,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       final userId = _profile!.id;
       switch (_myTournamentTab) {
         case _MyTournamentTab.registered:
-          items = items.where((item) => item.registrationUserIds.contains(userId));
+          items =
+              items.where((item) => item.registrationUserIds.contains(userId));
           break;
         case _MyTournamentTab.created:
           items = items.where(
@@ -145,186 +147,191 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     return Theme(
       data: baseTheme.copyWith(
         textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
-        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
       child: PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: widget.onBackTap ?? () => Navigator.of(context).pop(),
-      ),
-      titleSpacing: -4,
-      title: Row(
-        children: [
-          Image.asset(
-            'assets/images/pgoIconoAPP.png',
-            height: 64,
-            fit: BoxFit.contain,
-          ),
-        ],
-      ),
-      actions: const [
-        PgoOptionsMenuButton(),
-      ],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: widget.onBackTap ?? () => Navigator.of(context).pop(),
         ),
-        child: Column(
+        titleSpacing: -4,
+        title: Row(
           children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  RefreshIndicator(
-                    onRefresh: _loadData,
-                    color: AppColors.SecondBlue,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(24, 22, 24, 120),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Center(
-                                child: Text(
-                                  'Torneos',
-                                  style: GoogleFonts.inter(
-                                    color: AppColors.SecondBlue,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: _RefreshButton(
-                                  isLoading: _isLoading,
-                                  onTap: _isLoading ? null : _loadData,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          _buildSearchField(),
-                          const SizedBox(height: 14),
-                          _buildTabs(),
-                          if (_showMyTournaments) ...[
-                            const SizedBox(height: 10),
-                            _buildMyTournamentTabs(),
-                          ],
-                          const SizedBox(height: 16),
-                          if (_isLoading)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 42),
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          else if (_error != null)
-                            _StatusCard(
-                              title: 'No pudimos cargar los torneos',
-                              message: _error!,
-                              actionLabel: 'Reintentar',
-                              onTap: _loadData,
-                            )
-                          else if (_filteredTournaments.isEmpty)
-                            _StatusCard(
-                              title: _showMyTournaments
-                                  ? _emptyMyTournamentsTitle
-                                  : 'Aun no hay torneos disponibles',
-                              message: _searchController.text.trim().isEmpty
-                                  ? 'Cuando crees o publiques torneos apareceran aqui.'
-                                  : 'No encontramos torneos con ese criterio.',
-                              actionLabel: 'Actualizar',
-                              onTap: _loadData,
-                            )
-                          else
-                            Column(
-                              children: _filteredTournaments
-                                  .map(
-                                    (tournament) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 18),
-                                      child: _TournamentCard(
-                                        tournament: tournament,
-                                        onTap: () {
-                                          final route = _showMyTournaments &&
-                                                  _myTournamentTab ==
-                                                      _MyTournamentTab.draft
-                                              ? MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      TournamentCreateFlowScreen(
-                                                    initialTournament:
-                                                        tournament,
-                                                  ),
-                                                )
-                                              : _showMyTournaments &&
-                                                      _myTournamentTab ==
-                                                          _MyTournamentTab
-                                                              .created
-                                                  ? MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          TournamentAdminScreen(
-                                                        tournament: tournament,
-                                                      ),
-                                                    )
-                                              : MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      TournamentDescriptionScreen(
-                                                    tournament: tournament,
-                                                  ),
-                                                );
-                                          Navigator.of(context)
-                                              .push(route)
-                                              .then((_) => _loadData());
-                                        },
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 14,
-                    bottom: 22,
-                    child: _CreateTournamentFab(
-                      onTap: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const TournamentCreateFlowScreen(),
-                          ),
-                        );
-                        if (!mounted) return;
-                        _loadData();
-                      },
-                    ),
-                  ),
-                ],
-              ),
+            Image.asset(
+              'assets/images/pgoIconoAPP.png',
+              height: 64,
+              fit: BoxFit.contain,
             ),
-            if (widget.showBottomNav)
-              widget.bottomNavigationBar ??
-                  PgoBottomNav(
-                    currentTab: PgoNavTab.tournaments,
-                    onHomeTap:
-                        widget.onHomeTap ?? () => Navigator.of(context).pop(),
-                    onTournamentsTap: () {},
-                    onProfileTap: widget.onProfileTap ??
-                        () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const ProfileScreen(),
-                            ),
-                          );
-                        },
-                  ),
           ],
         ),
-      ),
+        actions: const [
+          PgoOptionsMenuButton(),
+        ],
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: _loadData,
+                      color: AppColors.SecondBlue,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 120),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Center(
+                                  child: Text(
+                                    'Torneos',
+                                    style: GoogleFonts.inter(
+                                      color: AppColors.SecondBlue,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: _RefreshButton(
+                                    isLoading: _isLoading,
+                                    onTap: _isLoading ? null : _loadData,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _buildSearchField(),
+                            const SizedBox(height: 14),
+                            _buildTabs(),
+                            if (_showMyTournaments) ...[
+                              const SizedBox(height: 10),
+                              _buildMyTournamentTabs(),
+                            ],
+                            const SizedBox(height: 16),
+                            if (_isLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 42),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
+                              )
+                            else if (_error != null)
+                              _StatusCard(
+                                title: 'No pudimos cargar los torneos',
+                                message: _error!,
+                                actionLabel: 'Reintentar',
+                                onTap: _loadData,
+                              )
+                            else if (_filteredTournaments.isEmpty)
+                              _StatusCard(
+                                title: _showMyTournaments
+                                    ? _emptyMyTournamentsTitle
+                                    : 'Aun no hay torneos disponibles',
+                                message: _searchController.text.trim().isEmpty
+                                    ? 'Cuando crees o publiques torneos apareceran aqui.'
+                                    : 'No encontramos torneos con ese criterio.',
+                                actionLabel: 'Actualizar',
+                                onTap: _loadData,
+                              )
+                            else
+                              Column(
+                                children: _filteredTournaments
+                                    .map(
+                                      (tournament) => Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 18),
+                                        child: _TournamentCard(
+                                          tournament: tournament,
+                                          onTap: () {
+                                            final route = _showMyTournaments &&
+                                                    _myTournamentTab ==
+                                                        _MyTournamentTab.draft
+                                                ? MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        TournamentCreateFlowScreen(
+                                                      initialTournament:
+                                                          tournament,
+                                                    ),
+                                                  )
+                                                : _showMyTournaments &&
+                                                        _myTournamentTab ==
+                                                            _MyTournamentTab
+                                                                .created
+                                                    ? MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            TournamentAdminScreen(
+                                                          tournament:
+                                                              tournament,
+                                                        ),
+                                                      )
+                                                    : MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            TournamentDescriptionScreen(
+                                                          tournament:
+                                                              tournament,
+                                                        ),
+                                                      );
+                                            Navigator.of(context)
+                                                .push(route)
+                                                .then((_) => _loadData());
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 14,
+                      bottom: 22,
+                      child: _CreateTournamentFab(
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const TournamentCreateFlowScreen(),
+                            ),
+                          );
+                          if (!mounted) return;
+                          _loadData();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.showBottomNav)
+                widget.bottomNavigationBar ??
+                    PgoBottomNav(
+                      currentTab: PgoNavTab.tournaments,
+                      onHomeTap:
+                          widget.onHomeTap ?? () => Navigator.of(context).pop(),
+                      onTournamentsTap: () {},
+                      onProfileTap: widget.onProfileTap ??
+                          () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const ProfileScreen(),
+                              ),
+                            );
+                          },
+                    ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -646,8 +653,8 @@ class _TournamentCard extends StatelessWidget {
   final TournamentRecord tournament;
   final VoidCallback onTap;
 
-  String get _displayTitle =>
-      tournament.title.replaceFirst(RegExp(r'^\[DEMO\]\s*', caseSensitive: false), '');
+  String get _displayTitle => tournament.title
+      .replaceFirst(RegExp(r'^\[DEMO\]\s*', caseSensitive: false), '');
 
   String get _formattedDate {
     const weekDays = [
@@ -717,189 +724,190 @@ class _TournamentCard extends StatelessWidget {
           ],
         ),
         child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-            child: SizedBox(
-              height: 146,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _TournamentCardImage(photoUrl: tournament.photoUrl),
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      height: 84,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Color(0x1A132033),
-                            Color(0xA6132033),
-                          ],
+          children: [
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(22)),
+              child: SizedBox(
+                height: 146,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _TournamentCardImage(photoUrl: tournament.photoUrl),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        height: 84,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Color(0x1A132033),
+                              Color(0xA6132033),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: Container(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.96),
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.whatshot,
+                                    size: 12,
+                                    color: AppColors.primaryOrange,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _badgeText,
+                                    style: const TextStyle(
+                                      color: AppColors.SecondBlue,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 4,
+                              horizontal: 12,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.96),
-                              borderRadius: BorderRadius.circular(13),
+                              color: AppColors.PrimaryGreen,
+                              borderRadius: BorderRadius.circular(999),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.whatshot,
-                                  size: 12,
-                                  color: AppColors.primaryOrange,
+                            child: Text(
+                              tournament.category.toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.SecondBlue,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _displayTitle.toUpperCase(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                              height: 0.94,
+                              letterSpacing: 0,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.white,
+                                  offset: Offset(0.5, 0),
+                                  blurRadius: 0,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _badgeText,
-                                  style: const TextStyle(
-                                    color: AppColors.SecondBlue,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                Shadow(
+                                  color: Colors.white,
+                                  offset: Offset(-0.5, 0),
+                                  blurRadius: 0,
+                                ),
+                                Shadow(
+                                  color: Colors.white,
+                                  offset: Offset(0, 0.5),
+                                  blurRadius: 0,
+                                ),
+                                Shadow(
+                                  color: Colors.white,
+                                  offset: Offset(0, -0.5),
+                                  blurRadius: 0,
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.PrimaryGreen,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            tournament.category.toUpperCase(),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formattedDate,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: AppColors.SecondBlue,
+                              color: Colors.white,
                               fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      tournament.location,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 78,
+                    height: 32,
+                    child: ElevatedButton(
+                      onPressed: onTap,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.PrimaryGreen,
+                        foregroundColor: AppColors.SecondBlue,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _displayTitle.toUpperCase(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            fontWeight: FontWeight.w900,
-                            height: 0.94,
-                            letterSpacing: 0,
-                            shadows: [
-                              Shadow(
-                                color: Colors.white,
-                                offset: Offset(0.5, 0),
-                                blurRadius: 0,
-                              ),
-                              Shadow(
-                                color: Colors.white,
-                                offset: Offset(-0.5, 0),
-                                blurRadius: 0,
-                              ),
-                              Shadow(
-                                color: Colors.white,
-                                offset: Offset(0, 0.5),
-                                blurRadius: 0,
-                              ),
-                              Shadow(
-                                color: Colors.white,
-                                offset: Offset(0, -0.5),
-                                blurRadius: 0,
-                              ),
-                            ],
-                          ),
+                      ),
+                      child: const Text(
+                        'VER',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _formattedDate,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Text(
-                    tournament.location,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 78,
-                  height: 32,
-                  child: ElevatedButton(
-                    onPressed: onTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.PrimaryGreen,
-                      foregroundColor: AppColors.SecondBlue,
-                      elevation: 0,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                    child: const Text(
-                      'VER',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -921,7 +929,7 @@ class _TournamentCardImage extends StatelessWidget {
           photoUrl!,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Image.asset(
-            'assets/images/trigal_onepadel.png',
+            AppAssets.defaultTournamentImage,
             fit: BoxFit.cover,
           ),
         );
@@ -934,7 +942,7 @@ class _TournamentCardImage extends StatelessWidget {
     }
 
     return Image.asset(
-      'assets/images/trigal_onepadel.png',
+      AppAssets.defaultTournamentImage,
       fit: BoxFit.cover,
     );
   }

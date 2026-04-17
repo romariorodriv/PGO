@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/tournament_admin_bracket.dart';
 import '../models/tournament_record.dart';
@@ -137,7 +138,8 @@ class _TournamentAdminBracketScreenState
                 else if (_error != null)
                   _MessageCard(message: _error!)
                 else if (_matches.isEmpty)
-                  const _MessageCard(message: 'Aún no hay cruces para esta ronda.')
+                  const _MessageCard(
+                      message: 'Aún no hay cruces para esta ronda.')
                 else
                   ..._matches.map(
                     (match) => Padding(
@@ -191,19 +193,19 @@ class _HeroCard extends StatelessWidget {
                       tournament.photoUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/InkaPadel.png',
+                        AppAssets.defaultTournamentImage,
                         fit: BoxFit.cover,
                       ),
                     )
                   : (bytes != null
                       ? Image.memory(bytes, fit: BoxFit.cover)
                       : Image.asset(
-                          'assets/images/InkaPadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ))
             else
               Image.asset(
-                'assets/images/InkaPadel.png',
+                AppAssets.defaultTournamentImage,
                 fit: BoxFit.cover,
               ),
             Container(
@@ -785,5 +787,3 @@ class _MessageCard extends StatelessWidget {
     );
   }
 }
-
-

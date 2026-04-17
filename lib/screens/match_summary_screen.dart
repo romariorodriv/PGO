@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/match_record.dart';
 import '../models/selected_player.dart';
@@ -25,11 +27,17 @@ class MatchSummaryScreen extends StatelessWidget {
   final List<SelectedPlayer> players;
   final int winnerTeam;
 
-  int get _team1Games => match.games.fold<int>(
-      0, (total, game) => total + ((game['team1'] as num?)?.toInt() ?? 0));
+  int get _team1Sets => match.games
+      .where((game) =>
+          ((game['team1'] as num?)?.toInt() ?? 0) >
+          ((game['team2'] as num?)?.toInt() ?? 0))
+      .length;
 
-  int get _team2Games => match.games.fold<int>(
-      0, (total, game) => total + ((game['team2'] as num?)?.toInt() ?? 0));
+  int get _team2Sets => match.games
+      .where((game) =>
+          ((game['team2'] as num?)?.toInt() ?? 0) >
+          ((game['team1'] as num?)?.toInt() ?? 0))
+      .length;
 
   List<SelectedPlayer> get _winnerPlayers => winnerTeam == 1
       ? players.take(2).toList()
@@ -37,100 +45,110 @@ class MatchSummaryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Actividad',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [PgoOptionsMenuButton()],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: Text(
+          'Actividad',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 26),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeroCard(),
-              Transform.translate(
-                offset: const Offset(0, -28),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 26),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildScoreCard(),
-                      const SizedBox(height: 18),
-                      _buildInfoCard(),
-                      if (match.description != null &&
-                          match.description!.trim().isNotEmpty) ...[
+        actions: const [PgoOptionsMenuButton()],
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 26),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeroCard(),
+                Transform.translate(
+                  offset: const Offset(0, -28),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 26),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildScoreCard(),
+                        const SizedBox(height: 18),
+                        _buildInfoCard(),
+                        if (match.description != null &&
+                            match.description!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Descripcion',
+                            style: TextStyle(
+                              color: AppColors.SecondBlue,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildDescriptionCard(),
+                        ],
                         const SizedBox(height: 14),
                         const Text(
-                          'Descripcion',
+                          'Jugadores',
                           style: TextStyle(
                             color: AppColors.SecondBlue,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        _buildDescriptionCard(),
+                        const SizedBox(height: 12),
+                        _buildPlayersRow(),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              MainShell.openReplacement(
+                                context,
+                                initialTab: PgoNavTab.home,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD7FF59),
+                              foregroundColor: AppColors.SecondBlue,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            child: Text(
+                              'REGRESAR AL INICIO',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.SecondBlue,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Jugadores',
-                        style: TextStyle(
-                          color: AppColors.SecondBlue,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPlayersRow(),
-                      const SizedBox(height: 22),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            MainShell.openReplacement(
-                              context,
-                              initialTab: PgoNavTab.home,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD7FF59),
-                            foregroundColor: AppColors.SecondBlue,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                          ),
-                          child: const Text(
-                            'REGRESAR AL INICIO',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -174,10 +192,10 @@ class MatchSummaryScreen extends StatelessWidget {
                 match.matchType == 'RANKED'
                     ? 'Match competitivo'
                     : 'Match amistoso',
-                style: const TextStyle(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 4),
@@ -200,7 +218,7 @@ class MatchSummaryScreen extends StatelessWidget {
     final photoUrl = match.photoUrl;
     if (photoUrl == null || photoUrl.isEmpty) {
       return Image.asset(
-        'assets/images/trigal_onepadel.png',
+        AppAssets.defaultTournamentImage,
         fit: BoxFit.cover,
       );
     }
@@ -217,7 +235,7 @@ class MatchSummaryScreen extends StatelessWidget {
       photoUrl,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => Image.asset(
-        'assets/images/trigal_onepadel.png',
+        AppAssets.defaultTournamentImage,
         fit: BoxFit.cover,
       ),
     );
@@ -241,19 +259,19 @@ class MatchSummaryScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Sets',
-            style: TextStyle(
+            style: GoogleFonts.inter(
               color: AppColors.SecondBlue,
               fontSize: 16,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 4),
           Center(
             child: Text(
-              '$_team1Games - $_team2Games',
-              style: const TextStyle(
+              '$_team1Sets - $_team2Sets',
+              style: GoogleFonts.inter(
                 color: AppColors.SecondBlue,
                 fontSize: 42,
                 fontWeight: FontWeight.w900,
@@ -267,12 +285,12 @@ class MatchSummaryScreen extends StatelessWidget {
             color: const Color(0xFFD7DDE5),
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Games',
-            style: TextStyle(
+            style: GoogleFonts.inter(
               color: AppColors.SecondBlue,
               fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 12),
@@ -315,11 +333,11 @@ class MatchSummaryScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Nivel',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -331,11 +349,11 @@ class MatchSummaryScreen extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                const Text(
+                Text(
                   'Ranking',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -358,11 +376,11 @@ class MatchSummaryScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Club',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(width: 12),

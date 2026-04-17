@@ -239,10 +239,6 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
       return;
     }
 
-    if (totalPoints % 6 == 0) {
-      _isSidesSwapped = !_isSidesSwapped;
-    }
-
     _servingTeam =
         _resolveTieBreakServingTeam(totalPoints, _tieBreakFirstServingTeam!);
   }
@@ -267,10 +263,6 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     _team1Points = 0;
     _team2Points = 0;
     _servingTeam = _servingTeam == 1 ? 2 : 1;
-    if ((_team1Games + _team2Games).isOdd) {
-      _isSidesSwapped = !_isSidesSwapped;
-    }
-
     if (_team1Games == 6 && _team2Games == 6) {
       _isTieBreak = true;
       _team1TieBreakPoints = 0;
@@ -344,11 +336,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   }
 
   void _toggleSides() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('El cambio de lado ahora es automatico.'),
-      ),
-    );
+    setState(() {
+      _pushHistory();
+      _isSidesSwapped = !_isSidesSwapped;
+    });
   }
 
   Future<void> _finishLiveMatch() async {
@@ -418,12 +409,25 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   List<SelectedPlayer> get _rightTeamPlayers =>
       _rightTeam == 1 ? _team1Players : _team2Players;
 
-  String get _setsLabel => '$_team1Sets - $_team2Sets';
-  String get _gamesLabel => '$_team1Games - $_team2Games';
-  String get _serviceLabel => 'Equipo $_servingTeam';
-  List<String> get _completedSetLabels => _completedSets
-      .map((set) => '${set['team1'] ?? 0} - ${set['team2'] ?? 0}')
-      .toList();
+  int get _leftTeamSets => _leftTeam == 1 ? _team1Sets : _team2Sets;
+  int get _rightTeamSets => _rightTeam == 1 ? _team1Sets : _team2Sets;
+  int get _leftTeamGames => _leftTeam == 1 ? _team1Games : _team2Games;
+  int get _rightTeamGames => _rightTeam == 1 ? _team1Games : _team2Games;
+
+  String get _setsLabel => '$_leftTeamSets - $_rightTeamSets';
+  String get _gamesLabel => '$_leftTeamGames - $_rightTeamGames';
+  String get _serviceLabel {
+    if (_servingTeam == _leftTeam) return 'Equipo 1';
+    return 'Equipo 2';
+  }
+
+  List<String> get _completedSetLabels => _completedSets.map((set) {
+        final leftGames =
+            _leftTeam == 1 ? set['team1'] ?? 0 : set['team2'] ?? 0;
+        final rightGames =
+            _rightTeam == 1 ? set['team1'] ?? 0 : set['team2'] ?? 0;
+        return '$leftGames - $rightGames';
+      }).toList();
 
   String get _smallCenterTopText {
     final elapsed = _matchTimer.elapsed;
@@ -435,7 +439,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     return '${seconds.toString().padLeft(2, '0')}s';
   }
 
-  String get _smallCenterBottomText => '$_team1Sets-$_team2Sets';
+  String get _smallCenterBottomText => '$_leftTeamSets-$_rightTeamSets';
 
   @override
   Widget build(BuildContext context) {

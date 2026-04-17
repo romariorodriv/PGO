@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
@@ -25,7 +26,8 @@ class TournamentProfileScreen extends StatefulWidget {
   final TournamentRecord? tournament;
 
   @override
-  State<TournamentProfileScreen> createState() => _TournamentProfileScreenState();
+  State<TournamentProfileScreen> createState() =>
+      _TournamentProfileScreenState();
 }
 
 class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
@@ -38,7 +40,8 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   String get _title => _currentTournament?.title ?? 'Torneo PGO';
   String get _category => _currentTournament?.category ?? '4TA';
   String get _photoUrl => _currentTournament?.photoUrl ?? '';
-  String get _createdByName => _currentTournament?.createdByName ?? 'Organizador';
+  String get _createdByName =>
+      _currentTournament?.createdByName ?? 'Organizador';
   String get _location => _currentTournament?.location ?? 'One Padel Trigal';
   List<TournamentPlayer> get _players =>
       _currentTournament?.registeredPlayers ?? const [];
@@ -129,7 +132,8 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
     return Theme(
       data: baseTheme.copyWith(
         textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
-        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
       child: PgoHeaderScaffold(
         leading: IconButton(
@@ -233,18 +237,18 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
                         _photoUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/images/trigal_onepadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ),
                       )
                     : (bytes != null
                         ? Image.memory(bytes, fit: BoxFit.cover)
                         : Image.asset(
-                            'assets/images/trigal_onepadel.png',
+                            AppAssets.defaultTournamentImage,
                             fit: BoxFit.cover,
                           ))
                 : Image.asset(
-                    'assets/images/trigal_onepadel.png',
+                    AppAssets.defaultTournamentImage,
                     fit: BoxFit.cover,
                   ),
           ),

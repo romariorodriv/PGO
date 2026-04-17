@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/lima_padel_clubs.dart';
@@ -747,7 +748,7 @@ class _HomeScreenState extends State<HomeScreen> {
               fit: StackFit.expand,
               children: [
                 _HomeRecommendationImage(
-                  imageAsset: 'assets/images/trigal_onepadel.png',
+                  imageAsset: AppAssets.defaultTournamentImage,
                   photoUrl: tournament?.photoUrl,
                 ),
                 const DecoratedBox(

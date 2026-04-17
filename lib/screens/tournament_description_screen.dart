@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
+import '../services/profile_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
@@ -30,9 +33,12 @@ class TournamentDescriptionScreen extends StatefulWidget {
       _TournamentDescriptionScreenState();
 }
 
-class _TournamentDescriptionScreenState extends State<TournamentDescriptionScreen> {
+class _TournamentDescriptionScreenState
+    extends State<TournamentDescriptionScreen> {
   TournamentRecord? _tournament;
+  ProfileSummary? _profile;
   bool _isLoading = false;
+  bool _isLoadingProfile = false;
   String? _loadError;
 
   TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
@@ -40,8 +46,9 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
   String get _category => _currentTournament?.category ?? '4TA';
   String get _location => _currentTournament?.location ?? 'One Padel Trigal';
   String get _prize => _currentTournament?.prize ?? 'S/ 250 en premios';
-  String get _entryFee =>
-      _currentTournament != null ? 'S/.${_currentTournament!.entryFee}' : 'S/.60';
+  String get _entryFee => _currentTournament != null
+      ? 'S/.${_currentTournament!.entryFee}'
+      : 'S/.60';
   String get _photoUrl => _currentTournament?.photoUrl ?? '';
   int get _playerCapacity => _currentTournament?.playerCapacity ?? 16;
   int get _registrationsCount => _currentTournament?.registrationsCount ?? 0;
@@ -54,6 +61,29 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
     super.initState();
     _tournament = widget.tournament;
     _loadTournament();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() {
+      _isLoadingProfile = true;
+    });
+
+    try {
+      final profile = await ProfileService().getMyProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+      });
+    } catch (_) {
+      // If profile loading fails, keep the previous CTA behavior.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadTournament() async {
@@ -147,6 +177,17 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
     return '${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}';
   }
 
+  bool get _isCurrentUserRegistered {
+    final userId = _profile?.id;
+    final tournament = _currentTournament;
+    if (userId == null || userId.isEmpty || tournament == null) {
+      return false;
+    }
+    return tournament.registrationUserIds.contains(userId);
+  }
+
+  bool get _showJoinAction => !_isLoadingProfile && !_isCurrentUserRegistered;
+
   @override
   Widget build(BuildContext context) {
     return PgoHeaderScaffold(
@@ -215,46 +256,50 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
                     const SizedBox(height: 22),
                     _buildPlayersPreview(),
                     const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (widget.isPaid ||
-                              _currentTournament?.registrationsOpen == false ||
-                              (_currentTournament != null &&
-                                  _currentTournament!.registrationsCount >=
-                                      _currentTournament!.playerCapacity)) {
-                            return;
-                          }
-                          _handleRegisterTap(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD7FF59),
-                          foregroundColor: AppColors.SecondBlue,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
+                    if (_showJoinAction)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (widget.isPaid ||
+                                _currentTournament?.registrationsOpen ==
+                                    false ||
+                                (_currentTournament != null &&
+                                    _currentTournament!.registrationsCount >=
+                                        _currentTournament!.playerCapacity)) {
+                              return;
+                            }
+                            _handleRegisterTap(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD7FF59),
+                            foregroundColor: AppColors.SecondBlue,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          widget.isPaid
-                              ? 'IR AL PARTIDO'
-                              : (_currentTournament?.registrationsOpen == false
-                                  ? 'INSCRIPCIONES CERRADAS'
-                                  : (_currentTournament != null &&
-                                          _currentTournament!
-                                                  .registrationsCount >=
-                                              _currentTournament!.playerCapacity
-                                      ? 'CUPOS COMPLETOS'
-                                      : 'UNIRME')),
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
+                          child: Text(
+                            widget.isPaid
+                                ? 'IR AL PARTIDO'
+                                : (_currentTournament?.registrationsOpen ==
+                                        false
+                                    ? 'INSCRIPCIONES CERRADAS'
+                                    : (_currentTournament != null &&
+                                            _currentTournament!
+                                                    .registrationsCount >=
+                                                _currentTournament!
+                                                    .playerCapacity
+                                        ? 'CUPOS COMPLETOS'
+                                        : 'UNIRME')),
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -280,7 +325,8 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
     }
 
     try {
-      final refreshed = await TournamentService().getTournament(currentTournament.id);
+      final refreshed =
+          await TournamentService().getTournament(currentTournament.id);
       if (!mounted) return;
       setState(() {
         _tournament = refreshed;
@@ -312,18 +358,18 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
                         _photoUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/images/trigal_onepadel.png',
+                          AppAssets.defaultTournamentImage,
                           fit: BoxFit.cover,
                         ),
                       )
                     : (bytes != null
                         ? Image.memory(bytes, fit: BoxFit.cover)
                         : Image.asset(
-                            'assets/images/trigal_onepadel.png',
+                            AppAssets.defaultTournamentImage,
                             fit: BoxFit.cover,
                           ))
                 : Image.asset(
-                    'assets/images/trigal_onepadel.png',
+                    AppAssets.defaultTournamentImage,
                     fit: BoxFit.cover,
                   ),
           ),
@@ -638,7 +684,8 @@ class _TournamentDescriptionScreenState extends State<TournamentDescriptionScree
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 22, color: AppColors.SecondBlue.withValues(alpha: 0.7)),
+          Icon(icon,
+              size: 22, color: AppColors.SecondBlue.withValues(alpha: 0.7)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
