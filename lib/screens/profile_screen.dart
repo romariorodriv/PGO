@@ -5,11 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../constants/colors.dart';
+import '../models/match_record.dart';
 import '../models/profile_summary.dart';
+import '../models/selected_player.dart';
 import '../services/profile_service.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_options_menu.dart';
 import '../widgets/pgo_header_scaffold.dart';
+import 'match_summary_screen.dart';
 import 'profile_edit_screen.dart';
 import 'profile_history_screen.dart';
 import 'profile_public_preview_screen.dart';
@@ -66,6 +69,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  void _openMatchSummary(HistoryItemData item) {
+    final summaryData = _buildMatchSummaryData(item.raw);
+    if (summaryData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay suficiente informacion para abrir el resumen.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MatchSummaryScreen(
+          matchDate: _formatHistoryDate(summaryData.match.playedAt),
+          match: summaryData.match,
+          players: summaryData.players,
+          winnerTeam: summaryData.match.winnerTeam ?? 1,
+        ),
+      ),
+    );
   }
 
   @override
@@ -145,6 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const SizedBox(height: 16),
                             RecentHistoryCard(
                               history: buildHistoryItems(profile),
+                              onHistoryTap: _openMatchSummary,
                               onViewAll: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
@@ -553,10 +580,12 @@ class RecentHistoryCard extends StatelessWidget {
   const RecentHistoryCard({
     super.key,
     required this.history,
+    required this.onHistoryTap,
     required this.onViewAll,
   });
 
   final List<HistoryItemData> history;
+  final ValueChanged<HistoryItemData> onHistoryTap;
   final VoidCallback onViewAll;
 
   @override
@@ -606,64 +635,89 @@ class RecentHistoryCard extends StatelessWidget {
             const SizedBox(height: 8),
           ] else ...[
             const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Toca un partido para ver su resumen',
+                style: TextStyle(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.45),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
             ...history.map(
               (item) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: item.isWin
-                            ? AppColors.PrimaryGreen
-                            : const Color(0xFFFF334B),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        item.isWin ? Icons.check : Icons.close,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              color: AppColors.SecondBlue,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
+                child: InkWell(
+                  onTap: () => onHistoryTap(item),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: item.isWin
+                                ? AppColors.PrimaryGreen
+                                : const Color(0xFFFF334B),
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.subtitle,
-                            style: TextStyle(
-                              color: AppColors.SecondBlue.withValues(
-                                alpha: 0.55,
+                          child: Icon(
+                            item.isWin ? Icons.check : Icons.close,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                style: const TextStyle(
+                                  color: AppColors.SecondBlue,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                            ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.subtitle,
+                                style: TextStyle(
+                                  color: AppColors.SecondBlue.withValues(
+                                    alpha: 0.55,
+                                  ),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        Text(
+                          '${item.isWin ? '+' : '-'}${item.xp} XP',
+                          style: TextStyle(
+                            color: item.isWin
+                                ? AppColors.PrimaryGreen
+                                : const Color(0xFFFF334B),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.SecondBlue.withValues(alpha: 0.4),
+                          size: 18,
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${item.isWin ? '+' : '-'}${item.xp} XP',
-                      style: TextStyle(
-                        color: item.isWin
-                            ? AppColors.PrimaryGreen
-                            : const Color(0xFFFF334B),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -697,6 +751,157 @@ class RecentHistoryCard extends StatelessWidget {
   }
 }
 
+class _MatchSummaryData {
+  const _MatchSummaryData({
+    required this.match,
+    required this.players,
+  });
+
+  final MatchRecord match;
+  final List<SelectedPlayer> players;
+}
+
+_MatchSummaryData? _buildMatchSummaryData(Map<String, dynamic> item) {
+  final id = item['id'] as String?;
+  final participantsJson = (item['participants'] as List?) ?? const [];
+  if (id == null || id.isEmpty || participantsJson.isEmpty) {
+    return null;
+  }
+
+  final playedAtValue = item['playedAt'];
+  final playedAt = playedAtValue is String
+      ? DateTime.tryParse(playedAtValue) ?? DateTime.now()
+      : playedAtValue is DateTime
+          ? playedAtValue
+          : DateTime.now();
+
+  final participants = participantsJson
+      .whereType<Map>()
+      .map((raw) => Map<String, dynamic>.from(raw))
+      .toList()
+    ..sort(
+      (a, b) =>
+          ((a['slot'] as num?)?.toInt() ?? 0).compareTo(
+        (b['slot'] as num?)?.toInt() ?? 0,
+      ),
+    );
+
+  final selectedPlayers = <SelectedPlayer>[];
+  final matchParticipants = <MatchParticipantRecord>[];
+
+  for (var index = 0; index < participants.length; index++) {
+    final participant = participants[index];
+    final user = participant['user'] is Map
+        ? Map<String, dynamic>.from(participant['user'] as Map)
+        : <String, dynamic>{};
+    final profile = user['profile'] is Map
+        ? Map<String, dynamic>.from(user['profile'] as Map)
+        : <String, dynamic>{};
+    final userId = user['id'] as String? ?? 'player-$index';
+    final name = user['name'] as String? ?? 'Jugador ${index + 1}';
+    final photoUrl = profile['photoUrl'] as String?;
+    final category = profile['category'] as String?;
+    final slot = (participant['slot'] as num?)?.toInt() ?? index + 1;
+    final team = (participant['team'] as num?)?.toInt() ?? (index < 2 ? 1 : 2);
+
+    selectedPlayers.add(
+      SelectedPlayer(
+        id: userId,
+        name: name,
+        photoUrl: photoUrl,
+        category: category,
+        rankingPosition: 0,
+      ),
+    );
+
+    matchParticipants.add(
+      MatchParticipantRecord(
+        id: '$id-$userId-$slot',
+        userId: userId,
+        slot: slot,
+        team: team,
+        user: MatchParticipantUserRecord(
+          id: userId,
+          name: name,
+          photoUrl: photoUrl,
+          category: category,
+        ),
+      ),
+    );
+  }
+
+  if (selectedPlayers.length < 4) {
+    return null;
+  }
+
+  final match = MatchRecord(
+    id: id,
+    createdById: item['createdById'] as String? ?? '',
+    clubName: item['clubName'] as String? ?? 'Club no definido',
+    playedAt: playedAt,
+    matchType: item['matchType'] as String? ?? 'RANKED',
+    status: item['status'] as String? ?? 'COMPLETED',
+    description: item['description'] as String?,
+    winnerTeam: (item['winnerTeam'] as num?)?.toInt(),
+    games: ((item['games'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((game) => Map<String, dynamic>.from(game))
+        .toList(),
+    createdAt: playedAt,
+    updatedAt: playedAt,
+    photoUrl: item['photoUrl'] as String?,
+    participants: matchParticipants,
+  );
+
+  return _MatchSummaryData(
+    match: match,
+    players: selectedPlayers,
+  );
+}
+
+String _formatHistoryDate(DateTime date) {
+  const weekdays = [
+    'Lunes',
+    'Martes',
+    'Miercoles',
+    'Jueves',
+    'Viernes',
+    'Sabado',
+    'Domingo',
+  ];
+  const months = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+
+  return '${weekdays[date.weekday - 1]} ${date.day} de ${months[date.month - 1]}';
+}
+
+class HistoryItemData {
+  const HistoryItemData({
+    required this.title,
+    required this.subtitle,
+    required this.xp,
+    required this.isWin,
+    required this.raw,
+  });
+
+  final String title;
+  final String subtitle;
+  final int xp;
+  final bool isWin;
+  final Map<String, dynamic> raw;
+}
 class FriendsCard extends StatelessWidget {
   const FriendsCard({
     super.key,
@@ -924,20 +1129,6 @@ class _ProfileErrorState extends StatelessWidget {
   }
 }
 
-class HistoryItemData {
-  const HistoryItemData({
-    required this.title,
-    required this.subtitle,
-    required this.xp,
-    required this.isWin,
-  });
-
-  final String title;
-  final String subtitle;
-  final int xp;
-  final bool isWin;
-}
-
 List<HistoryItemData> buildHistoryItems(ProfileSummary profile) {
   if (profile.matchHistory.isEmpty) {
     return const [];
@@ -957,6 +1148,7 @@ List<HistoryItemData> buildHistoryItems(ProfileSummary profile) {
       subtitle: subtitle,
       xp: xp.abs(),
       isWin: isWin,
+      raw: item,
     );
   }).toList();
 }

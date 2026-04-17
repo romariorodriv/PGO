@@ -157,7 +157,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
     if (_matchWinnerTeam != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('El partido ya tiene un ganador. Ya puedes finalizarlo.'),
+          content:
+              Text('El partido ya tiene un ganador. Ya puedes finalizarlo.'),
         ),
       );
       return;
@@ -329,8 +330,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
       _completedSets
         ..clear()
         ..addAll(
-          previous.completedSets
-              .map((item) => {'team1': item['team1']!, 'team2': item['team2']!}),
+          previous.completedSets.map(
+              (item) => {'team1': item['team1']!, 'team2': item['team2']!}),
         );
     });
   }
@@ -410,7 +411,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   }
 
   List<SelectedPlayer> get _team1Players => widget.players.take(2).toList();
-  List<SelectedPlayer> get _team2Players => widget.players.skip(2).take(2).toList();
+  List<SelectedPlayer> get _team2Players =>
+      widget.players.skip(2).take(2).toList();
   List<SelectedPlayer> get _leftTeamPlayers =>
       _leftTeam == 1 ? _team1Players : _team2Players;
   List<SelectedPlayer> get _rightTeamPlayers =>
@@ -419,7 +421,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
   String get _setsLabel => '$_team1Sets - $_team2Sets';
   String get _gamesLabel => '$_team1Games - $_team2Games';
   String get _serviceLabel => 'Equipo $_servingTeam';
-  String get _modeLabel => _useGoldenPoint ? 'Punto de oro' : 'Ventaja';
+  List<String> get _completedSetLabels => _completedSets
+      .map((set) => '${set['team1'] ?? 0} - ${set['team2'] ?? 0}')
+      .toList();
 
   String get _smallCenterTopText {
     final elapsed = _matchTimer.elapsed;
@@ -512,17 +516,19 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
                               ? _team1PointsLabel
                               : _team2PointsLabel,
                           gamesLabel: _gamesLabel,
+                          setRows: _completedSetLabels,
                           topText: _smallCenterTopText,
                           bottomText: _smallCenterBottomText,
                           leftPlayers: _leftTeamPlayers,
                           rightPlayers: _rightTeamPlayers,
+                          onLeftScoreTap: () => _addPointToTeam(_leftTeam),
+                          onRightScoreTap: () => _addPointToTeam(_rightTeam),
                         ),
                         const SizedBox(height: 18),
                         _CompactInfoCard(
                           sets: _setsLabel,
                           games: _gamesLabel,
                           servingTeam: _serviceLabel,
-                          mode: _modeLabel,
                         ),
                         const SizedBox(height: 18),
                         _ActionPill(
@@ -564,13 +570,14 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
                           width: 126,
                           height: 36,
                           child: ElevatedButton(
-                            onPressed:
-                                _isSaving || !_canFinish ? null : _finishLiveMatch,
+                            onPressed: _isSaving || !_canFinish
+                                ? null
+                                : _finishLiveMatch,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFD7FF59),
                               foregroundColor: AppColors.SecondBlue,
-                              disabledBackgroundColor:
-                                  const Color(0xFFD7FF59).withValues(alpha: 0.45),
+                              disabledBackgroundColor: const Color(0xFFD7FF59)
+                                  .withValues(alpha: 0.45),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
@@ -580,8 +587,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child:
-                                        CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Text(
                                     'Finalizar',
@@ -608,11 +615,13 @@ class _LiveMatchScreenState extends State<LiveMatchScreen> {
 class _CenterScoreCard extends StatelessWidget {
   const _CenterScoreCard({
     required this.gamesLabel,
+    required this.setRows,
     required this.topText,
     required this.bottomText,
   });
 
   final String gamesLabel;
+  final List<String> setRows;
   final String topText;
   final String bottomText;
 
@@ -669,23 +678,29 @@ class _CenterScoreCard extends StatelessWidget {
                 color: const Color(0xFFD8DEE8),
               ),
               const SizedBox(height: 3),
-              Text(
-                _latestSetText(bottomText, 1),
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                _latestSetText(bottomText, 2),
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              if (setRows.isEmpty)
+                Text(
+                  'Set en curso',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.65),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                ...setRows.take(3).map(
+                      (set) => Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Text(
+                          set,
+                          style: TextStyle(
+                            color: AppColors.SecondBlue.withValues(alpha: 0.8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
               const SizedBox(height: 6),
               Container(
                 width: 52,
@@ -710,11 +725,6 @@ class _CenterScoreCard extends StatelessWidget {
       ],
     );
   }
-
-  String _latestSetText(String fallback, int row) {
-    if (row == 1) return fallback == '0-0' ? '6-4' : fallback;
-    return fallback == '0-0' ? '5-7' : fallback;
-  }
 }
 
 class _CompactInfoCard extends StatelessWidget {
@@ -722,13 +732,11 @@ class _CompactInfoCard extends StatelessWidget {
     required this.sets,
     required this.games,
     required this.servingTeam,
-    required this.mode,
   });
 
   final String sets;
   final String games;
   final String servingTeam;
-  final String mode;
 
   @override
   Widget build(BuildContext context) {
@@ -757,14 +765,6 @@ class _CompactInfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _CompactInfoRow(label: 'Games', value: games),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            height: 1,
-            color: const Color(0xFFD8DEE8),
-          ),
-          const SizedBox(height: 8),
-          _CompactInfoRow(label: 'Modo', value: mode),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
@@ -811,19 +811,25 @@ class _TopScoreSection extends StatelessWidget {
     required this.leftScore,
     required this.rightScore,
     required this.gamesLabel,
+    required this.setRows,
     required this.topText,
     required this.bottomText,
     required this.leftPlayers,
     required this.rightPlayers,
+    required this.onLeftScoreTap,
+    required this.onRightScoreTap,
   });
 
   final String leftScore;
   final String rightScore;
   final String gamesLabel;
+  final List<String> setRows;
   final String topText;
   final String bottomText;
   final List<SelectedPlayer> leftPlayers;
   final List<SelectedPlayer> rightPlayers;
+  final VoidCallback onLeftScoreTap;
+  final VoidCallback onRightScoreTap;
 
   @override
   Widget build(BuildContext context) {
@@ -837,27 +843,35 @@ class _TopScoreSection extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      leftScore,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.SecondBlue,
-                        fontSize: 76,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onLeftScoreTap,
+                      child: Text(
+                        leftScore,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.SecondBlue,
+                          fontSize: 76,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 108),
                   Expanded(
-                    child: Text(
-                      rightScore,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.SecondBlue,
-                        fontSize: 76,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onRightScoreTap,
+                      child: Text(
+                        rightScore,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.SecondBlue,
+                          fontSize: 76,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
                       ),
                     ),
                   ),
@@ -866,6 +880,7 @@ class _TopScoreSection extends StatelessWidget {
             ),
             _CenterScoreCard(
               gamesLabel: gamesLabel,
+              setRows: setRows,
               topText: topText,
               bottomText: bottomText,
             ),

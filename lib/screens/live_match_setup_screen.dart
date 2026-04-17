@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
@@ -33,6 +36,12 @@ class _LiveMatchSetupScreenState extends State<LiveMatchSetupScreen> {
 
   bool _isSubmitting = false;
   int? _servingTeam;
+
+  void _handleDrawServingTeam() {
+    setState(() {
+      _servingTeam = Random().nextBool() ? 1 : 2;
+    });
+  }
 
   Future<void> _handleStartMatch() async {
     if (_servingTeam == null) {
@@ -87,242 +96,271 @@ class _LiveMatchSetupScreenState extends State<LiveMatchSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final currentTheme = Theme.of(context);
+
+    return Theme(
+      data: currentTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(currentTheme.textTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(currentTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Registro en vivo',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [
-        PgoOptionsMenuButton(),
-      ],
-      bottomNavigationBar: PgoBottomNav(
-        currentTab: PgoNavTab.tournaments,
-        onHomeTap: () {
-          MainShell.openReplacement(context, initialTab: PgoNavTab.home);
-        },
-        onTournamentsTap: () {
-          MainShell.openReplacement(context, initialTab: PgoNavTab.tournaments);
-        },
-        onProfileTap: () {
-          MainShell.openReplacement(context, initialTab: PgoNavTab.profile);
-        },
-      ),
-      body: SafeArea(
-        top: false,
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF4F5F7),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: const Text(
+          'Registro en vivo',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(26),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFB7D56A),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.sports_tennis,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Cancha 2 - Semifinal',
-                            style: TextStyle(
-                              color: AppColors.SecondBlue,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 22),
-                      IntrinsicHeight(
-                        child: Row(
+        ),
+        actions: const [
+          PgoOptionsMenuButton(),
+        ],
+        bottomNavigationBar: PgoBottomNav(
+          currentTab: PgoNavTab.tournaments,
+          onHomeTap: () {
+            MainShell.openReplacement(context, initialTab: PgoNavTab.home);
+          },
+          onTournamentsTap: () {
+            MainShell.openReplacement(context,
+                initialTab: PgoNavTab.tournaments);
+          },
+          onProfileTap: () {
+            MainShell.openReplacement(context, initialTab: PgoNavTab.profile);
+          },
+        ),
+        body: SafeArea(
+          top: false,
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF4F5F7),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Equipo 1',
-                                    style: TextStyle(
-                                      color: AppColors.SecondBlue,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      _LiveSetupPlayer(player: widget.players[0]),
-                                      _LiveSetupPlayer(player: widget.players[1]),
-                                    ],
-                                  ),
-                                ],
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFB7D56A),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.sports_tennis,
+                                color: Colors.white,
+                                size: 16,
                               ),
                             ),
-                            const VerticalDivider(
-                              width: 22,
-                              thickness: 1,
-                              color: Color(0xFFCBD2DE),
-                            ),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Equipo 2',
-                                    style: TextStyle(
-                                      color: AppColors.SecondBlue,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      _LiveSetupPlayer(player: widget.players[2]),
-                                      _LiveSetupPlayer(player: widget.players[3]),
-                                    ],
-                                  ),
-                                ],
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Cancha 2 - Semifinal',
+                              style: TextStyle(
+                                color: AppColors.SecondBlue,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        height: 1,
-                        color: const Color(0xFFD8DEE8),
-                      ),
-                      const SizedBox(height: 18),
-                      const Center(
-                        child: Text(
-                          '¿Quién empieza sacando?',
-                          style: TextStyle(
-                            color: AppColors.SecondBlue,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
+                        const SizedBox(height: 22),
+                        IntrinsicHeight(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      'Equipo 1',
+                                      style: TextStyle(
+                                        color: AppColors.SecondBlue,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _LiveSetupPlayer(
+                                            player: widget.players[0]),
+                                        _LiveSetupPlayer(
+                                            player: widget.players[1]),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const VerticalDivider(
+                                width: 22,
+                                thickness: 1,
+                                color: Color(0xFFCBD2DE),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      'Equipo 2',
+                                      style: TextStyle(
+                                        color: AppColors.SecondBlue,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _LiveSetupPlayer(
+                                            player: widget.players[2]),
+                                        _LiveSetupPlayer(
+                                            player: widget.players[3]),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Container(
-                          height: 30,
-                          padding: const EdgeInsets.symmetric(horizontal: 22),
-                          decoration: BoxDecoration(
-                            color: AppColors.SecondBlue,
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'SORTEO',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                        const SizedBox(height: 20),
+                        Container(
+                          width: double.infinity,
+                          height: 1,
+                          color: const Color(0xFFD8DEE8),
                         ),
-                      ),
-                      const SizedBox(height: 22),
-                      _ServeOptionCard(
-                        active: _servingTeam == 1,
-                        players: widget.players.take(2).toList(),
-                        showBall: true,
-                        onTap: () {
-                          setState(() {
-                            _servingTeam = 1;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      _ServeOptionCard(
-                        active: _servingTeam == 2,
-                        players: widget.players.skip(2).take(2).toList(),
-                        onTap: () {
-                          setState(() {
-                            _servingTeam = 2;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _handleStartMatch,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD7FF59),
-                      disabledBackgroundColor:
-                          const Color(0xFFD7FF59).withValues(alpha: 0.45),
-                      foregroundColor: AppColors.SecondBlue,
-                      disabledForegroundColor:
-                          AppColors.SecondBlue.withValues(alpha: 0.55),
-                      elevation: 4,
-                      shadowColor: Colors.black.withValues(alpha: 0.18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'EMPEZAR PARTIDO',
+                        const SizedBox(height: 18),
+                        const Center(
+                          child: Text(
+                            '¿Quién empieza sacando?',
                             style: TextStyle(
+                              color: AppColors.SecondBlue,
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _handleDrawServingTeam,
+                              borderRadius: BorderRadius.circular(15),
+                              child: Ink(
+                                width: 138,
+                                height: 30,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 22),
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.secondaryGradient,
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'SORTEO',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        _ServeOptionCard(
+                          active: _servingTeam == 1,
+                          players: widget.players.take(2).toList(),
+                          showBall: _servingTeam == 1,
+                          onTap: () {
+                            setState(() {
+                              _servingTeam = 1;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        _ServeOptionCard(
+                          active: _servingTeam == 2,
+                          players: widget.players.skip(2).take(2).toList(),
+                          showBall: _servingTeam == 2,
+                          onTap: () {
+                            setState(() {
+                              _servingTeam = 2;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _handleStartMatch,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD7FF59),
+                        disabledBackgroundColor:
+                            const Color(0xFFD7FF59).withValues(alpha: 0.45),
+                        foregroundColor: AppColors.SecondBlue,
+                        disabledForegroundColor:
+                            AppColors.SecondBlue.withValues(alpha: 0.55),
+                        elevation: 4,
+                        shadowColor: Colors.black.withValues(alpha: 0.18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              'EMPEZAR PARTIDO',
+                              style: GoogleFonts.inter(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.SecondBlue,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

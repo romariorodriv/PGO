@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
@@ -39,10 +40,6 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   String get _photoUrl => _currentTournament?.photoUrl ?? '';
   String get _createdByName => _currentTournament?.createdByName ?? 'Organizador';
   String get _location => _currentTournament?.location ?? 'One Padel Trigal';
-  String get _city => _currentTournament?.city ?? 'Lima';
-  String get _format => _currentTournament?.format ?? 'dobles';
-  String get _modality => _currentTournament?.modality ?? 'masculino';
-  int get _playerCapacity => _currentTournament?.playerCapacity ?? 16;
   List<TournamentPlayer> get _players =>
       _currentTournament?.registeredPlayers ?? const [];
 
@@ -82,12 +79,6 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
         });
       }
     }
-  }
-
-  String _capitalize(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return 'Sin definir';
-    return '${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}';
   }
 
   void _toggleFollow(TournamentPlayer player) {
@@ -133,107 +124,94 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Torneo',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [PgoOptionsMenuButton()],
-      bottomNavigationBar: _buildBottomNavigation(context),
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: Text(
+          'Actividad',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHero(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(30, 14, 30, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTabs(context),
-                    const SizedBox(height: 16),
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (_loadError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildInfoTile(
-                          icon: Icons.warning_amber_rounded,
-                          title: 'No pudimos actualizar los jugadores',
-                          subtitle: _loadError!,
+        actions: const [PgoOptionsMenuButton()],
+        bottomNavigationBar: _buildBottomNavigation(context),
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHero(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(30, 14, 30, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTabs(context),
+                      const SizedBox(height: 8),
+                      _buildFriendsRegisteredBadge(),
+                      const SizedBox(height: 10),
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_loadError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _buildInfoTile(
+                            icon: Icons.warning_amber_rounded,
+                            title: 'No pudimos actualizar los jugadores',
+                            subtitle: _loadError!,
+                          ),
+                        ),
+                      _buildOrganizerCard(),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Jugadores',
+                        style: TextStyle(
+                          color: AppColors.SecondBlue,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    _buildOrganizerCard(),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Jugadores',
-                      style: TextStyle(
-                        color: AppColors.SecondBlue,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildInfoTile(
-                      icon: Icons.groups_2_outlined,
-                      title: 'Cupos disponibles',
-                      subtitle:
-                          '${_players.length} de $_playerCapacity jugadores inscritos.',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildInfoTile(
-                      icon: Icons.sports_tennis_outlined,
-                      title: 'Formato',
-                      subtitle:
-                          '${_capitalize(_format)} · ${_capitalize(_modality)}',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildInfoTile(
-                      icon: Icons.location_on_outlined,
-                      title: 'Sede',
-                      subtitle: '$_location · $_city',
-                    ),
-                    const SizedBox(height: 16),
-                    if (_players.isEmpty)
-                      _buildInfoTile(
-                        icon: Icons.person_off_outlined,
-                        title: 'Aun no hay jugadores visibles',
-                        subtitle:
-                            'Cuando existan inscripciones confirmadas apareceran aqui.',
-                      )
-                    else
-                      ..._players.map(
-                        (player) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _RegisteredPlayerTile(
+                      const SizedBox(height: 6),
+                      if (_players.isEmpty)
+                        _buildInfoTile(
+                          icon: Icons.person_off_outlined,
+                          title: 'Aun no hay jugadores visibles',
+                          subtitle:
+                              'Cuando existan inscripciones confirmadas apareceran aqui.',
+                        )
+                      else
+                        ..._players.map(
+                          (player) => _RegisteredPlayerTile(
                             player: player,
                             isFollowing: _followingIds.contains(player.id),
                             onFollowTap: () => _toggleFollow(player),
                             onProfileTap: () => _openPlayerProfile(player),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -416,6 +394,47 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
     );
   }
 
+  Widget _buildFriendsRegisteredBadge() {
+    final count = _players.length;
+
+    return Center(
+      child: Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.local_fire_department_rounded,
+              size: 13,
+              color: Color(0xFFFF9800),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              '$count amigos inscritos',
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildOrganizerCard() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -547,15 +566,17 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
 class _AvatarCircle extends StatelessWidget {
   const _AvatarCircle({
     this.selected = false,
+    this.size = 40,
   });
 
   final bool selected;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 40,
-      height: 40,
+      width: size,
+      height: size,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -589,17 +610,17 @@ class _RegisteredPlayerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           Row(
             children: [
-              const _AvatarCircle(),
+              InkWell(
+                onTap: onProfileTap,
+                customBorder: const CircleBorder(),
+                child: const _AvatarCircle(size: 34),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -607,87 +628,85 @@ class _RegisteredPlayerTile extends StatelessWidget {
                   children: [
                     Text(
                       player.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.SecondBlue,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
-                      player.category ?? 'Sin categoria',
+                      'Amigo',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: AppColors.SecondBlue.withValues(alpha: 0.6),
-                        fontSize: 12,
+                        color: AppColors.SecondBlue.withValues(alpha: 0.58),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
+              if (!isFollowing) ...[
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF3E6EA7),
+                        Color(0xFF10192A),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onFollowTap,
+                      borderRadius: BorderRadius.circular(12),
+                      child: const SizedBox(
+                        width: 58,
+                        height: 21,
+                        child: Center(
+                          child: Text(
+                            '+ Seguir',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD7FF59),
-                  borderRadius: BorderRadius.circular(14),
+                width: 31,
+                height: 31,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD7FF59),
+                  shape: BoxShape.circle,
                 ),
                 child: Text(
                   '#${player.rankingPosition}',
                   style: const TextStyle(
                     color: AppColors.SecondBlue,
-                    fontSize: 10,
+                    fontSize: 8,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: ElevatedButton(
-                    onPressed: onFollowTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isFollowing
-                          ? const Color(0xFFE7EBF0)
-                          : AppColors.PrimaryGreen,
-                      foregroundColor: AppColors.SecondBlue,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: Text(
-                      isFollowing ? 'Siguiendo' : 'Seguir',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: OutlinedButton(
-                    onPressed: onProfileTap,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.SecondBlue,
-                      side: BorderSide(
-                        color: AppColors.SecondBlue.withValues(alpha: 0.18),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Perfil',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          Container(
+            height: 1,
+            margin: const EdgeInsets.only(left: 44, top: 5),
+            color: AppColors.SecondBlue.withValues(alpha: 0.12),
           ),
         ],
       ),

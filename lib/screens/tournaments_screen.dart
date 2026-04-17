@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
@@ -139,7 +140,14 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+      ),
+      child: PgoHeaderScaffold(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: widget.onBackTap ?? () => Navigator.of(context).pop(),
@@ -180,10 +188,10 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                           Stack(
                             alignment: Alignment.center,
                             children: [
-                              const Center(
+                              Center(
                                 child: Text(
                                   'Torneos',
-                                  style: TextStyle(
+                                  style: GoogleFonts.inter(
                                     color: AppColors.SecondBlue,
                                     fontSize: 28,
                                     fontWeight: FontWeight.w900,
@@ -317,15 +325,16 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
   Widget _buildSearchField() {
     return Center(
       child: Container(
-        height: 42,
+        height: 36,
         width: 300,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 13),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -343,6 +352,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
                   hintText: 'Nombre del torneo',
                   hintStyle: TextStyle(
                     color: AppColors.SecondBlue.withValues(alpha: 0.72),
@@ -606,30 +617,20 @@ class _CreateTournamentFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: const Color(0xFFD7FF59),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.16),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.add,
-            color: AppColors.SecondBlue,
-            size: 34,
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 54,
+        height: 54,
+        decoration: const BoxDecoration(
+          color: Color(0xFFD7FF59),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.add,
+          color: AppColors.SecondBlue,
+          size: 34,
         ),
       ),
     );

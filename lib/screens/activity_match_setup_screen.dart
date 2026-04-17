@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../constants/lima_padel_clubs.dart';
@@ -34,6 +35,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   static const _fallbackClubName = 'One Padel Olguin';
 
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final CommunityService _communityService = CommunityService();
   Timer? _searchDebounce;
 
@@ -63,6 +65,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -160,6 +163,10 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
       }
       _loadCommunity(query: value);
     });
+  }
+
+  void _focusSearchInput() {
+    FocusScope.of(context).requestFocus(_searchFocusNode);
   }
 
   bool _isAlreadySelected(String userId) {
@@ -347,296 +354,308 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final isBusy = _isLoadingProfile || _isLoadingCommunity;
+    final baseTheme = Theme.of(context);
+    final interTextTheme = GoogleFonts.interTextTheme(baseTheme.textTheme);
 
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: interTextTheme,
+        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Actividad',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [
-        PgoOptionsMenuButton(),
-      ],
-      body: SafeArea(
-        top: false,
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF4F5F7),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: const Text(
+          'Actividad',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(26, 22, 26, 34),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                const Center(
-                  child: Text(
-                    'Anadir jugadores',
-                    style: TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
+        ),
+        actions: const [
+          PgoOptionsMenuButton(),
+        ],
+        body: SafeArea(
+          top: false,
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF4F5F7),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(26, 22, 26, 34),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  const Center(
+                    child: Text(
+                      'Anadir jugadores',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                const Center(
-                  child: Text(
-                    'Con quien juegas hoy?',
-                    style: TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                if (isBusy)
-                  const Center(child: CircularProgressIndicator())
-                else if (_profileError != null)
-                  _StatusCard(
-                    title: 'No pudimos cargar tu perfil',
-                    message: _profileError!,
-                    actionLabel: 'Reintentar',
-                    onTap: _loadInitialData,
-                  )
-                else ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(
-                      4,
-                      (index) {
-                        final player = _selectedPlayers[index];
-                        if (player == null) {
-                          return _AddPlayerCircle(
-                              label: 'Jugador ${index + 1}');
-                        }
-
-                        return _PlayerCircle(
-                          label: player.name,
-                          imageUrl: player.photoUrl,
-                          selected: true,
-                          removable: !player.locked,
-                          onRemove: () => _removePlayer(index),
-                        );
-                      },
+                  const SizedBox(height: 2),
+                  const Center(
+                    child: Text(
+                      'Con quien juegas hoy?',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 42,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.search,
-                                size: 18,
-                                color: AppColors.SecondBlue.withValues(
-                                    alpha: 0.45),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  onChanged: _onSearchChanged,
-                                  decoration: InputDecoration(
-                                    hintText: 'Nombre, correo electronico',
-                                    hintStyle: TextStyle(
-                                      color: AppColors.SecondBlue.withValues(
-                                        alpha: 0.55,
+                  if (isBusy)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_profileError != null)
+                    _StatusCard(
+                      title: 'No pudimos cargar tu perfil',
+                      message: _profileError!,
+                      actionLabel: 'Reintentar',
+                      onTap: _loadInitialData,
+                    )
+                  else ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(
+                        4,
+                        (index) {
+                          final player = _selectedPlayers[index];
+                          if (player == null) {
+                            return _AddPlayerCircle(
+                              label: 'Jugador ${index + 1}',
+                              onTap: _focusSearchInput,
+                            );
+                          }
+
+                          return _PlayerCircle(
+                            label: player.name,
+                            imageUrl: player.photoUrl,
+                            selected: true,
+                            removable: !player.locked,
+                            onRemove: () => _removePlayer(index),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 42,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.search,
+                                  size: 18,
+                                  color: AppColors.SecondBlue.withValues(
+                                      alpha: 0.45),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    focusNode: _searchFocusNode,
+                                    controller: _searchController,
+                                    onChanged: _onSearchChanged,
+                                    decoration: InputDecoration(
+                                      hintText: 'Nombre, correo electronico',
+                                      hintStyle: TextStyle(
+                                        color: AppColors.SecondBlue.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
                                       ),
+                                      border: InputBorder.none,
+                                    ),
+                                    style: const TextStyle(
+                                      color: AppColors.SecondBlue,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
-                                    border: InputBorder.none,
-                                  ),
-                                  style: const TextStyle(
-                                    color: AppColors.SecondBlue,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: _handleQrScan,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          width: 60,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'QR',
-                            style: TextStyle(
-                              color: AppColors.SecondBlue,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    _searchController.text.trim().isEmpty
-                        ? 'Sugerencias'
-                        : 'Resultados de busqueda',
-                    style: const TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_communityError != null)
-                    _InlineInfoCard(message: _communityError!)
-                  else if (_isSearching)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_displayUsers.isEmpty)
-                    _InlineInfoCard(
-                      message: _searchController.text.trim().isEmpty
-                          ? 'Aun no tienes companeros con los que hayas jugado.'
-                          : 'No encontramos jugadores con esa busqueda.',
-                    )
-                  else
-                    ..._displayUsers.map(
-                      (user) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _CommunityUserCard(
-                          user: user,
-                          alreadySelected: _isAlreadySelected(user.id),
-                          onTap: () => _addPlayer(user),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Club de juego',
-                    style: TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _clubName,
-                            style: const TextStyle(
-                              color: AppColors.SecondBlue,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: _handleQrScan,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: 60,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _pickClub,
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 0),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text(
-                            'Cambiar',
-                            style: TextStyle(
-                              color: AppColors.PrimaryGreen,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    widget.isCompetitive
-                        ? 'Este match se registrara como competitivo'
-                        : 'Este match se registrara como amistoso',
-                    style: TextStyle(
-                      color: AppColors.SecondBlue.withValues(alpha: 0.62),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _canContinue ? _handleCreateMatch : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _canContinue
-                            ? const Color(0xFFD7FF59)
-                            : const Color(0xFFD9DEE7),
-                        foregroundColor: _canContinue
-                            ? AppColors.SecondBlue
-                            : AppColors.SecondBlue.withValues(alpha: 0.48),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
-                        ),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'SIGUIENTE',
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'QR',
                               style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
+                                color: AppColors.SecondBlue,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 32),
+                    Text(
+                      _searchController.text.trim().isEmpty
+                          ? 'Sugerencias'
+                          : 'Resultados de busqueda',
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_communityError != null)
+                      _InlineInfoCard(message: _communityError!)
+                    else if (_isSearching)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_displayUsers.isEmpty)
+                      _InlineInfoCard(
+                        message: _searchController.text.trim().isEmpty
+                            ? 'Aun no tienes companeros con los que hayas jugado.'
+                            : 'No encontramos jugadores con esa busqueda.',
+                      )
+                    else
+                      ..._displayUsers.map(
+                        (user) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _CommunityUserCard(
+                            user: user,
+                            alreadySelected: _isAlreadySelected(user.id),
+                            onTap: () => _addPlayer(user),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Club de juego',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _clubName,
+                              style: const TextStyle(
+                                color: AppColors.SecondBlue,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _pickClub,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 0),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Cambiar',
+                              style: TextStyle(
+                                color: AppColors.PrimaryGreen,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.isCompetitive
+                          ? 'Este match se registrara como competitivo'
+                          : 'Este match se registrara como amistoso',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _canContinue ? _handleCreateMatch : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _canContinue
+                              ? const Color(0xFFD7FF59)
+                              : const Color(0xFFD9DEE7),
+                          foregroundColor: _canContinue
+                              ? AppColors.SecondBlue
+                              : AppColors.SecondBlue.withValues(alpha: 0.48),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text(
+                                'SIGUIENTE',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -746,9 +765,11 @@ class _PlayerCircle extends StatelessWidget {
 
 class _AddPlayerCircle extends StatelessWidget {
   final String label;
+  final VoidCallback onTap;
 
   const _AddPlayerCircle({
     required this.label,
+    required this.onTap,
   });
 
   @override
@@ -757,18 +778,22 @@ class _AddPlayerCircle extends StatelessWidget {
       width: 72,
       child: Column(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: const BoxDecoration(
-              color: Color(0xFFABB8CC),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 34,
+          InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 58,
+              height: 58,
+              decoration: const BoxDecoration(
+                color: Color(0xFFABB8CC),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 34,
+                ),
               ),
             ),
           ),

@@ -16,7 +16,6 @@ class ActivityScreen extends StatefulWidget {
 }
 
 class _ActivityScreenState extends State<ActivityScreen> {
-  bool _isCompetitive = true;
   ProfileSummary? _profile;
 
   @override
@@ -91,8 +90,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => ActivityMatchSetupScreen(
-                        isCompetitive: _isCompetitive,
+                      builder: (context) => const ActivityMatchSetupScreen(
+                        isCompetitive: true,
                       ),
                     ),
                   );
@@ -101,41 +100,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
               const SizedBox(height: 16),
               _ActionButton(
                 label: 'Registrar en vivo',
-                enabled: _isCompetitive,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => LiveMatchPlayersScreen(
-                        isCompetitive: _isCompetitive,
+                      builder: (context) => const LiveMatchPlayersScreen(
+                        isCompetitive: true,
                       ),
                     ),
                   );
                 },
               ),
-              const SizedBox(height: 54),
-              Row(
-                children: [
-                  const Text(
-                    'Competitivo',
-                    style: TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const Spacer(),
-                  _CompetitiveToggle(
-                    value: _isCompetitive,
-                    onChanged: (value) {
-                      setState(() {
-                        _isCompetitive = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              if (_isCompetitive) _CategoryCard(profile: _profile),
               const Spacer(),
             ],
           ),
@@ -200,128 +174,5 @@ class _ActionButton extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _CompetitiveToggle extends StatelessWidget {
-  const _CompetitiveToggle({
-    required this.value,
-    required this.onChanged,
-  });
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 52,
-        height: 28,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: value ? AppColors.SecondBlue : const Color(0xFFB7BECA),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: AnimatedAlign(
-          duration: const Duration(milliseconds: 180),
-          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            width: 22,
-            height: 22,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({
-    required this.profile,
-  });
-
-  final ProfileSummary? profile;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  profile?.category ?? '4ta categoría',
-                  style: const TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Text(
-                '#${profile?.rankingPosition ?? 120}',
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.5),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Stack(
-            children: [
-              Container(
-                height: 12,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEBEDF1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              FractionallySizedBox(
-                widthFactor: _progressFactor(profile),
-                child: Container(
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD2C9A4),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  double _progressFactor(ProfileSummary? profile) {
-    final ranking = profile?.rankingPosition ?? 120;
-    if (ranking <= 0) {
-      return 0.56;
-    }
-    final normalized = 1 - (ranking / 250);
-    return normalized.clamp(0.22, 0.9);
   }
 }

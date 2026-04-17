@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../constants/colors.dart';
@@ -54,8 +55,16 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
     return widget.players.skip(2).take(2).toList();
   }
 
-  String get _winnerNames =>
-      _winnerPlayers.map((player) => player.name).join(', ');
+  String get _winnerCategory {
+    final category = _winnerPlayers
+        .map((player) => player.category)
+        .whereType<String>()
+        .map((value) => value.trim())
+        .firstWhere((value) => value.isNotEmpty, orElse: () => '4ta categoria');
+    return category.toLowerCase().contains('categoria')
+        ? category
+        : '$category categoria';
+  }
 
   Future<void> _pickPhoto() async {
     final image = await _imagePicker.pickImage(
@@ -132,97 +141,108 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PgoHeaderScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+    final baseTheme = Theme.of(context);
+
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      title: const Text(
-        'Actividad',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
+      child: PgoHeaderScaffold(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ),
-      actions: const [PgoOptionsMenuButton()],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+        title: const Text(
+          'Actividad',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(26, 24, 26, 34),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Text(
-                  widget.matchDate,
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.8),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildXpCard(),
-              const SizedBox(height: 14),
-              _buildClubChip(),
-              const SizedBox(height: 18),
-              const Text(
-                'Anade tu foto del match',
-                style: TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildPhotoCard(),
-              const SizedBox(height: 18),
-              const Text(
-                'Descripcion',
-                style: TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildDescriptionField(),
-              const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _finishMatch,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD7FF59),
-                    foregroundColor: AppColors.SecondBlue,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+        actions: const [PgoOptionsMenuButton()],
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(28, 40, 28, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Text(
+                    widget.matchDate,
+                    style: TextStyle(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.78),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'FINALIZAR',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                _buildXpCard(),
+                const SizedBox(height: 14),
+                _buildClubChip(),
+                const SizedBox(height: 18),
+                const Text(
+                  'Añade tu foto del match',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildPhotoCard(),
+                const SizedBox(height: 18),
+                const Text(
+                  'Descripción',
+                  style: TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildDescriptionField(),
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _finishMatch,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD7FF59),
+                      foregroundColor: AppColors.SecondBlue,
+                      elevation: 3,
+                      shadowColor: Colors.black.withValues(alpha: 0.16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'FINALIZAR',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -232,15 +252,15 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
   Widget _buildXpCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.09),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -252,69 +272,62 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
               color: AppColors.SecondBlue,
               fontSize: 58,
               height: 1,
+              fontFamily: 'Inter',
               fontWeight: FontWeight.w900,
+              letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 3),
           const Text(
-            'Cada ganador suma +$_winnerXp XP y +1 victoria',
+            '+10 puntos para subir de nivel',
             style: TextStyle(
               color: AppColors.SecondBlue,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Ganadores: $_winnerNames',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 18,
+              fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: const SizedBox(
-              height: 12,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 60,
-                    child: ColoredBox(color: Color(0xFFA7A087)),
-                  ),
-                  Expanded(
-                    flex: 20,
-                    child: ColoredBox(color: Color(0xFFC6C0A4)),
-                  ),
-                  Expanded(
-                    flex: 20,
-                    child: ColoredBox(color: Color(0xFFDADDE3)),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 22),
+          Text(
+            _winnerCategory,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 17,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              height: 10,
+              color: const Color(0xFFE0E3E9),
+              child: const FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: 0.5,
+                child: ColoredBox(color: Color(0xFFA7A087)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Text(
-                '+$_winnerXp XP',
+                '+14 PCM',
                 style: TextStyle(
                   color: AppColors.SecondBlue,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               Text(
-                '+1 victoria',
+                '+2 ranking',
                 style: TextStyle(
                   color: AppColors.SecondBlue,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -327,17 +340,17 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
   Widget _buildClubChip() {
     return Container(
       width: double.infinity,
-      height: 40,
+      height: 28,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
       ),
       alignment: Alignment.center,
       child: Text(
         widget.match.clubName,
         style: const TextStyle(
           color: AppColors.SecondBlue,
-          fontSize: 15,
+          fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -353,7 +366,7 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
         height: 152,
         decoration: BoxDecoration(
           color: const Color(0xFFF0F2F5),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: const Color(0xFFCDD4DE),
             width: 1.2,
@@ -387,7 +400,7 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
                     'Subir foto',
                     style: TextStyle(
                       color: AppColors.SecondBlue,
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -401,21 +414,22 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: TextField(
         controller: _descriptionController,
-        maxLines: 4,
+        minLines: 1,
+        maxLines: 1,
         decoration: InputDecoration(
-          hintText: 'Descripcion opcional',
+          hintText: 'Descripción opcional',
           hintStyle: TextStyle(
             color: AppColors.SecondBlue.withValues(alpha: 0.42),
-            fontSize: 15,
+            fontSize: 13,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 14,
+            vertical: 10,
           ),
         ),
       ),
