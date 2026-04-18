@@ -15,7 +15,7 @@ import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
-import 'tournament_description_screen.dart';
+import 'tournament_admin_screen.dart';
 
 enum _TournamentCreateStep {
   intro,
@@ -41,7 +41,7 @@ class TournamentCreateFlowScreen extends StatefulWidget {
 
 class _TournamentCreateFlowScreenState
     extends State<TournamentCreateFlowScreen> {
-  static const int _maxTournamentPhotoBytes = 850 * 1024;
+  static const int _maxTournamentPhotoBytes = 650 * 1024;
 
   final ImagePicker _imagePicker = ImagePicker();
   final TextEditingController _nameController =
@@ -305,9 +305,9 @@ class _TournamentCreateFlowScreenState
   Future<void> _pickTournamentPhoto() async {
     final picked = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 60,
-      maxWidth: 960,
-      maxHeight: 960,
+      imageQuality: 45,
+      maxWidth: 720,
+      maxHeight: 720,
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
@@ -451,9 +451,16 @@ class _TournamentCreateFlowScreenState
       }
     } catch (error) {
       if (!mounted) return;
+      final rawMessage = error.toString().replaceFirst('Exception: ', '');
+      final normalized = rawMessage.toLowerCase();
+      final friendlyMessage = normalized.contains('request entity too large') ||
+              normalized.contains('payload too large') ||
+              normalized.contains('413')
+          ? 'La imagen es muy pesada para subirla. Prueba con una foto mas ligera o recortada.'
+          : rawMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(friendlyMessage),
         ),
       );
     } finally {
@@ -957,10 +964,21 @@ class _TournamentCreateFlowScreenState
                   label: 'Ver torneo',
                   enabled: !_isSubmitting,
                   onTap: () {
+                    final tournament = _createdTournament;
+                    if (tournament == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Aun no se pudo cargar el torneo publicado.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => TournamentDescriptionScreen(
-                          tournament: _createdTournament,
+                        builder: (context) => TournamentAdminScreen(
+                          tournament: tournament,
                         ),
                       ),
                     );

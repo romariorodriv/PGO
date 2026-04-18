@@ -44,6 +44,7 @@ dev_dependencies:
 
   # Linting
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -51,6 +52,13 @@ flutter:
   assets:
     - assets/images/
     - assets/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  web:
+    generate: true
+  image_path: "web/icons/icono-oficial.png"
 
   # fonts:
   #   - family: Poppins

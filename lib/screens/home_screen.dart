@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -36,12 +40,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _onboardingPhonePrefix = 'profile_onboarding_phone_';
+
   ProfileSummary? _profile;
   List<TournamentRecord> _tournaments = const [];
   bool _isLoadingProfile = true;
   String? _profileError;
   bool _isUpdatingProfile = false;
   bool _hasShownProfileComplete = false;
+  bool _hasShownProfileOnboarding = false;
+  String _savedOnboardingPhone = '';
 
   @override
   void initState() {
@@ -57,10 +65,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
       final profile = results[0] as ProfileSummary;
       final tournaments = results[1] as List<TournamentRecord>;
+      final savedPhone = await _readOnboardingPhone(profile.id);
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _tournaments = tournaments;
+        _savedOnboardingPhone = savedPhone;
         _profileError = null;
       });
       _checkProfileCompletion();
@@ -74,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isLoadingProfile = false;
         });
+        _checkProfileOnboarding();
       }
     }
   }
@@ -217,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => _SchedulePickerDialog(
-        initial: _profile?.experienceLevel,
+        initial: _profile?.racketModel,
       ),
     );
 
@@ -231,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final updated = await ProfileService().updateMyProfile(
         name: _profile?.name ?? '',
-        experienceLevel: selected,
+        racketModel: selected,
       );
       if (!mounted) return;
       setState(() {
@@ -302,9 +313,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final profile = _profile;
     if (profile == null) return false;
     final side = profile.preferredSide?.trim() ?? '';
-    final schedule = profile.experienceLevel?.trim() ?? '';
+    final schedule = profile.racketModel?.trim() ?? '';
     final club = profile.preferredClub?.trim() ?? '';
     return side.isNotEmpty && schedule.isNotEmpty && club.isNotEmpty;
+  }
+
+  bool get _isOnboardingProfileComplete {
+    final profile = _profile;
+    if (profile == null) return false;
+    final hasName = profile.name.trim().isNotEmpty;
+    final hasPhoto = (profile.photoUrl ?? '').trim().isNotEmpty;
+    final hasPhone = _savedOnboardingPhone.trim().isNotEmpty;
+    return hasName && hasPhoto && hasPhone;
   }
 
   void _checkProfileCompletion() {
@@ -320,7 +340,113 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _checkProfileOnboarding() {
+    if (_isLoadingProfile) return;
+    if (_profile == null || _hasShownProfileOnboarding) return;
+    if (_isOnboardingProfileComplete) return;
+
+    _hasShownProfileOnboarding = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _profile == null) return;
+
+      final result = await showDialog<_ProfileOnboardingResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _CompleteProfileOnboardingDialog(
+          initialName: _profile!.name,
+          email: _profile!.email,
+          initialPhotoUrl: _profile!.photoUrl,
+          initialPhone: _savedOnboardingPhone,
+        ),
+      );
+
+      if (!mounted || result == null || result.omitted) {
+        return;
+      }
+
+      setState(() {
+        _isUpdatingProfile = true;
+      });
+
+      try {
+        final updated = await ProfileService().updateMyProfile(
+          name: result.name,
+          photoUrl: result.photoUrl,
+        );
+        await _saveOnboardingPhone(updated.id, result.phone);
+        if (!mounted) return;
+        setState(() {
+          _profile = updated;
+          _savedOnboardingPhone = result.phone;
+        });
+        _checkProfileCompletion();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo guardar tu perfil inicial.'),
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isUpdatingProfile = false;
+          });
+        }
+      }
+    });
+  }
+
+  Future<String> _readOnboardingPhone(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('$_onboardingPhonePrefix$userId') ?? '';
+  }
+
+  Future<void> _saveOnboardingPhone(String userId, String phone) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_onboardingPhonePrefix$userId', phone.trim());
+  }
+
   Future<void> _openRecommendedTournament() async {
+    final tournament = _recommendedTournament;
+    if (tournament == null) {
+      await _openTournamentsSection();
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TournamentDescriptionScreen(
+          tournament: tournament,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    _loadProfile();
+  }
+
+  Future<void> _openTournamentsSection() async {
+    if (widget.onTournamentsTap != null) {
+      widget.onTournamentsTap!();
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TournamentsScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+    _loadProfile();
+  }
+
+  Future<void> _openRecommendationButton() async {
+    await _openTournamentsSection();
+  }
+
+  Future<void> _openRecommendationCard() async {
     final tournament = _recommendedTournament;
     if (tournament == null) {
       await Navigator.of(context).push(
@@ -328,18 +454,12 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context) => const TournamentsScreen(),
         ),
       );
-    } else {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => TournamentDescriptionScreen(
-            tournament: tournament,
-          ),
-        ),
-      );
+      if (!mounted) return;
+      _loadProfile();
+      return;
     }
 
-    if (!mounted) return;
-    _loadProfile();
+    await _openRecommendedTournament();
   }
 
   @override
@@ -535,6 +655,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final side = _profile?.preferredSide?.trim().isNotEmpty == true
         ? _profile!.preferredSide!
         : 'pendiente';
+    final schedule = _profile?.racketModel?.trim().isNotEmpty == true
+        ? _profile!.racketModel!
+        : 'pendiente';
     final club = _profile?.preferredClub?.trim().isNotEmpty == true
         ? _profile!.preferredClub!
         : 'pendiente';
@@ -542,7 +665,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF2F4E7A),
+        gradient: AppColors.secondaryGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -583,7 +706,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _ProfileHintRow(
             icon: Icons.schedule,
             label: 'Horario habitual',
-            value: 'pendiente',
+            value: schedule,
             onTap: _openSchedulePicker,
           ),
           const SizedBox(height: 8),
@@ -606,8 +729,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final side = profile?.preferredSide?.isNotEmpty == true
         ? profile!.preferredSide!
         : 'Drive';
-    final schedule = profile?.experienceLevel?.isNotEmpty == true
-        ? profile!.experienceLevel!
+    final schedule = profile?.racketModel?.isNotEmpty == true
+        ? profile!.racketModel!
         : 'Noche';
     final club = profile?.preferredClub?.isNotEmpty == true
         ? profile!.preferredClub!
@@ -616,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF2F4E7A),
+        gradient: AppColors.secondaryGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -629,9 +752,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Tu perfil esta listo',
-            style: TextStyle(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -685,9 +808,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: const Text(
+                child: Text(
                   'Ver torneos',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
@@ -740,127 +863,130 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: SizedBox(
-            height: 112,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _HomeRecommendationImage(
-                  imageAsset: AppAssets.defaultTournamentImage,
-                  photoUrl: tournament?.photoUrl,
-                ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      stops: [0.0, 0.34, 0.7, 1.0],
-                      colors: [
-                        Color(0xE623334B),
-                        Color(0xC623334B),
-                        Color(0x4023334B),
-                        Color(0x10000000),
-                      ],
+        GestureDetector(
+          onTap: _openRecommendationCard,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              height: 112,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _HomeRecommendationImage(
+                    imageAsset: AppAssets.defaultTournamentImage,
+                    photoUrl: tournament?.photoUrl,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        stops: [0.0, 0.34, 0.7, 1.0],
+                        colors: [
+                          Color(0xE623334B),
+                          Color(0xC623334B),
+                          Color(0x4023334B),
+                          Color(0x10000000),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                tournament?.category ??
+                                    (_profile?.category ?? 'Sin categoria'),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                tournament?.title ?? 'Sin torneos recomendados',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: 118,
+                                height: 28,
+                                child: ElevatedButton(
+                                  onPressed: _openRecommendationButton,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.homeGreen,
+                                    foregroundColor: AppColors.SecondBlue,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(17),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Ver mas torneos',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
+                            _InfoChip(
+                              icon: Icons.whatshot,
+                              text: tournament == null
+                                  ? 'Sin recomendacion'
+                                  : '${tournament.registrationsCount} inscritos',
+                            ),
+                            const SizedBox(height: 6),
+                            _InfoChip(
+                              icon: Icons.sports_tennis,
+                              text: tournament == null
+                                  ? 'Explora torneos'
+                                  : tournament.format,
+                            ),
+                            const Spacer(),
                             Text(
-                              tournament?.category ??
-                                  (_profile?.category ?? 'Sin categoria'),
+                              tournament == null
+                                  ? (_profile?.preferredClub ??
+                                      'Sin club favorito')
+                                  : '$tournamentDate\n${tournament.location}',
+                              textAlign: TextAlign.right,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
+                                color: Colors.white.withValues(alpha: 0.84),
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              tournament?.title ?? 'Sin torneos recomendados',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                height: 1,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: 118,
-                              height: 28,
-                              child: ElevatedButton(
-                                onPressed: _openRecommendedTournament,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.homeGreen,
-                                  foregroundColor: AppColors.SecondBlue,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(17),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Ver mas torneos',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          _InfoChip(
-                            icon: Icons.whatshot,
-                            text: tournament == null
-                                ? 'Sin recomendacion'
-                                : '${tournament.registrationsCount} inscritos',
-                          ),
-                          const SizedBox(height: 6),
-                          _InfoChip(
-                            icon: Icons.sports_tennis,
-                            text: tournament == null
-                                ? 'Explora torneos'
-                                : tournament.format,
-                          ),
-                          const Spacer(),
-                          Text(
-                            tournament == null
-                                ? (_profile?.preferredClub ??
-                                    'Sin club favorito')
-                                : '$tournamentDate\n${tournament.location}',
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.84),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1082,6 +1208,391 @@ class _ProfileCompleteDialog extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileOnboardingResult {
+  const _ProfileOnboardingResult({
+    required this.name,
+    required this.phone,
+    required this.photoUrl,
+    this.omitted = false,
+  });
+
+  final String name;
+  final String phone;
+  final String photoUrl;
+  final bool omitted;
+}
+
+class _CompleteProfileOnboardingDialog extends StatefulWidget {
+  const _CompleteProfileOnboardingDialog({
+    required this.initialName,
+    required this.email,
+    required this.initialPhotoUrl,
+    required this.initialPhone,
+  });
+
+  final String initialName;
+  final String email;
+  final String? initialPhotoUrl;
+  final String initialPhone;
+
+  @override
+  State<_CompleteProfileOnboardingDialog> createState() =>
+      _CompleteProfileOnboardingDialogState();
+}
+
+class _CompleteProfileOnboardingDialogState
+    extends State<_CompleteProfileOnboardingDialog> {
+  final ImagePicker _imagePicker = ImagePicker();
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  String? _photoDataUrl;
+  bool _savingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _phoneController = TextEditingController(text: widget.initialPhone);
+    _photoDataUrl = widget.initialPhotoUrl;
+    _nameController.addListener(_refresh);
+    _phoneController.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _nameController.removeListener(_refresh);
+    _phoneController.removeListener(_refresh);
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  bool get _canSubmit {
+    return _nameController.text.trim().isNotEmpty &&
+        _phoneController.text.trim().isNotEmpty &&
+        (_photoDataUrl ?? '').trim().isNotEmpty &&
+        !_savingImage;
+  }
+
+  void _refresh() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _pickPhoto() async {
+    try {
+      setState(() {
+        _savingImage = true;
+      });
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1200,
+      );
+      if (picked == null || !mounted) {
+        setState(() {
+          _savingImage = false;
+        });
+        return;
+      }
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      final mimeType = _guessMimeType(picked.path);
+      setState(() {
+        _photoDataUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+        _savingImage = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _savingImage = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo seleccionar la foto.')),
+      );
+    }
+  }
+
+  String _guessMimeType(String path) {
+    final lowerPath = path.toLowerCase();
+    if (lowerPath.endsWith('.png')) return 'image/png';
+    if (lowerPath.endsWith('.webp')) return 'image/webp';
+    if (lowerPath.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final photoBytes = tryDecodeDataUrl(_photoDataUrl);
+    final hasNetworkPhoto =
+        _photoDataUrl != null && _photoDataUrl!.startsWith('http');
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(34)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Completa tu perfil',
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Anade tu foto y datos basicos para empezar a jugar',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.74),
+                  fontSize: 12.3,
+                  fontWeight: FontWeight.w500,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB6C3D9),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: photoBytes != null
+                        ? ClipOval(
+                            child: Image.memory(photoBytes, fit: BoxFit.cover),
+                          )
+                        : hasNetworkPhoto
+                            ? ClipOval(
+                                child: Image.network(
+                                  _photoDataUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.add_rounded,
+                                    size: 84,
+                                    color: Color(0xFFE9EEF7),
+                                  ),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.add_rounded,
+                                size: 84,
+                                color: Color(0xFFE9EEF7),
+                              ),
+                  ),
+                  Positioned(
+                    right: 10,
+                    bottom: 8,
+                    child: Material(
+                      color: AppColors.SecondBlue,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: _savingImage ? null : _pickPhoto,
+                        customBorder: const CircleBorder(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.photo_camera_outlined,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Haz que otros jugadores te reconozcan mas facil.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.75),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _OnboardingFieldLabel(text: 'Nombre'),
+              const SizedBox(height: 6),
+              _OnboardingTextField(
+                controller: _nameController,
+                hintText: 'Romario Moises',
+              ),
+              const SizedBox(height: 14),
+              _OnboardingFieldLabel(text: 'Correo registrado'),
+              const SizedBox(height: 6),
+              _OnboardingTextField(
+                initialValue: widget.email,
+                enabled: false,
+              ),
+              const SizedBox(height: 14),
+              _OnboardingFieldLabel(text: 'Numero de telefono'),
+              const SizedBox(height: 6),
+              _OnboardingTextField(
+                controller: _phoneController,
+                hintText: '999 999 999',
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _canSubmit
+                      ? () {
+                          Navigator.of(context).pop(
+                            _ProfileOnboardingResult(
+                              name: _nameController.text.trim(),
+                              phone: _phoneController.text.trim(),
+                              photoUrl: (_photoDataUrl ?? '').trim(),
+                            ),
+                          );
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD7FF59),
+                    foregroundColor: AppColors.SecondBlue,
+                    disabledBackgroundColor:
+                        const Color(0xFFD7FF59).withValues(alpha: 0.45),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: Text(
+                    'Guardar y continuar',
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(
+                  const _ProfileOnboardingResult(
+                    name: '',
+                    phone: '',
+                    photoUrl: '',
+                    omitted: true,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: Size.zero,
+                  padding: EdgeInsets.zero,
+                ),
+                child: Text(
+                  'Omitir',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.56),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingFieldLabel extends StatelessWidget {
+  const _OnboardingFieldLabel({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          color: AppColors.SecondBlue,
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingTextField extends StatelessWidget {
+  const _OnboardingTextField({
+    this.controller,
+    this.initialValue,
+    this.hintText,
+    this.enabled = true,
+    this.keyboardType,
+  });
+
+  final TextEditingController? controller;
+  final String? initialValue;
+  final String? hintText;
+  final bool enabled;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      initialValue: controller == null ? initialValue : null,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      style: GoogleFonts.inter(
+        color: AppColors.SecondBlue.withValues(alpha: 0.92),
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: const Color(0xFFE3E6EC),
+        hintText: hintText,
+        hintStyle: GoogleFonts.inter(
+          color: AppColors.SecondBlue.withValues(alpha: 0.5),
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 11,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(11),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(11),
+          borderSide: BorderSide.none,
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(11),
+          borderSide: BorderSide.none,
         ),
       ),
     );

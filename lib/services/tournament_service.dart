@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/tournament_admin_bracket.dart';
 import '../models/tournament_admin_matches.dart';
+import '../models/tournament_alert.dart';
 import '../models/tournament_record.dart';
 import 'api_config.dart';
 import 'session_service.dart';
@@ -172,14 +173,12 @@ class TournamentService {
 
   Future<List<TournamentRecord>> getTournaments() async {
     try {
-      final response = await _client
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/tournaments'),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/tournaments'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(_requestTimeout);
 
       final json = jsonDecode(response.body);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -213,14 +212,12 @@ class TournamentService {
 
   Future<TournamentRecord> getTournament(String tournamentId) async {
     try {
-      final response = await _client
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId'),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(_requestTimeout);
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -244,26 +241,85 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-matches'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.get(
+        Uri.parse(
+            '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-matches'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(json['message'] ?? 'No se pudieron cargar los partidos');
+        throw Exception(
+            json['message'] ?? 'No se pudieron cargar los partidos');
       }
 
       return TournamentAdminMatchesData.fromJson(json);
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al cargar los partidos.');
+      throw Exception(
+          'La conexion con el backend expiro al cargar los partidos.');
     } on http.ClientException {
-      throw Exception('No se pudo conectar al backend para cargar los partidos.');
+      throw Exception(
+          'No se pudo conectar al backend para cargar los partidos.');
+    }
+  }
+
+  Future<TournamentAdminMatchesData> getTournamentMatches(
+    String tournamentId,
+  ) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/matches'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(_requestTimeout);
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+            json['message'] ?? 'No se pudieron cargar los partidos');
+      }
+
+      return TournamentAdminMatchesData.fromJson(json);
+    } on TimeoutException {
+      throw Exception(
+          'La conexion con el backend expiro al cargar los partidos.');
+    } on http.ClientException {
+      throw Exception(
+          'No se pudo conectar al backend para cargar los partidos.');
+    }
+  }
+
+  Future<TournamentAlertsResponse> getMyAlerts() async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesion activa');
+    }
+
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/tournaments/me/alerts'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          json['message'] ?? 'No se pudieron cargar las alertas',
+        );
+      }
+
+      return TournamentAlertsResponse.fromJson(json);
+    } on TimeoutException {
+      throw Exception('La conexion con el backend expiro al cargar alertas.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend para cargar alertas.');
     }
   }
 
@@ -276,15 +332,14 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-bracket'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.get(
+        Uri.parse(
+            '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-bracket'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -293,7 +348,33 @@ class TournamentService {
 
       return TournamentAdminBracketData.fromJson(json);
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al cargar el bracket.');
+      throw Exception(
+          'La conexion con el backend expiro al cargar el bracket.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend para cargar el bracket.');
+    }
+  }
+
+  Future<TournamentAdminBracketData> getTournamentBracket(
+    String tournamentId,
+  ) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/bracket'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(_requestTimeout);
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(json['message'] ?? 'No se pudo cargar el bracket');
+      }
+
+      return TournamentAdminBracketData.fromJson(json);
+    } on TimeoutException {
+      throw Exception(
+          'La conexion con el backend expiro al cargar el bracket.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para cargar el bracket.');
     }
@@ -306,15 +387,14 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .post(
-            Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/generate-bracket'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.post(
+        Uri.parse(
+            '${ApiConfig.baseUrl}/tournaments/$tournamentId/generate-bracket'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -334,22 +414,21 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .post(
-            Uri.parse(
-              '${ApiConfig.baseUrl}/tournaments/$tournamentId/close-and-generate',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.post(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/tournaments/$tournamentId/close-and-generate',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         throw Exception(
-          json['message'] ?? 'No se pudieron cerrar inscripciones y generar cruces',
+          json['message'] ??
+              'No se pudieron cerrar inscripciones y generar cruces',
         );
       }
     } on TimeoutException {
@@ -373,26 +452,26 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .patch(
-            Uri.parse(
-              '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-matches/$matchId/start',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.patch(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-matches/$matchId/start',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         throw Exception(json['message'] ?? 'No se pudo iniciar el partido');
       }
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al iniciar el partido.');
+      throw Exception(
+          'La conexion con el backend expiro al iniciar el partido.');
     } on http.ClientException {
-      throw Exception('No se pudo conectar al backend para iniciar el partido.');
+      throw Exception(
+          'No se pudo conectar al backend para iniciar el partido.');
     }
   }
 
@@ -419,7 +498,8 @@ class TournamentService {
             },
             body: jsonEncode({
               'winnerLabel': winnerLabel,
-              if (score != null && score.trim().isNotEmpty) 'score': score.trim(),
+              if (score != null && score.trim().isNotEmpty)
+                'score': score.trim(),
             }),
           )
           .timeout(_requestTimeout);
@@ -429,7 +509,8 @@ class TournamentService {
         throw Exception(json['message'] ?? 'No se pudo registrar el ganador');
       }
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al registrar el ganador.');
+      throw Exception(
+          'La conexion con el backend expiro al registrar el ganador.');
     } on http.ClientException {
       throw Exception(
         'No se pudo conectar al backend para registrar el ganador.',
@@ -460,7 +541,8 @@ class TournamentService {
             },
             body: jsonEncode({
               'winnerLabel': winnerLabel,
-              if (score != null && score.trim().isNotEmpty) 'score': score.trim(),
+              if (score != null && score.trim().isNotEmpty)
+                'score': score.trim(),
             }),
           )
           .timeout(_requestTimeout);
@@ -470,7 +552,8 @@ class TournamentService {
         throw Exception(json['message'] ?? 'No se pudo corregir el resultado');
       }
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al corregir el resultado.');
+      throw Exception(
+          'La conexion con el backend expiro al corregir el resultado.');
     } on http.ClientException {
       throw Exception(
         'No se pudo conectar al backend para corregir el resultado.',
@@ -491,7 +574,8 @@ class TournamentService {
     try {
       final response = await _client
           .post(
-            Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/register-solo'),
+            Uri.parse(
+                '${ApiConfig.baseUrl}/tournaments/$tournamentId/register-solo'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
@@ -505,7 +589,8 @@ class TournamentService {
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        throw Exception(json['message'] ?? 'No se pudo completar la inscripcion');
+        throw Exception(
+            json['message'] ?? 'No se pudo completar la inscripcion');
       }
     } on TimeoutException {
       throw Exception('La conexion con el backend expiro al inscribirte.');
@@ -541,7 +626,8 @@ class TournamentService {
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        throw Exception(json['message'] ?? 'No se pudo completar la inscripcion');
+        throw Exception(
+            json['message'] ?? 'No se pudo completar la inscripcion');
       }
     } on TimeoutException {
       throw Exception('La conexion con el backend expiro al inscribirte.');
@@ -561,21 +647,20 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .patch(
-            Uri.parse(
-              '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-registrations/$registrationId/pair/$partnerRegistrationId',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.patch(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-registrations/$registrationId/pair/$partnerRegistrationId',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(json['message'] ?? 'No se pudo emparejar la inscripcion');
+        throw Exception(
+            json['message'] ?? 'No se pudo emparejar la inscripcion');
       }
 
       return TournamentRecord.fromJson(json);
@@ -596,17 +681,15 @@ class TournamentService {
     }
 
     try {
-      final response = await _client
-          .patch(
-            Uri.parse(
-              '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-registrations/$registrationId/remove',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await _client.patch(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-registrations/$registrationId/remove',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -615,9 +698,11 @@ class TournamentService {
 
       return TournamentRecord.fromJson(json);
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al quitar la inscripcion.');
+      throw Exception(
+          'La conexion con el backend expiro al quitar la inscripcion.');
     } on http.ClientException {
-      throw Exception('No se pudo conectar al backend para quitar la inscripcion.');
+      throw Exception(
+          'No se pudo conectar al backend para quitar la inscripcion.');
     }
   }
 }

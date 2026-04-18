@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
@@ -27,9 +28,18 @@ class AuthService {
       return;
     }
 
+    // Android (Credential Manager) requires serverClientId.
+    // iOS uses clientId. Keep serverClientId when available for iOS too.
+    final bool isAndroid = defaultTargetPlatform == TargetPlatform.android;
+    final String? clientId = isAndroid ? null : ApiConfig.googleClientIdOrNull;
+    final String? serverClientId = isAndroid
+        ? (ApiConfig.googleServerClientIdOrNull ??
+            ApiConfig.googleClientIdOrNull)
+        : ApiConfig.googleServerClientIdOrNull;
+
     await _googleSignIn.initialize(
-      clientId: ApiConfig.googleClientIdOrNull,
-      serverClientId: ApiConfig.googleServerClientIdOrNull,
+      clientId: clientId,
+      serverClientId: serverClientId,
     );
     _googleInitialized = true;
   }
@@ -124,7 +134,7 @@ class AuthService {
           throw Exception('Se cancelo el inicio de sesion con Google');
         case GoogleSignInExceptionCode.clientConfigurationError:
           throw Exception(
-            'Google Sign-In no esta configurado correctamente. Revisa el client ID y la configuracion de Android.',
+            'Google Sign-In no esta configurado correctamente. En Android revisa package name, SHA-1 y serverClientId.',
           );
         default:
           throw Exception(

@@ -288,6 +288,7 @@ class _TournamentAdminRegistrationsScreenState
   Future<void> _pairRegistration(TournamentRegistrationEntry entry) async {
     final partner = await showModalBottomSheet<TournamentRegistrationEntry>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _PairRegistrationSheet(
         currentEntry: entry,
@@ -1032,80 +1033,90 @@ class _PairRegistrationSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Emparejar a ${currentEntry.user.name}',
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Selecciona otro jugador inscrito sin pareja.',
-            style: TextStyle(
-              color: AppColors.SecondBlue.withValues(alpha: 0.72),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (availableEntries.isEmpty)
-            const Text(
-              'No hay otro jugador solo disponible para emparejar.',
-              style: TextStyle(
+    final maxHeight = MediaQuery.of(context).size.height * 0.78;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Emparejar a ${currentEntry.user.name}',
+              style: const TextStyle(
                 color: AppColors.SecondBlue,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
               ),
-            )
-          else
-            ...availableEntries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: ListTile(
-                  onTap: () => Navigator.of(context).pop(entry),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                  tileColor: const Color(0xFFF2F4F8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  leading: _Avatar(photoUrl: entry.user.photoUrl),
-                  title: Text(
-                    entry.user.name,
-                    style: const TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      if ((entry.preferredSide ?? '').isNotEmpty)
-                        _Tag(text: entry.preferredSide!),
-                      if ((entry.availability ?? '').isNotEmpty)
-                        _Tag(text: entry.availability!),
-                    ],
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                    color: AppColors.SecondBlue,
-                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Selecciona otro jugador inscrito sin pareja.',
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (availableEntries.isEmpty)
+              const Text(
+                'No hay otro jugador solo disponible para emparejar.',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  itemCount: availableEntries.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final entry = availableEntries[index];
+                    return ListTile(
+                      onTap: () => Navigator.of(context).pop(entry),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                      tileColor: const Color(0xFFF2F4F8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      leading: _Avatar(photoUrl: entry.user.photoUrl),
+                      title: Text(
+                        entry.user.name,
+                        style: const TextStyle(
+                          color: AppColors.SecondBlue,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      subtitle: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          if ((entry.preferredSide ?? '').isNotEmpty)
+                            _Tag(text: entry.preferredSide!),
+                          if ((entry.availability ?? '').isNotEmpty)
+                            _Tag(text: entry.availability!),
+                        ],
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppColors.SecondBlue,
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

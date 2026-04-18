@@ -33,7 +33,7 @@ class FinishMatchScreen extends StatefulWidget {
 
 class _FinishMatchScreenState extends State<FinishMatchScreen> {
   static const _winnerXp = 30;
-  static const _maxMatchPhotoBytes = 850 * 1024;
+  static const _maxMatchPhotoBytes = 650 * 1024;
 
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
@@ -69,9 +69,9 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
   Future<void> _pickPhoto() async {
     final image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 60,
-      maxWidth: 960,
-      maxHeight: 960,
+      imageQuality: 45,
+      maxWidth: 720,
+      maxHeight: 720,
     );
 
     if (image == null) {
@@ -125,9 +125,16 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
       );
     } catch (error) {
       if (!mounted) return;
+      final rawMessage = error.toString().replaceFirst('Exception: ', '');
+      final normalized = rawMessage.toLowerCase();
+      final friendlyMessage = normalized.contains('request entity too large') ||
+              normalized.contains('payload too large') ||
+              normalized.contains('413')
+          ? 'La imagen es muy pesada para subirla. Prueba con una foto mas ligera o recortada.'
+          : rawMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(friendlyMessage),
         ),
       );
     } finally {
@@ -146,7 +153,8 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
     return Theme(
       data: baseTheme.copyWith(
         textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
-        primaryTextTheme: GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+        primaryTextTheme:
+            GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
       child: PgoHeaderScaffold(
         leading: IconButton(
