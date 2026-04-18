@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
+  static const String _productionBaseUrl = 'http://3.145.41.187/api';
+
   static const String _overrideBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
@@ -25,7 +27,8 @@ class ApiConfig {
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return 'http://3.145.41.187/api';
+      case TargetPlatform.iOS:
+        return _productionBaseUrl;
       default:
         return 'http://localhost:3001/api';
     }
