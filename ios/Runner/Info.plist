@@ -45,6 +45,17 @@
 	<string>PGO necesita acceso a tus fotos para seleccionar imagenes de partidos o torneos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>PGO puede guardar imagenes relacionadas con tus partidos o torneos si lo solicitas.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.870677477488-vnl3ektpua8bopksmfaa8gm4087leolr</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
@@ -13,14 +14,15 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  late TextEditingController _nameController;
-  late TextEditingController _emailController;
-  late TextEditingController _passwordController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
 
   bool _rememberUser = false;
   bool _agreeTerms = false;
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
 
   @override
   void initState() {
@@ -44,39 +46,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final password = _passwordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los campos')),
-      );
+      _showSnack('Completa todos los campos');
       return;
     }
 
     if (!email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa un correo valido')),
-      );
+      _showSnack('Ingresa un correo valido');
       return;
     }
 
     if (password.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La contrasena debe tener al menos 6 caracteres'),
-        ),
-      );
+      _showSnack('La contrasena debe tener al menos 6 caracteres');
       return;
     }
 
     if (!_agreeTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Debes aceptar los terminos y condiciones')),
-      );
+      _showSnack('Debes aceptar los terminos y condiciones');
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    setState(() => _isSubmitting = true);
 
     try {
       await AuthService().register(
@@ -85,337 +74,362 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: password,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MainShell.route(),
-      );
+      Navigator.of(context).pushReplacement(MainShell.route());
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(error.toString().replaceFirst('Exception: ', ''))),
-      );
+      _showSnack(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
+        setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _handleGoogleRegister() async {
+    setState(() => _isGoogleSubmitting = true);
+    try {
+      await AuthService().loginWithGoogle();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MainShell.route());
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleSubmitting = false);
+      }
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.primaryDark,
-              AppColors.primaryDark,
+      backgroundColor: AppColors.primaryDark,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(28, 20, 28, 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Image.asset(
+                'assets/images/Logo_Icono.png',
+                width: 170,
+                height: 170,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Registrate',
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 31,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _buildSocialButtons(),
+              const SizedBox(height: 14),
+              Text(
+                'O usa tu correo electronico',
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.82),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _buildInput(
+                controller: _nameController,
+                hint: 'Nombre',
+              ),
+              const SizedBox(height: 12),
+              _buildInput(
+                controller: _emailController,
+                hint: 'Correo electronico',
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              _buildPasswordInput(),
+              const SizedBox(height: 8),
+              _buildCheckboxRow(
+                value: _rememberUser,
+                onChanged: (value) => setState(() => _rememberUser = value),
+                text: 'Recordar usuario',
+              ),
+              const SizedBox(height: 2),
+              _buildCheckboxRow(
+                value: _agreeTerms,
+                onChanged: (value) => setState(() => _agreeTerms = value),
+                text: 'He leido y estoy de acuerdo con los terminos y condiciones',
+              ),
+              const SizedBox(height: 14),
+              _buildRegisterButton(),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Ya tienes una cuenta? ',
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.75),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
+                    },
+                    child: Text(
+                      'Inicia sesion',
+                      style: GoogleFonts.inter(
+                        color: AppColors.SecondBlue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 50.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.06),
-                _buildLogo(),
-                const SizedBox(height: 5),
-                Text(
-                  'Registrate',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.SecondBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 10),
-                _buildSocialButtons(),
-                const SizedBox(height: 10),
-                Text(
-                  'O usa tu correo electronico',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.7),
-                    fontSize: 12,
+      ),
+    );
+  }
+
+  Widget _buildSocialButtons() {
+    final disabled = _isSubmitting || _isGoogleSubmitting;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _SocialCircleButton(
+          backgroundColor: Colors.white,
+          onTap: disabled ? null : _handleGoogleRegister,
+          icon: _isGoogleSubmitting
+              ? Text(
+                  '...',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
                   ),
-                ),
-                const SizedBox(height: 20),
-                _buildTextField(
-                  controller: _nameController,
-                  hintText: 'Nombre',
-                  icon: Icons.person,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: _emailController,
-                  hintText: 'Correo electronico',
-                  icon: Icons.email,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                _buildPasswordField(),
-                const SizedBox(height: 16),
-                _buildCheckboxes(),
-                const SizedBox(height: 24),
-                _buildRegisterButton(),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Ya tienes una cuenta? ',
-                      style: TextStyle(
-                        color: AppColors.SecondBlue.withValues(alpha: 0.7),
-                        fontSize: 12,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Inicia sesion',
-                        style: TextStyle(
-                          color: AppColors.PrimaryGreen,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
+                )
+              : const _GoogleGIcon(),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildLogo() {
-    return SizedBox(
-      width: 220,
-      height: 220,
-      child: Center(
-        child: Image.asset(
-          'assets/images/Logo_Icono.png',
-          width: 180,
-          height: 180,
-          fit: BoxFit.contain,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
+  Widget _buildInput({
     required TextEditingController controller,
-    required String hintText,
-    required IconData icon,
+    required String hint,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.gray),
+      style: GoogleFonts.inter(
+        color: AppColors.SecondBlue,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+      ),
       decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: TextStyle(
-          color: AppColors.SecondBlue.withValues(alpha: 0.5),
-        ),
-        prefixIcon: Icon(
-          icon,
-          color: AppColors.SecondBlue.withValues(alpha: 0.5),
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(
+          color: AppColors.SecondBlue.withValues(alpha: 0.55),
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
         ),
         filled: true,
-        fillColor: AppColors.SecondBlue.withValues(alpha: 0.1),
+        fillColor: Colors.white.withValues(alpha: 0.92),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(999),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       ),
     );
   }
 
-  Widget _buildPasswordField() {
+  Widget _buildPasswordInput() {
     return TextField(
       controller: _passwordController,
       obscureText: _obscurePassword,
-      style: const TextStyle(color: AppColors.SecondBlue),
+      style: GoogleFonts.inter(
+        color: AppColors.SecondBlue,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+      ),
       decoration: InputDecoration(
         hintText: 'Crea una contrasena',
-        hintStyle: TextStyle(
-          color: AppColors.SecondBlue.withValues(alpha: 0.5),
+        hintStyle: GoogleFonts.inter(
+          color: AppColors.SecondBlue.withValues(alpha: 0.55),
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
         ),
-        prefixIcon: Icon(
-          Icons.lock,
-          color: AppColors.SecondBlue.withValues(alpha: 0.5),
-        ),
-        suffixIcon: GestureDetector(
-          onTap: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
-          child: Icon(
-            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-            color: AppColors.SecondBlue.withValues(alpha: 0.5),
+        suffixIcon: IconButton(
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: AppColors.SecondBlue.withValues(alpha: 0.55),
+            size: 20,
           ),
         ),
         filled: true,
-        fillColor: AppColors.SecondBlue.withValues(alpha: 0.1),
+        fillColor: Colors.white.withValues(alpha: 0.92),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(999),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       ),
     );
   }
 
-  Widget _buildCheckboxes() {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _rememberUser = !_rememberUser;
-            });
-          },
-          child: Row(
-            children: [
-              Checkbox(
-                value: _rememberUser,
-                onChanged: (value) {
-                  setState(() {
-                    _rememberUser = value ?? false;
-                  });
-                },
-                activeColor: AppColors.PrimaryGreen,
+  Widget _buildCheckboxRow({
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required String text,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: Checkbox(
+              value: value,
+              onChanged: (v) => onChanged(v ?? false),
+              side: BorderSide(
+                color: AppColors.SecondBlue.withValues(alpha: 0.38),
+                width: 1.2,
               ),
-              Expanded(
-                child: Text(
-                  'Recordar usuario',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.7),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
+              activeColor: AppColors.PrimaryGreen,
+              checkColor: AppColors.SecondBlue,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
-        ),
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _agreeTerms = !_agreeTerms;
-            });
-          },
-          child: Row(
-            children: [
-              Checkbox(
-                value: _agreeTerms,
-                onChanged: (value) {
-                  setState(() {
-                    _agreeTerms = value ?? false;
-                  });
-                },
-                activeColor: AppColors.PrimaryGreen,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue.withValues(alpha: 0.8),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
               ),
-              Expanded(
-                child: Text(
-                  'He leido y estoy de acuerdo con los terminos y condiciones',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.7),
-                    fontSize: 11,
-                  ),
-                  maxLines: 2,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildRegisterButton() {
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: 44,
       child: ElevatedButton(
+        onPressed: _isSubmitting || _isGoogleSubmitting ? null : _handleRegister,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.PrimaryGreen,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          disabledBackgroundColor: AppColors.PrimaryGreen.withValues(alpha: 0.6),
+          foregroundColor: AppColors.SecondBlue,
           elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
-        onPressed: _isSubmitting ? null : _handleRegister,
         child: _isSubmitting
             ? const SizedBox(
-                width: 20,
-                height: 20,
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Text(
+            : Text(
                 'Registrarse',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
                 ),
               ),
       ),
     );
   }
+}
 
-  Widget _buildSocialButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildSocialButton('assets/icons/facebook.png'),
-        const SizedBox(width: 20),
-        _buildSocialButton('assets/icons/apple.png'),
-        const SizedBox(width: 20),
-        _buildSocialButton('assets/icons/google.png'),
-      ],
+class _SocialCircleButton extends StatelessWidget {
+  const _SocialCircleButton({
+    required this.backgroundColor,
+    required this.icon,
+    this.onTap,
+  });
+
+  final Color backgroundColor;
+  final Widget icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
+          ),
+          child: Center(child: icon),
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildSocialButton(String iconPath) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: AppColors.SecondBlue.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: AppColors.SecondBlue.withValues(alpha: 0.2),
-          ),
-        ),
-        child: const Center(
-          child: Icon(
-            Icons.share,
-            color: AppColors.PrimaryGreen,
-          ),
+class _GoogleGIcon extends StatelessWidget {
+  const _GoogleGIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      shaderCallback: (bounds) => const SweepGradient(
+        startAngle: 0.0,
+        endAngle: 6.2831853,
+        colors: [
+          Color(0xFF4285F4),
+          Color(0xFF34A853),
+          Color(0xFFFBBC05),
+          Color(0xFFEA4335),
+          Color(0xFF4285F4),
+        ],
+      ).createShader(bounds),
+      child: Text(
+        'G',
+        style: GoogleFonts.inter(
+          color: Colors.white,
+          fontSize: 33,
+          fontWeight: FontWeight.w900,
+          height: 1,
         ),
       ),
     );

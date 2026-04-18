@@ -2,12 +2,16 @@ import 'package:flutter/foundation.dart';
 
 class ApiConfig {
   static const String _productionBaseUrl = 'http://3.145.41.187/api';
+  static const String _defaultAndroidGoogleClientId =
+      '870677477488-25pehte6fmjo0hk45o3imcqfk4euptd3.apps.googleusercontent.com';
+  static const String _defaultIosGoogleClientId =
+      '870677477488-vnl3ektpua8bopksmfaa8gm4087leolr.apps.googleusercontent.com';
 
   static const String _overrideBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
   );
-  static const String googleClientId = String.fromEnvironment(
+  static const String _overrideGoogleClientId = String.fromEnvironment(
     'GOOGLE_CLIENT_ID',
     defaultValue: '',
   );
@@ -31,6 +35,21 @@ class ApiConfig {
         return _productionBaseUrl;
       default:
         return 'http://localhost:3001/api';
+    }
+  }
+
+  static String get googleClientId {
+    if (_overrideGoogleClientId.isNotEmpty) {
+      return _overrideGoogleClientId;
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        return _defaultIosGoogleClientId;
+      case TargetPlatform.android:
+        return _defaultAndroidGoogleClientId;
+      default:
+        return '';
     }
   }
 
