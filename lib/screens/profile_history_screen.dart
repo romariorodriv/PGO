@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
@@ -516,7 +516,8 @@ class _HistoryMatchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWin = match.result == 'WIN';
+    final result = match.result.toUpperCase();
+    final isWin = result == 'WIN';
     final accentColor =
         isWin ? AppColors.PrimaryGreen : const Color(0xFFFF334B);
 
@@ -622,7 +623,7 @@ class _EmptyHistoryState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Aun no tienes historial registrado.',
+            'Aún no tienes historial registrado.',
             style: TextStyle(
               color: AppColors.SecondBlue.withValues(alpha: 0.7),
               fontSize: 13,
@@ -631,7 +632,7 @@ class _EmptyHistoryState extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Cuando registres partidos, apareceran aqui agrupados por mes.',
+            'Cuando registres partidos, aparecerán aquí agrupados por mes.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.SecondBlue.withValues(alpha: 0.5),
@@ -705,9 +706,13 @@ List<ProfileHistoryMatch> _filterHistory(
 ) {
   switch (filter) {
     case _HistoryFilter.wins:
-      return history.where((item) => item.result == 'WIN').toList();
+      return history
+          .where((item) => item.result.toUpperCase() == 'WIN')
+          .toList();
     case _HistoryFilter.losses:
-      return history.where((item) => item.result == 'LOSS').toList();
+      return history
+          .where((item) => item.result.toUpperCase() == 'LOSS')
+          .toList();
     case _HistoryFilter.all:
       return history;
   }

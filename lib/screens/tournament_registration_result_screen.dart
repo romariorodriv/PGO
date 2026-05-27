@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../models/tournament_record.dart';
+import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
 
 class TournamentRegistrationResultScreen extends StatelessWidget {
@@ -15,6 +16,10 @@ class TournamentRegistrationResultScreen extends StatelessWidget {
     required this.primaryLabel,
     this.secondaryLabel,
     this.statusTitle,
+    this.primaryPhotoUrl,
+    this.secondaryPhotoUrl,
+    this.isModal = false,
+    this.scrollController,
   });
 
   final TournamentRecord? tournament;
@@ -24,9 +29,20 @@ class TournamentRegistrationResultScreen extends StatelessWidget {
   final String primaryLabel;
   final String? secondaryLabel;
   final String? statusTitle;
+  final String? primaryPhotoUrl;
+  final String? secondaryPhotoUrl;
+  final bool isModal;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
+    if (isModal) {
+      return Material(
+        color: Colors.transparent,
+        child: _buildContent(context),
+      );
+    }
+
     return PgoHeaderScaffold(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -40,106 +56,111 @@ class TournamentRegistrationResultScreen extends StatelessWidget {
           fontWeight: FontWeight.w800,
         ),
       ),
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-          child: Column(
-            children: [
-              Center(
-                child: Container(
-                  width: 140,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFB6C0D0),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+      body: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF2F3F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+      ),
+      child: SingleChildScrollView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        child: Column(
+          children: [
+            Center(
+              child: Container(
+                width: 140,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB6C0D0),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const SizedBox(height: 18),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue,
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: const Color(0xFFD3DAE3),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _ResultAvatar(
+                  imageUrl: primaryPhotoUrl,
+                  highlight: true,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '...',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _ResultAvatar(
+                  imageUrl: secondaryPhotoUrl,
+                  highlight: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (statusTitle != null) ...[
               Text(
-                title,
-                textAlign: TextAlign.center,
+                statusTitle!,
                 style: GoogleFonts.inter(
                   color: AppColors.SecondBlue,
-                  fontSize: 21,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                height: 1,
-                color: const Color(0xFFD3DAE3),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _ResultAvatar(
-                    imageUrl: null,
-                    highlight: true,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '...',
-                    style: GoogleFonts.inter(
-                      color: AppColors.SecondBlue,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const _ResultAvatar(
-                    imageUrl: null,
-                    highlight: false,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (statusTitle != null) ...[
-                Text(
-                  statusTitle!,
-                  style: GoogleFonts.inter(
-                    color: AppColors.SecondBlue,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.72),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 18),
-              _TournamentResultCard(
-                tournament: tournament,
-                badge: badge,
-                primaryLabel: primaryLabel,
-                secondaryLabel: secondaryLabel,
-                onPrimary: () => Navigator.of(context).pop(),
-                onSecondary: secondaryLabel == null
-                    ? null
-                    : () {
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          '/',
-                          (route) => false,
-                        );
-                      },
-              ),
+              const SizedBox(height: 6),
             ],
-          ),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _TournamentResultCard(
+              tournament: tournament,
+              badge: badge,
+              primaryLabel: primaryLabel,
+              secondaryLabel: secondaryLabel,
+              onPrimary: () => Navigator.of(context).pop(),
+              onSecondary: secondaryLabel == null
+                  ? null
+                  : () {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/',
+                        (route) => false,
+                      );
+                    },
+            ),
+          ],
         ),
       ),
     );
@@ -352,23 +373,32 @@ class _ResultAvatar extends StatelessWidget {
         ),
       ),
       child: ClipOval(
-        child: imageUrl != null && imageUrl!.isNotEmpty
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              )
-            : const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 28,
-              ),
+        child: _avatarImage(),
       ),
     );
+  }
+
+  Widget _avatarImage() {
+    final normalized = imageUrl?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return const Icon(Icons.person, color: Colors.white, size: 28);
+    }
+
+    final bytes = tryDecodeDataUrl(normalized);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    if (normalized.startsWith('http')) {
+      return Image.network(
+        normalized,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.person, color: Colors.white, size: 28),
+      );
+    }
+
+    return const Icon(Icons.person, color: Colors.white, size: 28);
   }
 }
 

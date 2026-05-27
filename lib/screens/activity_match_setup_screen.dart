@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'dart:convert';
 
@@ -13,9 +13,11 @@ import '../models/selected_player.dart';
 import '../services/community_service.dart';
 import '../services/match_service.dart';
 import '../services/profile_service.dart';
+import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'match_score_screen.dart';
+import 'profile_public_preview_screen.dart';
 import 'qr_scanner_screen.dart';
 
 class ActivityMatchSetupScreen extends StatefulWidget {
@@ -32,7 +34,7 @@ class ActivityMatchSetupScreen extends StatefulWidget {
 }
 
 class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
-  static const _fallbackClubName = 'One Padel Olguin';
+  static const _fallbackClubName = 'One Padel Olguín';
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -54,6 +56,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   String? _selectedClubName;
   String? _profileError;
   String? _communityError;
+  int? _activeSlotIndex;
   bool _showAllSuggestions = false;
 
   @override
@@ -174,18 +177,31 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
     return _selectedPlayers.any((player) => player?.id == userId);
   }
 
-  void _addPlayer(CommunityUser user) {
-    if (_isAlreadySelected(user.id)) {
+  void _selectEmptySlot(int slotIndex) {
+    if (_selectedPlayers[slotIndex] != null) {
+      return;
+    }
+
+    setState(() {
+      _activeSlotIndex = slotIndex;
+    });
+    _focusSearchInput();
+  }
+
+  void _selectPlayer(CommunityUser user) {
+    final slotIndex = _activeSlotIndex;
+    if (slotIndex == null || _selectedPlayers[slotIndex] != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ese jugador ya fue agregado')),
+        const SnackBar(
+          content: Text('Primero selecciona el espacio del jugador.'),
+        ),
       );
       return;
     }
 
-    final slotIndex = _selectedPlayers.indexWhere((player) => player == null);
-    if (slotIndex == -1) {
+    if (_isAlreadySelected(user.id)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ya completaste los 4 jugadores')),
+        const SnackBar(content: Text('Ese jugador ya fue agregado')),
       );
       return;
     }
@@ -198,6 +214,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
         category: user.category,
         rankingPosition: user.rankingPosition,
       );
+      _activeSlotIndex = null;
       _searchController.clear();
       _searchResults = const [];
       _showAllSuggestions = false;
@@ -212,7 +229,39 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
 
     setState(() {
       _selectedPlayers[index] = null;
+      _activeSlotIndex = index;
     });
+  }
+
+  void _openSelectedPlayerProfile(SelectedPlayer player) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfilePublicPreviewScreen(
+          profile: ProfileSummary(
+            id: player.id,
+            name: player.name,
+            email: '',
+            photoUrl: player.photoUrl,
+            experiencePoints: 0,
+            category: player.category,
+            preferredClub: null,
+            preferredSide: null,
+            racketModel: null,
+            experienceLevel: null,
+            rankingPosition: player.rankingPosition,
+            matchesPlayed: 0,
+            wins: 0,
+            winRate: 0,
+            weeklyStreak: 0,
+            friendsCount: 0,
+            followersCount: 0,
+            followingCount: 0,
+            socialNotificationsCount: 0,
+            matchHistory: const [],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _handleCreateMatch() async {
@@ -276,6 +325,15 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
   String get _clubName =>
       _selectedClubName ?? _profile?.preferredClub ?? _fallbackClubName;
 
+  LimaPadelClub? get _selectedClubDetail {
+    for (final club in limaPadelClubDetails) {
+      if (club.name == _clubName) {
+        return club;
+      }
+    }
+    return null;
+  }
+
   List<CommunityUser> get _displayUsers =>
       _searchController.text.trim().isEmpty ? _communityUsers : _searchResults;
 
@@ -300,7 +358,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => _ClubPickerSheet(
         current: _clubName,
-        clubs: limaPadelClubs,
+        clubs: limaPadelClubDetails,
       ),
     );
 
@@ -339,7 +397,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
             (item.email?.toLowerCase() == normalized),
         orElse: () => users.first,
       );
-      _addPlayer(user);
+      _selectPlayer(user);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -407,12 +465,12 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 4),
-                  const Center(
+                  Center(
                     child: Text(
-                      'Anadir jugadores',
-                      style: TextStyle(
+                      'Añadir jugadores',
+                      style: GoogleFonts.inter(
                         color: AppColors.SecondBlue,
-                        fontSize: 22,
+                        fontSize: 23,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -420,11 +478,11 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                   const SizedBox(height: 2),
                   const Center(
                     child: Text(
-                      'Con quien juegas hoy?',
+                      '¿Con quién juegas hoy?',
                       style: TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -448,7 +506,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                           if (player == null) {
                             return _AddPlayerCircle(
                               label: 'Jugador ${index + 1}',
-                              onTap: _focusSearchInput,
+                              highlighted: _activeSlotIndex == index,
+                              onTap: () => _selectEmptySlot(index),
                             );
                           }
 
@@ -457,6 +516,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                             imageUrl: player.photoUrl,
                             selected: true,
                             removable: !player.locked,
+                            onTap: () => _openSelectedPlayerProfile(player),
                             onRemove: () => _removePlayer(index),
                           );
                         },
@@ -487,8 +547,23 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                                     focusNode: _searchFocusNode,
                                     controller: _searchController,
                                     onChanged: _onSearchChanged,
+                                    readOnly: _activeSlotIndex == null,
+                                    onTap: () {
+                                      if (_activeSlotIndex == null) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Primero selecciona el espacio del jugador.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
                                     decoration: InputDecoration(
-                                      hintText: 'Nombre, correo electronico',
+                                      hintText: _activeSlotIndex == null
+                                          ? 'Selecciona un jugador arriba'
+                                          : 'Nombre, correo electrónico',
                                       hintStyle: TextStyle(
                                         color: AppColors.SecondBlue.withValues(
                                           alpha: 0.55,
@@ -511,7 +586,17 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                         ),
                         const SizedBox(width: 8),
                         InkWell(
-                          onTap: _handleQrScan,
+                          onTap: _activeSlotIndex == null
+                              ? () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Primero selecciona el espacio del jugador.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              : _handleQrScan,
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             width: 60,
@@ -537,7 +622,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                     Text(
                       _searchController.text.trim().isEmpty
                           ? 'Sugerencias'
-                          : 'Resultados de busqueda',
+                          : 'Resultados de búsqueda',
                       style: const TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 16,
@@ -552,8 +637,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                     else if (_displayUsers.isEmpty)
                       _InlineInfoCard(
                         message: _searchController.text.trim().isEmpty
-                            ? 'Aun no tienes companeros con los que hayas jugado.'
-                            : 'No encontramos jugadores con esa busqueda.',
+                            ? 'Aún no tienes compañeros con los que hayas jugado.'
+                            : 'No encontramos jugadores con esa búsqueda.',
                       )
                     else ...[
                       ..._visibleUsers.map(
@@ -562,7 +647,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                           child: _CommunityUserCard(
                             user: user,
                             alreadySelected: _isAlreadySelected(user.id),
-                            onTap: () => _addPlayer(user),
+                            selected: false,
+                            onTap: () => _selectPlayer(user),
                           ),
                         ),
                       ),
@@ -589,7 +675,7 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                     ],
                     const SizedBox(height: 18),
                     const Text(
-                      'Club de juego',
+                      'Sede',
                       style: TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 16,
@@ -597,58 +683,16 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _clubName,
-                              style: const TextStyle(
-                                color: AppColors.SecondBlue,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _pickClub,
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(0, 0),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'Cambiar',
-                              style: TextStyle(
-                                color: AppColors.PrimaryGreen,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    _VenueCard(
+                      club: _selectedClubDetail,
+                      fallbackName: _clubName,
+                      onTap: _pickClub,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       widget.isCompetitive
-                          ? 'Este match se registrara como competitivo'
-                          : 'Este match se registrara como amistoso',
+                          ? 'Este match se registrará como competitivo'
+                          : 'Este match se registrará como amistoso',
                       style: TextStyle(
                         color: AppColors.SecondBlue.withValues(alpha: 0.62),
                         fontSize: 13,
@@ -705,6 +749,7 @@ class _PlayerCircle extends StatelessWidget {
   final String? imageUrl;
   final bool selected;
   final bool removable;
+  final VoidCallback? onTap;
   final VoidCallback? onRemove;
 
   const _PlayerCircle({
@@ -712,77 +757,77 @@ class _PlayerCircle extends StatelessWidget {
     required this.imageUrl,
     required this.selected,
     this.removable = false,
+    this.onTap,
     this.onRemove,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      child: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color:
-                        selected ? AppColors.PrimaryGreen : Colors.transparent,
-                    width: 1.5,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(42),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.PrimaryGreen
+                          : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: _avatarImage(imageUrl),
                   ),
                 ),
-                child: ClipOval(
-                  child: imageUrl != null && imageUrl!.isNotEmpty
-                      ? Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _fallbackAvatar(),
-                        )
-                      : _fallbackAvatar(),
-                ),
-              ),
-              if (removable)
-                Positioned(
-                  right: -4,
-                  top: -4,
-                  child: GestureDetector(
-                    onTap: onRemove,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 14,
+                if (removable)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: GestureDetector(
+                      onTap: onRemove,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 14,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -797,14 +842,34 @@ class _PlayerCircle extends StatelessWidget {
       ),
     );
   }
+
+  Widget _avatarImage(String? photoUrl) {
+    final normalized = photoUrl?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return _fallbackAvatar();
+    }
+
+    final bytes = tryDecodeDataUrl(normalized);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    return Image.network(
+      normalized,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallbackAvatar(),
+    );
+  }
 }
 
 class _AddPlayerCircle extends StatelessWidget {
   final String label;
+  final bool highlighted;
   final VoidCallback onTap;
 
   const _AddPlayerCircle({
     required this.label,
+    required this.highlighted,
     required this.onTap,
   });
 
@@ -817,12 +882,18 @@ class _AddPlayerCircle extends StatelessWidget {
           InkWell(
             onTap: onTap,
             customBorder: const CircleBorder(),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
               width: 58,
               height: 58,
-              decoration: const BoxDecoration(
-                color: Color(0xFFABB8CC),
+              decoration: BoxDecoration(
+                color: const Color(0xFFABB8CC),
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color:
+                      highlighted ? AppColors.PrimaryGreen : Colors.transparent,
+                  width: highlighted ? 2.5 : 1.6,
+                ),
               ),
               child: const Center(
                 child: Icon(
@@ -854,11 +925,13 @@ class _AddPlayerCircle extends StatelessWidget {
 class _CommunityUserCard extends StatelessWidget {
   final CommunityUser user;
   final bool alreadySelected;
+  final bool selected;
   final VoidCallback onTap;
 
   const _CommunityUserCard({
     required this.user,
     required this.alreadySelected,
+    required this.selected,
     required this.onTap,
   });
 
@@ -872,6 +945,10 @@ class _CommunityUserCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: selected ? AppColors.PrimaryGreen : Colors.transparent,
+            width: 2,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -894,13 +971,7 @@ class _CommunityUserCard extends StatelessWidget {
                 ),
               ),
               child: ClipOval(
-                child: user.photoUrl != null && user.photoUrl!.isNotEmpty
-                    ? Image.network(
-                        user.photoUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _fallbackAvatar(),
-                      )
-                    : _fallbackAvatar(),
+                child: _avatarImage(user.photoUrl),
               ),
             ),
             const SizedBox(width: 12),
@@ -918,7 +989,7 @@ class _CommunityUserCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    user.category ?? 'Sin categoria',
+                    user.category ?? 'Sin categoría',
                     style: TextStyle(
                       color: AppColors.SecondBlue.withValues(alpha: 0.72),
                       fontSize: 12,
@@ -964,6 +1035,24 @@ class _CommunityUserCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _avatarImage(String? photoUrl) {
+    final normalized = photoUrl?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return _fallbackAvatar();
+    }
+
+    final bytes = tryDecodeDataUrl(normalized);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    return Image.network(
+      normalized,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallbackAvatar(),
+    );
+  }
 }
 
 class _InlineInfoCard extends StatelessWidget {
@@ -994,6 +1083,88 @@ class _InlineInfoCard extends StatelessWidget {
   }
 }
 
+class _VenueCard extends StatelessWidget {
+  const _VenueCard({
+    required this.club,
+    required this.fallbackName,
+    required this.onTap,
+  });
+
+  final LimaPadelClub? club;
+  final String fallbackName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = club?.name ?? fallbackName;
+    final detail = club == null
+        ? 'Toca para cambiar la sede'
+        : '${club!.district} ? ${club!.address}';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.location_on_outlined,
+              color: AppColors.SecondBlue,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: AppColors.SecondBlue,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: TextStyle(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.58),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Cambiar',
+              style: TextStyle(
+                color: AppColors.PrimaryGreen,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ClubPickerSheet extends StatelessWidget {
   const _ClubPickerSheet({
     required this.current,
@@ -1001,7 +1172,7 @@ class _ClubPickerSheet extends StatelessWidget {
   });
 
   final String current;
-  final List<String> clubs;
+  final List<LimaPadelClub> clubs;
 
   @override
   Widget build(BuildContext context) {
@@ -1019,7 +1190,7 @@ class _ClubPickerSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Selecciona club',
+              'Selecciona sede',
               style: TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 18,
@@ -1034,22 +1205,30 @@ class _ClubPickerSheet extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final club = clubs[index];
                   return ListTile(
-                    onTap: () => Navigator.of(context).pop(club),
+                    onTap: () => Navigator.of(context).pop(club.name),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    tileColor: club == current
+                    tileColor: club.name == current
                         ? const Color(0xFFD7FF59)
                         : const Color(0xFFF2F4F8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     title: Text(
-                      club,
+                      club.name,
                       style: const TextStyle(
                         color: AppColors.SecondBlue,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    trailing: club == current
+                    subtitle: Text(
+                      '${club.district} ? ${club.address}',
+                      style: TextStyle(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    trailing: club.name == current
                         ? const Icon(Icons.check, color: AppColors.SecondBlue)
                         : null,
                   );

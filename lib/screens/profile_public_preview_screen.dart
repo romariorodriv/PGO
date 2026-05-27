@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
@@ -59,8 +59,8 @@ class ProfilePublicPreviewScreen extends StatelessWidget {
         currentTab: PgoNavTab.profile,
         onHomeTap: () =>
             MainShell.openReplacement(context, initialTab: PgoNavTab.home),
-        onTournamentsTap: () =>
-            MainShell.openReplacement(context, initialTab: PgoNavTab.tournaments),
+        onTournamentsTap: () => MainShell.openReplacement(context,
+            initialTab: PgoNavTab.tournaments),
         onProfileTap: () {},
       ),
     );
@@ -83,7 +83,10 @@ class _PreviewHeroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _PreviewAvatar(photoUrl: profile.photoUrl),
+              _PreviewAvatar(
+                photoUrl: profile.photoUrl,
+                experienceLevel: profile.experienceLevel,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -99,7 +102,7 @@ class _PreviewHeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      profile.category ?? 'Sin categoria',
+                      profile.category ?? 'Sin categoría',
                       style: TextStyle(
                         color: AppColors.SecondBlue.withValues(alpha: 0.72),
                         fontSize: 10,
@@ -155,24 +158,24 @@ class _PreviewHeroCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.emoji_events,
+                    Icon(
+                      Icons.workspace_premium_rounded,
                       size: 24,
-                      color: AppColors.SecondBlue,
+                      color: _levelAccent(profile.experienceLevel),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '#${profile.rankingPosition}',
+                      _formatExperienceLevel(profile.experienceLevel),
                       style: const TextStyle(
                         color: AppColors.SecondBlue,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
                 Text(
-                  profile.category ?? 'Sin categoria',
+                  '${profile.experiencePoints} XP acumulados',
                   style: TextStyle(
                     color: AppColors.SecondBlue.withValues(alpha: 0.56),
                     fontSize: 10,
@@ -344,7 +347,7 @@ class _PreviewHistoryCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 18),
               child: Text(
-                'Aun no hay partidos registrados para mostrar.',
+                'Aún no hay partidos registrados para mostrar.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.SecondBlue.withValues(alpha: 0.58),
@@ -463,9 +466,9 @@ class _PreviewFriendsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      '${(profile.friendsCount / 3).round().clamp(2, 8)} amigos en comun',
-      'Ya han jugado antes',
-      '${profile.socialNotificationsCount.clamp(1, 5)} torneos este mes',
+      'Invitaciones para jugar',
+      'Solicitudes y mensajes',
+      'Alertas de torneos',
     ];
 
     return Container(
@@ -577,9 +580,11 @@ class _ActionButton extends StatelessWidget {
 class _PreviewAvatar extends StatelessWidget {
   const _PreviewAvatar({
     required this.photoUrl,
+    required this.experienceLevel,
   });
 
   final String? photoUrl;
+  final String? experienceLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -589,11 +594,12 @@ class _PreviewAvatar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(2),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Color(0xFFD4F34E),
+        gradient: LinearGradient(colors: _avatarBorderColors(experienceLevel)),
       ),
       child: CircleAvatar(
+        key: ValueKey(photoUrl ?? 'empty-photo'),
         radius: 30,
         backgroundColor: const Color(0xFFE8EAEE),
         backgroundImage: hasRemotePhoto ? NetworkImage(photoUrl!) : null,
@@ -633,7 +639,7 @@ List<_PreviewHistoryItem> _buildHistoryItems(ProfileSummary profile) {
     final subtitle =
         item['subtitle'] as String? ?? item['clubName'] as String? ?? '';
     final xp = (item['xpDelta'] as num?)?.toInt() ?? 0;
-    final result = item['result'] as String? ?? 'PENDING';
+    final result = (item['result'] as String? ?? 'PENDING').toUpperCase();
 
     return _PreviewHistoryItem(
       title: title,
@@ -645,6 +651,12 @@ List<_PreviewHistoryItem> _buildHistoryItems(ProfileSummary profile) {
 }
 
 IconData _iconForFriendHint(String text) {
+  if (text.contains('Invitaciones')) {
+    return Icons.sports_tennis_rounded;
+  }
+  if (text.contains('mensajes')) {
+    return Icons.chat_bubble_outline_rounded;
+  }
   if (text.contains('comun')) {
     return Icons.group;
   }
@@ -652,6 +664,47 @@ IconData _iconForFriendHint(String text) {
     return Icons.sports_tennis;
   }
   return Icons.emoji_events;
+}
+
+String _formatExperienceLevel(String? value) {
+  switch (value?.toUpperCase()) {
+    case 'BEGINNER':
+      return 'Inicial';
+    case 'INTERMEDIATE':
+      return 'Intermedio';
+    case 'ADVANCED':
+      return 'Avanzado';
+    case 'PRO':
+      return 'Pro';
+    default:
+      return 'Nivel PGO';
+  }
+}
+
+Color _levelAccent(String? value) {
+  switch (value?.toUpperCase()) {
+    case 'PRO':
+      return const Color(0xFFFFA12B);
+    case 'ADVANCED':
+      return const Color(0xFF315FA6);
+    default:
+      return const Color(0xFFD7FF59);
+  }
+}
+
+List<Color> _avatarBorderColors(String? value) {
+  switch (value?.toUpperCase()) {
+    case 'PRO':
+      return const [Color(0xFFFFE066), Color(0xFFFF7A1A)];
+    case 'ADVANCED':
+      return const [Color(0xFF85F0FF), Color(0xFF315FA6)];
+    case 'INTERMEDIATE':
+      return const [Color(0xFFD7FF59), Color(0xFF3F6EA5)];
+    case 'BEGINNER':
+      return const [Color(0xFFD7FF59), Color(0xFFA8C6D8)];
+    default:
+      return const [Color(0xFFD4F34E), Color(0xFFD4F34E)];
+  }
 }
 
 BoxDecoration _cardDecoration() {

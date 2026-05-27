@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -6,10 +8,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'constants/colors.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
+import 'services/push_notification_service.dart';
 import 'services/session_service.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -21,6 +25,10 @@ void main() {
     ),
   );
   runApp(const MyApp());
+
+  unawaited(PushNotificationService().initialize().catchError(
+    (error) => debugPrint('Push notification initialization failed: $error'),
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -37,6 +45,7 @@ class MyApp extends StatelessWidget {
         GoogleFonts.interTextTheme(baseTheme.primaryTextTheme);
 
     return MaterialApp(
+      navigatorKey: PushNotificationService.navigatorKey,
       title: 'PGO',
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -107,6 +116,9 @@ class _AppEntryScreen extends StatelessWidget {
 
         final token = snapshot.data;
         if (token != null && token.isNotEmpty) {
+          PushNotificationService().registerCurrentDevice().catchError(
+            (error) => debugPrint('Push registration failed: $error'),
+          );
           return const MainShell();
         }
 

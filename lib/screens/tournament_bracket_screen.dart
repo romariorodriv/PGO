@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -8,6 +8,7 @@ import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
+import '../widgets/pgo_options_menu.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_description_screen.dart';
@@ -27,10 +28,8 @@ class TournamentBracketScreen extends StatefulWidget {
       _TournamentBracketScreenState();
 }
 
-enum _PublicBracketStage { octavos, cuartos, semis, finalStage }
-
 class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
-  _PublicBracketStage _stage = _PublicBracketStage.octavos;
+  String? _stageKey;
   TournamentAdminBracketData? _data;
   bool _loading = true;
   String? _error;
@@ -40,13 +39,24 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
   String get _photoUrl => widget.tournament?.photoUrl ?? '';
 
   List<TournamentAdminBracketMatch> get _matches {
-    final stageKey = switch (_stage) {
-      _PublicBracketStage.octavos => 'octavos',
-      _PublicBracketStage.cuartos => 'cuartos',
-      _PublicBracketStage.semis => 'semis',
-      _PublicBracketStage.finalStage => 'final',
-    };
+    final stageKeys = _data?.stageKeys ?? const <String>[];
+    final stageKey =
+        _stageKey ?? (stageKeys.isNotEmpty ? stageKeys.first : null);
     return _data?.stages[stageKey] ?? const <TournamentAdminBracketMatch>[];
+  }
+
+  List<String> get _stageTabs {
+    final stageKeys = _data?.stageKeys ?? const <String>[];
+    final hasProgressiveGames =
+        stageKeys.any((stage) => stage.startsWith('juego-'));
+    if (!hasProgressiveGames) {
+      return stageKeys;
+    }
+
+    return [
+      for (var index = 1; index <= 5; index++) 'juego-$index',
+      'final',
+    ];
   }
 
   @override
@@ -75,6 +85,9 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
       if (!mounted) return;
       setState(() {
         _data = data;
+        _stageKey = data.stageKeys.contains(_stageKey)
+            ? _stageKey
+            : (data.stageKeys.isNotEmpty ? data.stageKeys.first : null);
         _loading = false;
       });
     } catch (error) {
@@ -122,11 +135,8 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
           fontWeight: FontWeight.w800,
         ),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () {},
-        ),
+      actions: const [
+        PgoOptionsMenuButton(),
       ],
       bottomNavigationBar: _buildBottomNavigation(context),
       body: Container(
@@ -147,8 +157,10 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
                   children: [
                     _buildTopTabs(context),
                     const SizedBox(height: 10),
-                    _buildStageTabs(),
-                    const SizedBox(height: 16),
+                    if (_stageTabs.length > 1) ...[
+                      _buildStageTabs(),
+                      const SizedBox(height: 16),
+                    ],
                     if (_loading)
                       const Center(
                         child: Padding(
@@ -165,9 +177,9 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
                       )
                     else if (_matches.isEmpty)
                       _buildEmptyCard(
-                        title: 'Bracket aun no disponible',
+                        title: 'Bracket aún no disponible',
                         message:
-                            'Cuando el administrador genere los cruces, las rondas apareceran aqui.',
+                            'Cuando el administrador genere los cruces, las rondas aparecerán aquí.',
                       )
                     else
                       ..._matches.map(
@@ -250,7 +262,7 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_category.toUpperCase()} categoria',
+                  '${_category.toUpperCase()} categoría',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -297,7 +309,7 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
               },
               child: Center(
                 child: Text(
-                  'Descripcion',
+                  'Descripción',
                   style: TextStyle(
                     color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
@@ -374,6 +386,8 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
   }
 
   Widget _buildStageTabs() {
+    final stageKeys = _stageTabs;
+
     return Container(
       height: 34,
       padding: const EdgeInsets.all(3),
@@ -381,40 +395,137 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
         color: const Color(0xFFE6EAF0),
         borderRadius: BorderRadius.circular(17),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _StageTab(
-              label: 'Octavos',
-              selected: _stage == _PublicBracketStage.octavos,
-              onTap: () => setState(() => _stage = _PublicBracketStage.octavos),
-            ),
-          ),
-          Expanded(
-            child: _StageTab(
-              label: 'Cuartos',
-              selected: _stage == _PublicBracketStage.cuartos,
-              onTap: () => setState(() => _stage = _PublicBracketStage.cuartos),
-            ),
-          ),
-          Expanded(
-            child: _StageTab(
-              label: 'Semis',
-              selected: _stage == _PublicBracketStage.semis,
-              onTap: () => setState(() => _stage = _PublicBracketStage.semis),
-            ),
-          ),
-          Expanded(
-            child: _StageTab(
-              label: 'Final',
-              selected: _stage == _PublicBracketStage.finalStage,
-              onTap: () =>
-                  setState(() => _stage = _PublicBracketStage.finalStage),
-            ),
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: stageKeys
+              .map(
+                (stage) => SizedBox(
+                  width: 86,
+                  child: _StageTab(
+                    label: _stageLabel(stage),
+                    selected: _stageKey == stage,
+                    onTap: () => _handleStageTap(stage),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
+  }
+
+  void _handleStageTap(String stage) {
+    if (_data?.stages.containsKey(stage) ?? false) {
+      setState(() => _stageKey = stage);
+      return;
+    }
+
+    _showStageLockedSheet(stage);
+  }
+
+  Future<void> _showStageLockedSheet(String stage) async {
+    final currentStage = _currentAvailableStageLabel;
+    final requestedStage = _stageLabel(stage).toLowerCase();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC6CDD8),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Icon(
+              Icons.lock_clock_rounded,
+              color: AppColors.SecondBlue,
+              size: 34,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Cruces aún no disponibles',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'El torneo se encuentra en $currentStage. Cuando termine, podrás ver los cruces y partidos de $requestedStage.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Entendido',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String get _currentAvailableStageLabel {
+    final stageKeys = _data?.stageKeys ?? const <String>[];
+    if (stageKeys.isEmpty) {
+      return 'la etapa inicial';
+    }
+
+    return _stageLabel(stageKeys.last).toLowerCase();
+  }
+
+  String _stageLabel(String stage) {
+    if (stage == 'final') return 'Final';
+    if (stage.startsWith('juego-')) {
+      final number = stage.replaceFirst('juego-', '');
+      return 'Juego $number';
+    }
+    if (stage == 'semis') return 'Semis';
+    return '${stage[0].toUpperCase()}${stage.substring(1)}';
   }
 
   Widget _buildEmptyCard({
@@ -504,7 +615,7 @@ class _PublicBracketMatchCard extends StatelessWidget {
       _ => const Color(0xFFF4E58C),
     };
     final footer = match.status == 'FINISHED'
-        ? 'Ganador: ${match.winnerLabel ?? 'Por definir'}'
+        ? 'Ganador: ${match.winnerLabel ?? 'Por definir'}${(match.score ?? '').trim().isNotEmpty ? ' ? ${match.score!.trim()}' : ''}'
         : _formatDate(match.scheduledAt);
 
     return Container(
@@ -589,6 +700,8 @@ class _PublicBracketMatchCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     footer,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.92),
                       fontSize: 11,
@@ -597,23 +710,9 @@ class _PublicBracketMatchCard extends StatelessWidget {
                   ),
                 ),
                 if (match.status == 'LIVE')
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF3D4A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'LIVE${match.score != null ? ' - ${match.score}' : ''}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                  _BracketLiveBadge(
+                    start: match.startedAt ?? match.scheduledAt,
+                    score: match.score,
                   ),
               ],
             ),
@@ -671,6 +770,74 @@ class _TeamLine extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+  }
+}
+
+class _BracketLiveBadge extends StatefulWidget {
+  const _BracketLiveBadge({
+    required this.start,
+    required this.score,
+  });
+
+  final DateTime start;
+  final String? score;
+
+  @override
+  State<_BracketLiveBadge> createState() => _BracketLiveBadgeState();
+}
+
+class _BracketLiveBadgeState extends State<_BracketLiveBadge> {
+  late final ValueNotifier<DateTime> _now;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = ValueNotifier<DateTime>(DateTime.now());
+    _loop();
+  }
+
+  void _loop() async {
+    while (mounted) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      _now.value = DateTime.now();
+    }
+  }
+
+  @override
+  void dispose() {
+    _now.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _now,
+      builder: (context, now, _) {
+        final elapsed = now.difference(widget.start.toLocal());
+        final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+        final minutes = safeElapsed.inMinutes.toString().padLeft(2, '0');
+        final seconds = (safeElapsed.inSeconds % 60).toString().padLeft(2, '0');
+        final score = widget.score?.trim();
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF3D4A),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'LIVE $minutes:$seconds${score != null && score.isNotEmpty ? ' - $score' : ''}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        );
+      },
     );
   }
 }

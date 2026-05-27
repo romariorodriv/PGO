@@ -1,4 +1,4 @@
-class PadelSetValidationResult {
+﻿class PadelSetValidationResult {
   const PadelSetValidationResult({
     required this.isValid,
     this.winnerTeam,
@@ -83,7 +83,7 @@ class PadelRules {
     if (sets.length > maxSets) {
       return const PadelMatchValidationResult(
         isValid: false,
-        error: 'Un partido al mejor de 3 no puede tener mas de 3 sets.',
+        error: 'Un partido al mejor de 3 no puede tener más de 3 sets.',
       );
     }
 

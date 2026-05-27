@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
+import '../models/community_user.dart';
 import '../models/tournament_record.dart';
+import '../services/community_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
@@ -107,17 +109,16 @@ class _TournamentAdminRegistrationsScreenState
       );
 
       if (shouldClose == true) {
-        await _toggleRegistrations(open: false, goToBracket: true);
+        await _toggleRegistrations(open: false);
       }
       return;
     }
 
-    await _toggleRegistrations(open: true, goToBracket: false);
+    await _toggleRegistrations(open: true);
   }
 
   Future<void> _toggleRegistrations({
     required bool open,
-    required bool goToBracket,
   }) async {
     setState(() {
       _isUpdating = true;
@@ -125,17 +126,10 @@ class _TournamentAdminRegistrationsScreenState
 
     try {
       late TournamentRecord updated;
-      if (goToBracket) {
-        await TournamentService()
-            .closeAndGenerateBracket(_currentTournament.id);
-        updated =
-            await TournamentService().getTournament(_currentTournament.id);
-      } else {
-        updated = await TournamentService().updateTournament(
-          tournamentId: _currentTournament.id,
-          registrationsOpen: open,
-        );
-      }
+      updated = await TournamentService().updateTournament(
+        tournamentId: _currentTournament.id,
+        registrationsOpen: open,
+      );
 
       if (!mounted) return;
 
@@ -147,21 +141,49 @@ class _TournamentAdminRegistrationsScreenState
         SnackBar(
           content: Text(
             open
-                ? 'Inscripciones abiertas nuevamente'
+                ? 'Inscripciónes abiertas nuevamente'
                 : 'Inscripciones cerradas',
           ),
         ),
       );
-
-      if (goToBracket) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => TournamentAdminBracketGeneratedScreen(
-              tournament: updated,
-            ),
-          ),
-        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdating = false;
+        });
       }
+    }
+  }
+
+  Future<void> _generateAutomaticBrackets() async {
+    setState(() {
+      _isUpdating = true;
+    });
+
+    try {
+      await TournamentService().generateBracket(_currentTournament.id);
+      final updated =
+          await TournamentService().getTournament(_currentTournament.id);
+
+      if (!mounted) return;
+      setState(() {
+        _tournament = updated;
+      });
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => TournamentAdminBracketGeneratedScreen(
+            tournament: updated,
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -225,8 +247,8 @@ class _TournamentAdminRegistrationsScreenState
               if ((entry.availability ?? '').isNotEmpty)
                 _DetailLine(label: 'Horario', value: entry.availability!),
               _DetailLine(
-                label: 'Categoria',
-                value: entry.user.category ?? 'Sin categoria',
+                label: 'Categoría',
+                value: entry.user.category ?? 'Sin categoría',
               ),
               const SizedBox(height: 10),
               SizedBox(
@@ -269,7 +291,7 @@ class _TournamentAdminRegistrationsScreenState
         _tournament = updated;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inscripcion quitada')),
+        const SnackBar(content: Text('Inscripción quitada')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -335,6 +357,95 @@ class _TournamentAdminRegistrationsScreenState
     }
   }
 
+  Future<void> _autoPairSoloRegistrations() async {
+    final solos = _currentTournament.registrationEntries
+        .where((entry) => !entry.hasPartner)
+        .toList();
+    if (solos.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('No hay suficientes jugadores sin pareja')),
+      );
+      return;
+    }
+
+    setState(() => _isUpdating = true);
+    try {
+      TournamentRecord updated = _currentTournament;
+      for (var index = 0; index + 1 < solos.length; index += 2) {
+        updated = await TournamentService().pairAdminRegistrations(
+          tournamentId: _currentTournament.id,
+          registrationId: solos[index].id,
+          partnerRegistrationId: solos[index + 1].id,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _tournament = updated;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('${solos.length ~/ 2} parejas generadas automáticamente'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    }
+  }
+
+  Future<void> _addRegistration() async {
+    final selectedUser = await showModalBottomSheet<CommunityUser>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddRegistrationSheet(
+        registeredUserIds: _currentTournament.registrationUserIds.toSet(),
+      ),
+    );
+
+    if (selectedUser == null) {
+      return;
+    }
+
+    setState(() => _isUpdating = true);
+    try {
+      final updated = await TournamentService().addAdminRegistration(
+        tournamentId: _currentTournament.id,
+        userId: selectedUser.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _tournament = updated;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${selectedUser.name} agregado al torneo'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PgoHeaderScaffold(
@@ -383,6 +494,59 @@ class _TournamentAdminRegistrationsScreenState
                   playerCapacity: _currentTournament.playerCapacity,
                   soloCount: _soloCount,
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: _isUpdating ? null : _addRegistration,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.SecondBlue,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          AppColors.SecondBlue.withValues(alpha: 0.45),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                    label: const Text(
+                      'A?ADIR JUGADOR',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_soloCount >= 2) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed:
+                          _isUpdating ? null : _autoPairSoloRegistrations,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.SecondBlue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.auto_awesome, size: 18),
+                      label: const Text(
+                        'EMPAREJAR AUTOMATICAMENTE',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 if (_isLoading)
                   const Center(child: CircularProgressIndicator())
@@ -399,7 +563,7 @@ class _TournamentAdminRegistrationsScreenState
                 else if (_entries.isEmpty)
                   const _SimpleCard(
                     child: Text(
-                      'Aun no hay inscripciones en esta vista.',
+                      'Aún no hay inscripciones en esta vista.',
                       style: TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 14,
@@ -430,7 +594,9 @@ class _TournamentAdminRegistrationsScreenState
                   child: ElevatedButton(
                     onPressed: _isUpdating ? null : _handleCloseAction,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD7FF59),
+                      backgroundColor: _currentTournament.registrationsOpen
+                          ? const Color(0xFFD7FF59)
+                          : const Color(0xFFE7EBF0),
                       foregroundColor: AppColors.SecondBlue,
                       disabledBackgroundColor:
                           const Color(0xFFD7FF59).withValues(alpha: 0.55),
@@ -450,6 +616,38 @@ class _TournamentAdminRegistrationsScreenState
                     ),
                   ),
                 ),
+                if (!_currentTournament.registrationsOpen) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _isUpdating || _soloCount > 0
+                          ? null
+                          : _generateAutomaticBrackets,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD7FF59),
+                        foregroundColor: AppColors.SecondBlue,
+                        disabledBackgroundColor:
+                            const Color(0xFFD7FF59).withValues(alpha: 0.45),
+                        disabledForegroundColor:
+                            AppColors.SecondBlue.withValues(alpha: 0.55),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                      label: const Text(
+                        'Generar cruces automáticamente',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -561,7 +759,7 @@ class _AdminHeroCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    '${tournament.category.toUpperCase()} categoria',
+                    '${tournament.category.toUpperCase()} categoría',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -1084,7 +1282,8 @@ class _PairRegistrationSheet extends StatelessWidget {
                     final entry = availableEntries[index];
                     return ListTile(
                       onTap: () => Navigator.of(context).pop(entry),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 10),
                       tileColor: const Color(0xFFF2F4F8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -1161,6 +1360,239 @@ class _CardActionButton extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddRegistrationSheet extends StatefulWidget {
+  const _AddRegistrationSheet({
+    required this.registeredUserIds,
+  });
+
+  final Set<String> registeredUserIds;
+
+  @override
+  State<_AddRegistrationSheet> createState() => _AddRegistrationSheetState();
+}
+
+class _AddRegistrationSheetState extends State<_AddRegistrationSheet> {
+  final CommunityService _communityService = CommunityService();
+  final TextEditingController _searchController = TextEditingController();
+  List<CommunityUser> _users = const [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUsers([String query = '']) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final users = query.trim().isEmpty
+          ? await _communityService.getSuggestions()
+          : await _communityService.searchCommunity(query.trim());
+      if (!mounted) return;
+      setState(() {
+        _users = users
+            .where((user) => !widget.registeredUserIds.contains(user.id))
+            .toList();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.78,
+      minChildSize: 0.45,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F3F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            18,
+            10,
+            18,
+            18 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 72,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB8C1D3),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Añadir jugador',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: _loadUsers,
+                decoration: InputDecoration(
+                  hintText: 'Buscar por nombre o correo',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () {
+                      _searchController.clear();
+                      _loadUsers();
+                    },
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(
+                            child: Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.SecondBlue,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : _users.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No hay jugadores disponibles para añadir.',
+                                  style: TextStyle(
+                                    color: AppColors.SecondBlue,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: _users.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (context, index) {
+                                  final user = _users[index];
+                                  return _UserOptionTile(
+                                    user: user,
+                                    onTap: () =>
+                                        Navigator.of(context).pop(user),
+                                  );
+                                },
+                              ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UserOptionTile extends StatelessWidget {
+  const _UserOptionTile({
+    required this.user,
+    required this.onTap,
+  });
+
+  final CommunityUser user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              _Avatar(photoUrl: user.photoUrl),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if ((user.email ?? '').isNotEmpty)
+                      Text(
+                        user.email!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.SecondBlue.withValues(alpha: 0.55),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.add_circle_rounded,
+                color: AppColors.PrimaryGreen,
+                size: 28,
+              ),
+            ],
           ),
         ),
       ),
@@ -1346,7 +1778,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'El torneo ya completo sus cupos.',
+                  'El torneo ya completó sus cupos.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: AppColors.SecondBlue.withValues(alpha: 0.78),
@@ -1368,7 +1800,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Ya puedes generar los cruces del torneo',
+                  'Luego podrás generar los cruces manualmente',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: AppColors.SecondBlue.withValues(alpha: 0.78),
@@ -1388,7 +1820,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Ya no podran registrarse mas jugadores\n'
+                  'Ya no podrán registrarse más jugadores\n'
                   'en el torneo',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
@@ -1425,7 +1857,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                           style: TextStyle(fontWeight: FontWeight.w900),
                         ),
                         const TextSpan(
-                          text: 'generar cruces',
+                          text: 'generar cruces automáticos',
                           style: TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ],
@@ -1443,7 +1875,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                 ] else
                   const SizedBox(height: 12),
                 Text(
-                  'El torneo continuara con los jugadores\n'
+                  'El torneo continuará con los jugadores\n'
                   'actualmente confirmados',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
@@ -1457,7 +1889,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                 if (pendingPairs > 0) ...[
                   Text(
                     'Debes emparejar a los jugadores pendientes\n'
-                    'antes de generar los cruces.',
+                    'antes de generar los cruces automáticos.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       color: AppColors.SecondBlue.withValues(alpha: 0.7),
@@ -1500,9 +1932,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                     child: SizedBox(
                       height: 40,
                       child: ElevatedButton(
-                        onPressed: (isComplete && !canGenerate)
-                            ? null
-                            : onGenerateBrackets,
+                        onPressed: onGenerateBrackets,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFD7FF59),
                           foregroundColor: AppColors.SecondBlue,
@@ -1512,9 +1942,7 @@ class _CloseRegistrationsDialog extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          isComplete
-                              ? 'Generar cruces'
-                              : 'Cerrar inscripciones',
+                          isComplete ? 'Cerrar' : 'Cerrar inscripciones',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(

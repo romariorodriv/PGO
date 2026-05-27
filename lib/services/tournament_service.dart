@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -25,6 +25,7 @@ class TournamentService {
   Future<TournamentRecord> createTournament({
     required String title,
     required String tournamentType,
+    String pairingMode = 'FIXED',
     required int playerCapacity,
     required String modality,
     required String format,
@@ -43,7 +44,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -57,6 +58,7 @@ class TournamentService {
             body: jsonEncode({
               'title': title.trim(),
               'tournamentType': tournamentType,
+              'pairingMode': pairingMode,
               'playerCapacity': playerCapacity,
               'modality': modality,
               'format': format,
@@ -87,7 +89,7 @@ class TournamentService {
       return TournamentRecord.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al crear el torneo.',
+        'La conexión con el backend expiró al crear el torneo.',
       );
     } on http.ClientException {
       throw Exception(
@@ -100,6 +102,7 @@ class TournamentService {
     required String tournamentId,
     String? title,
     String? tournamentType,
+    String? pairingMode,
     int? playerCapacity,
     String? modality,
     String? format,
@@ -118,12 +121,13 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title.trim();
     if (tournamentType != null) body['tournamentType'] = tournamentType;
+    if (pairingMode != null) body['pairingMode'] = pairingMode;
     if (playerCapacity != null) body['playerCapacity'] = playerCapacity;
     if (modality != null) body['modality'] = modality;
     if (format != null) body['format'] = format;
@@ -162,7 +166,7 @@ class TournamentService {
       return TournamentRecord.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al actualizar el torneo.',
+        'La conexión con el backend expiró al actualizar el torneo.',
       );
     } on http.ClientException {
       throw Exception(
@@ -189,7 +193,7 @@ class TournamentService {
       }
 
       if (json is! List) {
-        throw Exception('La respuesta de torneos no es valida');
+        throw Exception('La respuesta de torneos no es válida');
       }
 
       return json
@@ -201,7 +205,7 @@ class TournamentService {
           .toList();
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al cargar los torneos.',
+        'La conexión con el backend expiró al cargar los torneos.',
       );
     } on http.ClientException {
       throw Exception(
@@ -226,7 +230,7 @@ class TournamentService {
 
       return TournamentRecord.fromJson(json);
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al cargar el torneo.');
+      throw Exception('La conexión con el backend expiró al cargar el torneo.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para cargar el torneo.');
     }
@@ -237,7 +241,7 @@ class TournamentService {
   ) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -259,7 +263,7 @@ class TournamentService {
       return TournamentAdminMatchesData.fromJson(json);
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al cargar los partidos.');
+          'La conexión con el backend expiró al cargar los partidos.');
     } on http.ClientException {
       throw Exception(
           'No se pudo conectar al backend para cargar los partidos.');
@@ -286,17 +290,50 @@ class TournamentService {
       return TournamentAdminMatchesData.fromJson(json);
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al cargar los partidos.');
+          'La conexión con el backend expiró al cargar los partidos.');
     } on http.ClientException {
       throw Exception(
           'No se pudo conectar al backend para cargar los partidos.');
     }
   }
 
+  Future<TournamentAdminMatchesData> getMyTournamentMatches(
+    String tournamentId,
+  ) async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      return getTournamentMatches(tournamentId);
+    }
+
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/tournaments/$tournamentId/my-matches'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+            json['message'] ?? 'No se pudieron cargar tus partidos');
+      }
+
+      return TournamentAdminMatchesData.fromJson(json);
+    } on TimeoutException {
+      throw Exception(
+          'La conexión con el backend expiró al cargar tus partidos.');
+    } on http.ClientException {
+      throw Exception(
+          'No se pudo conectar al backend para cargar tus partidos.');
+    }
+  }
+
   Future<TournamentAlertsResponse> getMyAlerts() async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -317,7 +354,7 @@ class TournamentService {
 
       return TournamentAlertsResponse.fromJson(json);
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al cargar alertas.');
+      throw Exception('La conexión con el backend expiró al cargar alertas.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para cargar alertas.');
     }
@@ -328,7 +365,7 @@ class TournamentService {
   ) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -349,7 +386,7 @@ class TournamentService {
       return TournamentAdminBracketData.fromJson(json);
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al cargar el bracket.');
+          'La conexión con el backend expiró al cargar el bracket.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para cargar el bracket.');
     }
@@ -374,7 +411,7 @@ class TournamentService {
       return TournamentAdminBracketData.fromJson(json);
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al cargar el bracket.');
+          'La conexión con el backend expiró al cargar el bracket.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para cargar el bracket.');
     }
@@ -383,7 +420,7 @@ class TournamentService {
   Future<void> generateBracket(String tournamentId) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -401,7 +438,7 @@ class TournamentService {
         throw Exception(json['message'] ?? 'No se pudieron generar los cruces');
       }
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al generar cruces.');
+      throw Exception('La conexión con el backend expiró al generar cruces.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para generar cruces.');
     }
@@ -410,7 +447,7 @@ class TournamentService {
   Future<void> closeAndGenerateBracket(String tournamentId) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -433,12 +470,40 @@ class TournamentService {
       }
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al cerrar inscripciones y generar cruces.',
+        'La conexión con el backend expiró al cerrar inscripciones y generar cruces.',
       );
     } on http.ClientException {
       throw Exception(
         'No se pudo conectar al backend para cerrar inscripciones y generar cruces.',
       );
+    }
+  }
+
+  Future<void> deleteBracket(String tournamentId) async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    try {
+      final response = await _client.post(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/tournaments/$tournamentId/delete-bracket',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(json['message'] ?? 'No se pudieron eliminar cruces');
+      }
+    } on TimeoutException {
+      throw Exception('La conexión con el backend expiró al eliminar cruces.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend para eliminar cruces.');
     }
   }
 
@@ -448,7 +513,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -468,10 +533,86 @@ class TournamentService {
       }
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al iniciar el partido.');
+          'La conexión con el backend expiró al iniciar el partido.');
     } on http.ClientException {
       throw Exception(
           'No se pudo conectar al backend para iniciar el partido.');
+    }
+  }
+
+  Future<void> startTournamentMatch({
+    required String tournamentId,
+    required String matchId,
+  }) async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    try {
+      final response = await _client.patch(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/tournaments/$tournamentId/matches/$matchId/start',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(json['message'] ?? 'No se pudo iniciar el partido');
+      }
+    } on TimeoutException {
+      throw Exception(
+          'La conexión con el backend expiró al iniciar el partido.');
+    } on http.ClientException {
+      throw Exception(
+          'No se pudo conectar al backend para iniciar el partido.');
+    }
+  }
+
+  Future<void> finishTournamentMatch({
+    required String tournamentId,
+    required String matchId,
+    required String winnerLabel,
+    String? score,
+  }) async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    try {
+      final response = await _client
+          .patch(
+            Uri.parse(
+              '${ApiConfig.baseUrl}/tournaments/$tournamentId/matches/$matchId/finish',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'winnerLabel': winnerLabel,
+              if (score != null && score.trim().isNotEmpty)
+                'score': score.trim(),
+            }),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(json['message'] ?? 'No se pudo registrar el ganador');
+      }
+    } on TimeoutException {
+      throw Exception(
+          'La conexión con el backend expiró al registrar el ganador.');
+    } on http.ClientException {
+      throw Exception(
+        'No se pudo conectar al backend para registrar el ganador.',
+      );
     }
   }
 
@@ -483,7 +624,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -510,7 +651,7 @@ class TournamentService {
       }
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al registrar el ganador.');
+          'La conexión con el backend expiró al registrar el ganador.');
     } on http.ClientException {
       throw Exception(
         'No se pudo conectar al backend para registrar el ganador.',
@@ -526,7 +667,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -553,7 +694,7 @@ class TournamentService {
       }
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al corregir el resultado.');
+          'La conexión con el backend expiró al corregir el resultado.');
     } on http.ClientException {
       throw Exception(
         'No se pudo conectar al backend para corregir el resultado.',
@@ -568,7 +709,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -590,10 +731,10 @@ class TournamentService {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         throw Exception(
-            json['message'] ?? 'No se pudo completar la inscripcion');
+            json['message'] ?? 'No se pudo completar la inscripción');
       }
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al inscribirte.');
+      throw Exception('La conexión con el backend expiró al inscribirte.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para inscribirte.');
     }
@@ -605,7 +746,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -627,10 +768,10 @@ class TournamentService {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         throw Exception(
-            json['message'] ?? 'No se pudo completar la inscripcion');
+            json['message'] ?? 'No se pudo completar la inscripción');
       }
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al inscribirte.');
+      throw Exception('La conexión con el backend expiró al inscribirte.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para inscribirte.');
     }
@@ -643,7 +784,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -660,14 +801,55 @@ class TournamentService {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(
-            json['message'] ?? 'No se pudo emparejar la inscripcion');
+            json['message'] ?? 'No se pudo emparejar la inscripción');
       }
 
       return TournamentRecord.fromJson(json);
     } on TimeoutException {
-      throw Exception('La conexion con el backend expiro al emparejar.');
+      throw Exception('La conexión con el backend expiró al emparejar.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para emparejar.');
+    }
+  }
+
+  Future<TournamentRecord> addAdminRegistration({
+    required String tournamentId,
+    required String userId,
+    String? partnerUserId,
+  }) async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    try {
+      final response = await _client
+          .post(
+            Uri.parse(
+              '${ApiConfig.baseUrl}/tournaments/$tournamentId/admin-registrations',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'userId': userId,
+              if (partnerUserId != null && partnerUserId.isNotEmpty)
+                'partnerUserId': partnerUserId,
+            }),
+          )
+          .timeout(_requestTimeout);
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(json['message'] ?? 'No se pudo agregar al jugador');
+      }
+
+      return TournamentRecord.fromJson(json);
+    } on TimeoutException {
+      throw Exception('La conexión con el backend expiró al agregar jugador.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend para agregar jugador.');
     }
   }
 
@@ -677,7 +859,7 @@ class TournamentService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -693,16 +875,16 @@ class TournamentService {
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(json['message'] ?? 'No se pudo quitar la inscripcion');
+        throw Exception(json['message'] ?? 'No se pudo quitar la inscripción');
       }
 
       return TournamentRecord.fromJson(json);
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al quitar la inscripcion.');
+          'La conexión con el backend expiró al quitar la inscripción.');
     } on http.ClientException {
       throw Exception(
-          'No se pudo conectar al backend para quitar la inscripcion.');
+          'No se pudo conectar al backend para quitar la inscripción.');
     }
   }
 }

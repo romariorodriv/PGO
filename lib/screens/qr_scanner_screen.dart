@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../constants/colors.dart';
@@ -79,7 +79,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
               child: Text(
-                'Apunta la camara al QR del jugador. Si el codigo contiene su correo, nombre o ID, lo buscaremos automaticamente.',
+                'Apunta la camara al QR del jugador. Si el codigo contiene su correo, nombre o ID, lo buscaremos automáticamente.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.SecondBlue.withValues(alpha: 0.72),

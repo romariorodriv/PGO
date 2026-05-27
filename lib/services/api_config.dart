@@ -11,6 +11,10 @@ class ApiConfig {
     'API_BASE_URL',
     defaultValue: '',
   );
+  static const String _overrideShareBaseUrl = String.fromEnvironment(
+    'SHARE_BASE_URL',
+    defaultValue: '',
+  );
   static const String _overrideGoogleClientId = String.fromEnvironment(
     'GOOGLE_CLIENT_ID',
     defaultValue: '',
@@ -36,6 +40,26 @@ class ApiConfig {
       default:
         return 'http://localhost:3001/api';
     }
+  }
+
+  static String get shareBaseUrl {
+    if (_overrideShareBaseUrl.isNotEmpty) {
+      return _overrideShareBaseUrl;
+    }
+
+    final uri = Uri.parse(baseUrl);
+    final publicSegments = uri.pathSegments
+        .where(
+            (segment) => segment.isNotEmpty && segment.toLowerCase() != 'api')
+        .toList();
+    return uri
+        .replace(
+          pathSegments: publicSegments,
+          queryParameters: null,
+          fragment: null,
+        )
+        .toString()
+        .replaceFirst(RegExp(r'/$'), '');
   }
 
   static String get googleClientId {

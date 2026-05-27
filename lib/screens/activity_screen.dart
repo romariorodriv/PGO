@@ -7,7 +7,6 @@ import '../services/profile_service.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'activity_match_setup_screen.dart';
-import 'live_match_players_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
@@ -100,19 +99,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => const ActivityMatchSetupScreen(
-                          isCompetitive: true,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                _ActionButton(
-                  label: 'Registrar en vivo',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const LiveMatchPlayersScreen(
                           isCompetitive: true,
                         ),
                       ),

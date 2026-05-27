@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -34,7 +34,7 @@ class CommunityService {
   Future<List<CommunityUser>> getSuggestions() async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -63,7 +63,7 @@ class CommunityService {
           .map((item) => CommunityUser.fromJson(item as Map<String, dynamic>))
           .toList();
     } on TimeoutException {
-      throw Exception('La carga de sugerencias expiro.');
+      throw Exception('La carga de sugerencias expiró.');
     } on http.ClientException {
       throw Exception(
           'No se pudo conectar al backend para cargar sugerencias.');
@@ -73,7 +73,7 @@ class CommunityService {
   Future<List<CommunityUser>> searchCommunity(String query) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     final uri = Uri.parse('${ApiConfig.baseUrl}/users/community').replace(
@@ -106,7 +106,7 @@ class CommunityService {
           .map((item) => CommunityUser.fromJson(item as Map<String, dynamic>))
           .toList();
     } on TimeoutException {
-      throw Exception('La carga de la comunidad expiro.');
+      throw Exception('La carga de la comunidad expiró.');
     } on http.ClientException {
       throw Exception('No se pudo conectar al backend para cargar usuarios.');
     }

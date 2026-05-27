@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -22,7 +22,7 @@ class MatchService {
   Future<List<MatchRecord>> getMyMatches() async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -53,7 +53,7 @@ class MatchService {
           .toList();
     } on TimeoutException {
       throw Exception(
-          'La conexion con el backend expiro al cargar tus matches.');
+          'La conexión con el backend expiró al cargar tus matches.');
     } on http.ClientException {
       throw Exception(
           'No se pudo conectar al backend para cargar tus matches.');
@@ -69,7 +69,7 @@ class MatchService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -98,7 +98,7 @@ class MatchService {
       return MatchRecord.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al registrar el match.',
+        'La conexión con el backend expiró al registrar el match.',
       );
     } on http.ClientException {
       throw Exception(
@@ -115,7 +115,7 @@ class MatchService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -142,7 +142,7 @@ class MatchService {
       return MatchRecord.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al actualizar el match.',
+        'La conexión con el backend expiró al actualizar el match.',
       );
     } on http.ClientException {
       throw Exception(
@@ -159,7 +159,7 @@ class MatchService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -187,7 +187,7 @@ class MatchService {
       return MatchRecord.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro al finalizar el match.',
+        'La conexión con el backend expiró al finalizar el match.',
       );
     } on http.ClientException {
       throw Exception(

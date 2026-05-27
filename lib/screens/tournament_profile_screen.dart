@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
+import '../services/social_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
@@ -35,6 +36,7 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   bool _isLoading = false;
   String? _loadError;
   final Set<String> _followingIds = <String>{};
+  final Set<String> _followLoadingIds = <String>{};
 
   TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
   String get _title => _currentTournament?.title ?? 'Torneo PGO';
@@ -42,7 +44,6 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   String get _photoUrl => _currentTournament?.photoUrl ?? '';
   String get _createdByName =>
       _currentTournament?.createdByName ?? 'Organizador';
-  String get _location => _currentTournament?.location ?? 'One Padel Trigal';
   List<TournamentPlayer> get _players =>
       _currentTournament?.registeredPlayers ?? const [];
 
@@ -84,14 +85,36 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
     }
   }
 
-  void _toggleFollow(TournamentPlayer player) {
-    setState(() {
-      if (_followingIds.contains(player.id)) {
-        _followingIds.remove(player.id);
-      } else {
-        _followingIds.add(player.id);
+  Future<void> _requestFriend(TournamentPlayer player) async {
+    if (player.id.isEmpty ||
+        _followingIds.contains(player.id) ||
+        _followLoadingIds.contains(player.id)) {
+      return;
+    }
+
+    setState(() => _followLoadingIds.add(player.id));
+    try {
+      final request = await SocialService().requestFriend(player.id);
+      if (!mounted) return;
+      setState(() => _followingIds.add(player.id));
+      final message = request.isOutgoing
+          ? 'Solicitud enviada a ${player.name}'
+          : '${player.name} ahora es tu amigo';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _followLoadingIds.remove(player.id));
       }
-    });
+    }
   }
 
   Future<void> _openPlayerProfile(TournamentPlayer player) async {
@@ -198,16 +221,17 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
                       if (_players.isEmpty)
                         _buildInfoTile(
                           icon: Icons.person_off_outlined,
-                          title: 'Aun no hay jugadores visibles',
+                          title: 'Aún no hay jugadores visibles',
                           subtitle:
-                              'Cuando existan inscripciones confirmadas apareceran aqui.',
+                              'Cuando existan inscripciones confirmadas aparecerán aquí.',
                         )
                       else
                         ..._players.map(
                           (player) => _RegisteredPlayerTile(
                             player: player,
                             isFollowing: _followingIds.contains(player.id),
-                            onFollowTap: () => _toggleFollow(player),
+                            isLoading: _followLoadingIds.contains(player.id),
+                            onFollowTap: () => _requestFriend(player),
                             onProfileTap: () => _openPlayerProfile(player),
                           ),
                         ),
@@ -284,7 +308,7 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_category.toUpperCase()} categoria',
+                  '${_category.toUpperCase()} categoría',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -322,7 +346,7 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
               },
               child: Center(
                 child: Text(
-                  'Descripcion',
+                  'Descripción',
                   style: TextStyle(
                     color: AppColors.SecondBlue.withValues(alpha: 0.84),
                     fontSize: 12,
@@ -455,7 +479,7 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
       ),
       child: Row(
         children: [
-          const _AvatarCircle(selected: true),
+          _AvatarCircle(selected: true, photoUrl: _currentTournament?.photoUrl),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -569,10 +593,12 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
 
 class _AvatarCircle extends StatelessWidget {
   const _AvatarCircle({
+    this.photoUrl,
     this.selected = false,
     this.size = 40,
   });
 
+  final String? photoUrl;
   final bool selected;
   final double size;
 
@@ -590,11 +616,38 @@ class _AvatarCircle extends StatelessWidget {
         ),
       ),
       child: ClipOval(
-        child: Image.asset(
-          'assets/images/Logo_Icono.png',
-          fit: BoxFit.cover,
-        ),
+        child: _avatarImage(),
       ),
+    );
+  }
+
+  Widget _avatarImage() {
+    final normalized = photoUrl?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return _fallbackAvatar();
+    }
+
+    final bytes = tryDecodeDataUrl(normalized);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    if (normalized.startsWith('http')) {
+      return Image.network(
+        normalized,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallbackAvatar(),
+      );
+    }
+
+    return _fallbackAvatar();
+  }
+
+  Widget _fallbackAvatar() {
+    return Container(
+      color: const Color(0xFFAAB5CB),
+      alignment: Alignment.center,
+      child: const Icon(Icons.person, color: Colors.white),
     );
   }
 }
@@ -603,12 +656,14 @@ class _RegisteredPlayerTile extends StatelessWidget {
   const _RegisteredPlayerTile({
     required this.player,
     required this.isFollowing,
+    required this.isLoading,
     required this.onFollowTap,
     required this.onProfileTap,
   });
 
   final TournamentPlayer player;
   final bool isFollowing;
+  final bool isLoading;
   final VoidCallback onFollowTap;
   final VoidCallback onProfileTap;
 
@@ -623,7 +678,7 @@ class _RegisteredPlayerTile extends StatelessWidget {
               InkWell(
                 onTap: onProfileTap,
                 customBorder: const CircleBorder(),
-                child: const _AvatarCircle(size: 34),
+                child: _AvatarCircle(size: 34, photoUrl: player.photoUrl),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -641,7 +696,7 @@ class _RegisteredPlayerTile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Amigo',
+                      isFollowing ? 'Amigos' : 'Jugador inscrito',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -653,55 +708,45 @@ class _RegisteredPlayerTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!isFollowing) ...[
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF3E6EA7),
-                        Color(0xFF10192A),
-                      ],
-                    ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: isFollowing || isLoading
+                      ? null
+                      : AppColors.secondaryGradient,
+                  color:
+                      isFollowing || isLoading ? const Color(0xFFE7EBF0) : null,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: isFollowing || isLoading ? null : onFollowTap,
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: onFollowTap,
-                      borderRadius: BorderRadius.circular(12),
-                      child: const SizedBox(
-                        width: 58,
-                        height: 21,
-                        child: Center(
-                          child: Text(
-                            '+ Seguir',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
+                    child: SizedBox(
+                      width: 64,
+                      height: 24,
+                      child: Center(
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.SecondBlue,
+                                ),
+                              )
+                            : Text(
+                                isFollowing ? 'Enviado' : '+ Seguir',
+                                style: TextStyle(
+                                  color: isFollowing
+                                      ? AppColors.SecondBlue
+                                      : Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-              ],
-              Container(
-                width: 31,
-                height: 31,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFD7FF59),
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '#${player.rankingPosition}',
-                  style: const TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),

@@ -1,8 +1,9 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/community_user.dart';
 import '../models/profile_history.dart';
 import '../models/profile_summary.dart';
 import 'api_config.dart';
@@ -23,7 +24,7 @@ class ProfileService {
   Future<ProfileSummary> getMyProfile() async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -43,7 +44,7 @@ class ProfileService {
       return ProfileSummary.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La carga del perfil expiro. Verifica la conexion con el backend.',
+        'La carga del perfil expiró. Verifica la conexión con el backend.',
       );
     } on http.ClientException {
       throw Exception(
@@ -63,7 +64,7 @@ class ProfileService {
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     final payload = <String, dynamic>{
@@ -96,7 +97,7 @@ class ProfileService {
       return ProfileSummary.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La actualizacion del perfil expiro. Verifica la conexion con el backend.',
+        'La actualización del perfil expiró. Verifica la conexión con el backend.',
       );
     } on http.ClientException {
       throw Exception(
@@ -108,7 +109,7 @@ class ProfileService {
   Future<ProfileHistory> getMyHistory() async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('No hay sesion activa');
+      throw Exception('No hay sesión activa');
     }
 
     try {
@@ -130,12 +131,49 @@ class ProfileService {
       return ProfileHistory.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La carga del historial expiro. Verifica la conexion con el backend.',
+        'La carga del historial expiró. Verifica la conexión con el backend.',
       );
     } on http.ClientException {
       throw Exception(
         'No se pudo conectar al backend para cargar el historial.',
       );
+    }
+  }
+
+  Future<List<CommunityUser>> getMyFriends() async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/profile/me/friends'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_requestTimeout);
+
+      if (response.statusCode == 404) {
+        return const [];
+      }
+
+      final json = jsonDecode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (json is Map<String, dynamic>) {
+          throw Exception(json['message'] ?? 'No se pudo cargar amigos');
+        }
+        throw Exception('No se pudo cargar amigos');
+      }
+
+      return (json as List)
+          .map((item) => CommunityUser.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on TimeoutException {
+      throw Exception('La carga de amigos expiró.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend para cargar amigos.');
     }
   }
 }

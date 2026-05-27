@@ -1,8 +1,10 @@
 class TournamentRecord {
   const TournamentRecord({
     required this.id,
+    required this.slug,
     required this.title,
     required this.tournamentType,
+    required this.pairingMode,
     required this.playerCapacity,
     required this.modality,
     required this.format,
@@ -27,8 +29,10 @@ class TournamentRecord {
   });
 
   final String id;
+  final String slug;
   final String title;
   final String tournamentType;
+  final String pairingMode;
   final int playerCapacity;
   final String modality;
   final String format;
@@ -65,19 +69,29 @@ class TournamentRecord {
               (registration['status'] as String? ?? 'PENDING') != 'CANCELED',
         )
         .toList();
-    final registrationEntries = activeRegistrations
-        .map(TournamentRegistrationEntry.fromJson)
-        .toList();
+    final registrationEntries =
+        activeRegistrations.map(TournamentRegistrationEntry.fromJson).toList();
     final registeredPlayers = _extractRegisteredPlayers(activeRegistrations);
-    final registrationUserIds = _extractRegistrationUserIds(activeRegistrations);
-    final registrationsCount = registeredPlayers.isNotEmpty
+    final registrationUserIds =
+        _extractRegistrationUserIds(activeRegistrations);
+    final derivedRegistrationsCount = registeredPlayers.isNotEmpty
         ? registeredPlayers.length
         : activeRegistrations.length;
+    final registrationsCount =
+        (json['registrationsCount'] as num?)?.toInt() ??
+            (json['playersCount'] as num?)?.toInt() ??
+            derivedRegistrationsCount;
+    final rawStartsAt = json['startsAt'] as String?;
+    final startsAt = rawStartsAt == null
+        ? DateTime(1900)
+        : DateTime.tryParse(rawStartsAt) ?? DateTime(1900);
 
     return TournamentRecord(
       id: json['id'] as String,
+      slug: json['slug'] as String? ?? '',
       title: json['title'] as String? ?? '',
       tournamentType: json['tournamentType'] as String? ?? '',
+      pairingMode: json['pairingMode'] as String? ?? 'FIXED',
       playerCapacity: (json['playerCapacity'] as num?)?.toInt() ?? 0,
       modality: json['modality'] as String? ?? '',
       format: json['format'] as String? ?? '',
@@ -85,7 +99,7 @@ class TournamentRecord {
       address: json['address'] as String?,
       city: json['city'] as String? ?? '',
       district: json['district'] as String? ?? '',
-      startsAt: DateTime.parse(json['startsAt'] as String),
+      startsAt: startsAt,
       prize: json['prize'] as String? ?? '',
       entryFee: (json['entryFee'] as num?)?.toInt() ?? 0,
       category: json['category'] as String? ?? '',
@@ -93,7 +107,8 @@ class TournamentRecord {
       registrationsOpen: json['registrationsOpen'] as bool? ?? true,
       description: json['description'] as String?,
       photoUrl: json['photoUrl'] as String?,
-      createdById: (json['createdBy'] as Map<String, dynamic>?)?['id'] as String?,
+      createdById:
+          (json['createdBy'] as Map<String, dynamic>?)?['id'] as String?,
       createdByName:
           (json['createdBy'] as Map<String, dynamic>?)?['name'] as String?,
       registrationsCount: registrationsCount,

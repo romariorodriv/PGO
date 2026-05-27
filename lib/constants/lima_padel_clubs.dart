@@ -91,6 +91,54 @@ const List<LimaPadelClub> limaPadelClubDetails = [
     city: 'Lima',
     district: 'Miraflores',
   ),
+  LimaPadelClub(
+    name: 'Padel Nuestro Lima',
+    address: 'Av. Primavera 1878',
+    city: 'Lima',
+    district: 'Santiago de Surco',
+  ),
+  LimaPadelClub(
+    name: 'Lima Padel Center',
+    address: 'Av. Separadora Industrial 1980',
+    city: 'Lima',
+    district: 'La Molina',
+  ),
+  LimaPadelClub(
+    name: 'Costa Verde Padel',
+    address: 'Circuito de Playas 150',
+    city: 'Lima',
+    district: 'San Miguel',
+  ),
+  LimaPadelClub(
+    name: 'Padel Club San Isidro',
+    address: 'Av. Guardia Civil 727',
+    city: 'Lima',
+    district: 'San Isidro',
+  ),
+  LimaPadelClub(
+    name: 'Padel Norte',
+    address: 'Av. Alfredo Mendiola 3698',
+    city: 'Lima',
+    district: 'Independencia',
+  ),
+  LimaPadelClub(
+    name: 'Padel Barranco',
+    address: 'Av. República de Panamá 220',
+    city: 'Lima',
+    district: 'Barranco',
+  ),
+  LimaPadelClub(
+    name: 'Padel Miraflores',
+    address: 'Av. Petit Thouars 5356',
+    city: 'Lima',
+    district: 'Miraflores',
+  ),
+  LimaPadelClub(
+    name: 'Padel San Borja',
+    address: 'Av. San Borja Norte 996',
+    city: 'Lima',
+    district: 'San Borja',
+  ),
 ];
 
 final List<String> limaPadelClubs = [

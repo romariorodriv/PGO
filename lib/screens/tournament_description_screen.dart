@@ -1,13 +1,18 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../models/tournament_admin_matches.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
 import '../services/profile_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
+import '../utils/tournament_share_link.dart';
+import '../utils/tournament_rules.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
@@ -40,6 +45,7 @@ class _TournamentDescriptionScreenState
   bool _isLoading = false;
   bool _isLoadingProfile = false;
   String? _loadError;
+  TournamentAdminMatchesData? _matchesData;
 
   TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
   String get _title => _currentTournament?.title ?? 'Torneo PGO';
@@ -55,6 +61,8 @@ class _TournamentDescriptionScreenState
   String get _format => _currentTournament?.format ?? 'dobles';
   List<TournamentPlayer> get _players =>
       _currentTournament?.registeredPlayers ?? const [];
+  List<TournamentAdminMatch> get _matches =>
+      _matchesData?.matches ?? const <TournamentAdminMatch>[];
 
   @override
   void initState() {
@@ -62,6 +70,7 @@ class _TournamentDescriptionScreenState
     _tournament = widget.tournament;
     _loadTournament();
     _loadProfile();
+    _loadMatches();
   }
 
   Future<void> _loadProfile() async {
@@ -103,6 +112,7 @@ class _TournamentDescriptionScreenState
       setState(() {
         _tournament = tournament;
       });
+      _loadMatches();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -153,22 +163,9 @@ class _TournamentDescriptionScreenState
   }
 
   String get _statusChipText {
-    if (_currentTournament?.status == 'PUBLISHED' &&
-        _currentTournament?.registrationsOpen == false) {
-      return 'inscripciones cerradas';
-    }
-    switch (_currentTournament?.status) {
-      case 'DRAFT':
-        return 'borrador';
-      case 'PUBLISHED':
-        return 'inscripciones abiertas';
-      case 'COMPLETED':
-        return 'torneo finalizado';
-      case 'CANCELED':
-        return 'torneo cancelado';
-      default:
-        return 'torneo activo';
-    }
+    final tournament = _currentTournament;
+    if (tournament == null) return 'torneo activo';
+    return TournamentRules.statusLabel(tournament);
   }
 
   String _capitalize(String value) {
@@ -187,6 +184,94 @@ class _TournamentDescriptionScreenState
   }
 
   bool get _showJoinAction => !_isLoadingProfile && !_isCurrentUserRegistered;
+
+  TournamentAdminMatch? get _myMatch {
+    final manageable = _matches.where((match) => match.canManage).toList();
+    if (manageable.isNotEmpty) {
+      manageable.sort(_compareUserMatches);
+      return manageable.first;
+    }
+
+    final profileName = (_profile?.name ?? '').trim().toLowerCase();
+    if (profileName.isEmpty) return null;
+    final relevant = _matches.where((match) {
+      final teamOne = match.teamOne.toLowerCase();
+      final teamTwo = match.teamTwo.toLowerCase();
+      return teamOne.contains(profileName) || teamTwo.contains(profileName);
+    }).toList();
+    if (relevant.isEmpty) return null;
+    relevant.sort(_compareUserMatches);
+    return relevant.first;
+  }
+
+  int _compareUserMatches(
+      TournamentAdminMatch left, TournamentAdminMatch right) {
+    int rank(String status) => switch (status) {
+          'LIVE' => 0,
+          'PENDING' => 1,
+          'FINISHED' => 2,
+          _ => 3,
+        };
+    final statusCompare = rank(left.status).compareTo(rank(right.status));
+    if (statusCompare != 0) return statusCompare;
+    return left.scheduledAt.compareTo(right.scheduledAt);
+  }
+
+  TournamentPlayer? get _pairedPlayer {
+    final userId = _profile?.id;
+    final tournament = _currentTournament;
+    if (userId == null || tournament == null) return null;
+    for (final entry in tournament.registrationEntries) {
+      if (entry.user.id == userId) return entry.partnerUser;
+      if (entry.partnerUser?.id == userId) return entry.user;
+    }
+    return null;
+  }
+
+  Future<void> _loadMatches() async {
+    final tournament = _currentTournament;
+    if (tournament == null) return;
+    try {
+      final data =
+          await TournamentService().getMyTournamentMatches(tournament.id);
+      if (!mounted) return;
+      setState(() {
+        _matchesData = data;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openClubInMaps() async {
+    final tournament = _currentTournament;
+    final query = [
+      tournament?.location ?? _location,
+      tournament?.address,
+      tournament?.district,
+      tournament?.city,
+    ].where((part) => (part ?? '').trim().isNotEmpty).join(', ');
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}',
+    );
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos abrir Maps.')),
+      );
+    }
+  }
+
+  Future<void> _shareTournament() async {
+    final tournament = _currentTournament;
+    if (tournament == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Todavía no hay un link para compartir.')),
+      );
+      return;
+    }
+
+    final link = buildTournamentShareLink(tournament);
+    await Share.share(link, subject: _title);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +324,44 @@ class _TournamentDescriptionScreenState
                       ),
                     const SizedBox(height: 6),
                     _buildLocationRow(),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openClubInMaps,
+                            icon: const Icon(Icons.near_me_rounded, size: 17),
+                            label: const Text('Ver club en Maps'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.SecondBlue,
+                              side: const BorderSide(
+                                color: Color(0xFFD3DAE3),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _shareTournament,
+                            icon: const Icon(Icons.share_outlined, size: 17),
+                            label: const Text('Compartir'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.SecondBlue,
+                              side: const BorderSide(
+                                color: Color(0xFFD3DAE3),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     _buildDivider(),
                     const SizedBox(height: 16),
@@ -255,6 +378,14 @@ class _TournamentDescriptionScreenState
                     ),
                     const SizedBox(height: 22),
                     _buildPlayersPreview(),
+                    if (_isCurrentUserRegistered) ...[
+                      const SizedBox(height: 18),
+                      if (_pairedPlayer != null) ...[
+                        _buildPairedNotification(_pairedPlayer!),
+                        const SizedBox(height: 12),
+                      ],
+                      _buildMyMatchCard(),
+                    ],
                     const SizedBox(height: 24),
                     if (_showJoinAction)
                       SizedBox(
@@ -262,12 +393,11 @@ class _TournamentDescriptionScreenState
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
-                            if (widget.isPaid ||
-                                _currentTournament?.registrationsOpen ==
-                                    false ||
-                                (_currentTournament != null &&
-                                    _currentTournament!.registrationsCount >=
-                                        _currentTournament!.playerCapacity)) {
+                            final tournament = _currentTournament;
+                            if (widget.isPaid || tournament == null) {
+                              return;
+                            }
+                            if (!TournamentRules.canJoin(tournament)) {
                               return;
                             }
                             _handleRegisterTap(context);
@@ -281,18 +411,10 @@ class _TournamentDescriptionScreenState
                             ),
                           ),
                           child: Text(
-                            widget.isPaid
-                                ? 'IR AL PARTIDO'
-                                : (_currentTournament?.registrationsOpen ==
-                                        false
-                                    ? 'INSCRIPCIONES CERRADAS'
-                                    : (_currentTournament != null &&
-                                            _currentTournament!
-                                                    .registrationsCount >=
-                                                _currentTournament!
-                                                    .playerCapacity
-                                        ? 'CUPOS COMPLETOS'
-                                        : 'UNIRME')),
+                            TournamentRules.joinLabel(
+                              _currentTournament,
+                              isPaid: widget.isPaid,
+                            ),
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
@@ -312,15 +434,37 @@ class _TournamentDescriptionScreenState
 
   Future<void> _handleRegisterTap(BuildContext context) async {
     final currentTournament = _currentTournament;
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (context) => TournamentRegisterScreen(
-          tournament: currentTournament,
-        ),
+    if (currentTournament == null ||
+        !TournamentRules.canJoin(currentTournament)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(TournamentRules.joinLabel(currentTournament))),
+      );
+      return;
+    }
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.84,
+        minChildSize: 0.42,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (context, scrollController) {
+          return ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            child: TournamentRegisterScreen(
+              tournament: currentTournament,
+              isModal: true,
+              scrollController: scrollController,
+            ),
+          );
+        },
       ),
     );
 
-    if (result != true || currentTournament == null || !context.mounted) {
+    if (result != true || !context.mounted) {
       return;
     }
 
@@ -336,7 +480,7 @@ class _TournamentDescriptionScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'La inscripcion se registro, pero no pudimos refrescar el torneo.',
+            'La inscripción se registró, pero no pudimos refrescar el torneo.',
           ),
         ),
       );
@@ -404,7 +548,7 @@ class _TournamentDescriptionScreenState
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_category.toUpperCase()} categoria',
+                  '${_category.toUpperCase()} categoría',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -445,7 +589,7 @@ class _TournamentDescriptionScreenState
               ),
               alignment: Alignment.center,
               child: const Text(
-                'Descripcion',
+                'Descripción',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -642,8 +786,8 @@ class _TournamentDescriptionScreenState
     if (_players.isEmpty) {
       return _buildMessageCard(
         icon: Icons.person_off_outlined,
-        title: 'Aun no hay jugadores inscritos',
-        subtitle: 'Los participantes apareceran aqui cuando se unan al torneo.',
+        title: 'Aún no hay jugadores inscritos',
+        subtitle: 'Los participantes aparecerán aquí cuando se unan al torneo.',
       );
     }
 
@@ -668,6 +812,297 @@ class _TournamentDescriptionScreenState
         ],
       ),
     );
+  }
+
+  Widget _buildMyMatchCard() {
+    final match = _myMatch;
+    final hasGeneratedMatches = _matches.isNotEmpty;
+    if (match == null) {
+      return _buildMessageCard(
+        icon: Icons.sports_tennis,
+        title: hasGeneratedMatches
+            ? 'Tu partido por ser asignado'
+            : 'Tu partido se mostrará aquí',
+        subtitle: hasGeneratedMatches
+            ? 'Los cruces ya fueron generados. Cuando tengas cancha asignada, tu partido aparecerá aquí.'
+            : 'Cuando el organizador genere cruces, tu próximo partido aparecerá aquí.',
+      );
+    }
+
+    final statusLabel = switch (match.status) {
+      'LIVE' => 'En curso',
+      'FINISHED' => 'Finalizado',
+      _ => 'Pendiente',
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sports_tennis, color: AppColors.SecondBlue),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  match.status == 'LIVE'
+                      ? 'Tu próximo partido ya empezó'
+                      : 'Tu próximo partido',
+                  style: const TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: match.status == 'LIVE'
+                      ? AppColors.PrimaryGreen
+                      : const Color(0xFFE7EBF0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: const TextStyle(
+                    color: AppColors.SecondBlue,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${match.courtLabel} - ${match.stageLabel}',
+            style: TextStyle(
+              color: AppColors.SecondBlue.withValues(alpha: 0.65),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            match.teamOne,
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Divider(height: 16),
+          Text(
+            match.teamTwo,
+            style: const TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (match.status == 'PENDING' || match.status == 'LIVE') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: () {
+                  final tournament = _currentTournament;
+                  if (tournament == null) return;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          TournamentLiveScreen(tournament: tournament),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                child: const Text(
+                  'IR AL PARTIDO',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (match.status == 'PENDING')
+                  Expanded(
+                    child: _SmallActionButton(
+                      label: 'Iniciar',
+                      onTap: () => _startUserMatch(match),
+                    ),
+                  ),
+                if (match.status == 'PENDING') const SizedBox(width: 10),
+                Expanded(
+                  child: _SmallActionButton(
+                    label: 'Registrar puntaje',
+                    onTap: () => _showUserWinnerDialog(match),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (match.status == 'FINISHED') ...[
+            const SizedBox(height: 10),
+            Text(
+              'Ganador: ${match.winnerLabel ?? 'Por definir'}${(match.score ?? '').trim().isNotEmpty ? ' - ${match.score!.trim()}' : ''}',
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPairedNotification(TournamentPlayer player) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF7D8),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_active_outlined,
+              color: AppColors.SecondBlue),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Ya tienes dupla: ${player.name}',
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Ahora sigues a ${player.name}')),
+            ),
+            child: const Text('Seguir'),
+          ),
+          TextButton(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Mensajes aún no disponible')),
+            ),
+            child: const Text('Mensaje'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startUserMatch(TournamentAdminMatch match) async {
+    final tournament = _currentTournament;
+    if (tournament == null) return;
+    try {
+      await TournamentService().startTournamentMatch(
+        tournamentId: tournament.id,
+        matchId: match.id,
+      );
+      await _loadMatches();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _showUserWinnerDialog(TournamentAdminMatch match) async {
+    final scoreController = TextEditingController(text: match.score ?? '');
+    var winner = match.teamOne;
+    final result = await showDialog<({String winner, String score})>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Registrar resultado'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DialogWinnerOption(
+                label: match.teamOne,
+                selected: winner == match.teamOne,
+                onTap: () => setDialogState(() => winner = match.teamOne),
+              ),
+              _DialogWinnerOption(
+                label: match.teamTwo,
+                selected: winner == match.teamTwo,
+                onTap: () => setDialogState(() => winner = match.teamTwo),
+              ),
+              TextField(
+                controller: scoreController,
+                decoration: const InputDecoration(
+                  labelText: 'Puntaje',
+                  hintText: 'Ej. 6-4, 4-2, 11-9',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(
+                (winner: winner, score: scoreController.text.trim()),
+              ),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    scoreController.dispose();
+    if (result == null || _currentTournament == null) return;
+    try {
+      await TournamentService().finishTournamentMatch(
+        tournamentId: _currentTournament!.id,
+        matchId: match.id,
+        winnerLabel: result.winner,
+        score: result.score,
+      );
+      await _loadMatches();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   Widget _buildMessageCard({
@@ -742,6 +1177,90 @@ class _TournamentDescriptionScreenState
   }
 }
 
+class _SmallActionButton extends StatelessWidget {
+  const _SmallActionButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 38,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.PrimaryGreen,
+          foregroundColor: AppColors.SecondBlue,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogWinnerOption extends StatelessWidget {
+  const _DialogWinnerOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.PrimaryGreen : const Color(0xFFF2F4F8),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: AppColors.SecondBlue,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PreviewPlayer extends StatelessWidget {
   const _PreviewPlayer({
     required this.label,
@@ -776,17 +1295,11 @@ class _PreviewPlayer extends StatelessWidget {
                   ? Image.network(
                       photoUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/Logo_Icono.png',
-                        fit: BoxFit.cover,
-                      ),
+                      errorBuilder: (_, __, ___) => _fallbackAvatar(),
                     )
                   : (bytes != null
                       ? Image.memory(bytes, fit: BoxFit.cover)
-                      : Image.asset(
-                          'assets/images/Logo_Icono.png',
-                          fit: BoxFit.cover,
-                        )),
+                      : _fallbackAvatar()),
             ),
           ),
           const SizedBox(height: 6),
@@ -802,6 +1315,18 @@ class _PreviewPlayer extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _fallbackAvatar() {
+    return Container(
+      color: const Color(0xFFE7EBF0),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.person_rounded,
+        color: AppColors.SecondBlue.withValues(alpha: 0.42),
+        size: 22,
       ),
     );
   }

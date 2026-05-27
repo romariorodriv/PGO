@@ -1,13 +1,16 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
 import '../models/match_record.dart';
+import '../models/profile_summary.dart';
 import '../models/selected_player.dart';
 import '../services/match_service.dart';
+import '../utils/data_url_image.dart';
 import '../utils/padel_rules.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'finish_match_screen.dart';
+import 'profile_public_preview_screen.dart';
 
 class MatchScoreScreen extends StatefulWidget {
   const MatchScoreScreen({
@@ -36,6 +39,21 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   void initState() {
     super.initState();
     _selectedDate = widget.match.playedAt;
+    if (widget.match.games.isNotEmpty) {
+      _games
+        ..clear()
+        ..addAll(
+          widget.match.games.map(
+            (game) => [
+              (game['team1'] as num?)?.toInt() ?? 0,
+              (game['team2'] as num?)?.toInt() ?? 0,
+            ],
+          ),
+        );
+      final validation = PadelRules.validateBestOfThreeMatch(_games);
+      _finalTeam1Sets = validation.team1SetsWon;
+      _finalTeam2Sets = validation.team2SetsWon;
+    }
   }
 
   String get _formattedDate {
@@ -86,7 +104,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     if (!_isFinalSetsValid) {
       return PadelMatchValidationResult(
         isValid: false,
-        error: 'Debes registrar el resultado final 2-1, 1-2, 2-0 o 0-2 en sets.',
+        error:
+            'Debes registrar el resultado final 2-1, 1-2, 2-0 o 0-2 en sets.',
         team1SetsWon: base.team1SetsWon,
         team2SetsWon: base.team2SetsWon,
       );
@@ -106,10 +125,9 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     return base;
   }
 
-  int get _team1SetsWon => _matchValidation.team1SetsWon;
-  int get _team2SetsWon => _matchValidation.team2SetsWon;
   int? get _selectedTeam =>
-      _finalWinnerTeam ?? (_matchValidation.isValid ? _matchValidation.winnerTeam : null);
+      _finalWinnerTeam ??
+      (_matchValidation.isValid ? _matchValidation.winnerTeam : null);
 
   bool get _canContinue => _matchValidation.isValid && _selectedTeam != null;
   bool get _isFinalSetsValid =>
@@ -269,7 +287,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     if (_games.length >= PadelRules.maxSets) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Un partido al mejor de 3 no puede tener mas de 3 sets'),
+          content:
+              Text('Un partido al mejor de 3 no puede tener más de 3 sets'),
         ),
       );
       return;
@@ -294,7 +313,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     });
 
     try {
-      await MatchService().updateMatchResult(
+      final updatedMatch = await MatchService().updateMatchResult(
         matchId: widget.match.id,
         playedAt: _selectedDate,
         winnerTeam: _selectedTeam!,
@@ -312,7 +331,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => FinishMatchScreen(
-            match: widget.match,
+            match: updatedMatch,
             players: widget.players,
             winnerTeam: _selectedTeam!,
             matchDate: _formattedDate,
@@ -370,6 +389,14 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         ),
       ),
       actions: const [PgoOptionsMenuButton()],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          color: const Color(0xFFF2F3F5),
+          padding: const EdgeInsets.fromLTRB(26, 10, 26, 14),
+          child: _buildContinueButton(),
+        ),
+      ),
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
@@ -377,7 +404,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(26, 22, 26, 34),
+          padding: const EdgeInsets.fromLTRB(26, 22, 26, 26),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -397,42 +424,43 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
               _buildTeamTabs(),
               const SizedBox(height: 12),
               _buildTeamPlayers(),
-              const SizedBox(height: 160),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _handleContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _canContinue
-                        ? const Color(0xFFD7FF59)
-                        : const Color(0xFFD9DEE7),
-                    foregroundColor: _canContinue
-                        ? AppColors.SecondBlue
-                        : AppColors.SecondBlue.withValues(alpha: 0.55),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'SIGUIENTE',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 17,
-                          ),
-                        ),
-                ),
-              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildContinueButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: _isSaving ? null : _handleContinue,
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+              _canContinue ? const Color(0xFFD7FF59) : const Color(0xFFD9DEE7),
+          foregroundColor: _canContinue
+              ? AppColors.SecondBlue
+              : AppColors.SecondBlue.withValues(alpha: 0.55),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+        ),
+        child: _isSaving
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text(
+                'SIGUIENTE',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 17,
+                ),
+              ),
       ),
     );
   }
@@ -736,44 +764,73 @@ class _ScorePlayerCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.PrimaryGreen,
-                width: 1.5,
+    return InkWell(
+      onTap: () => _openProfile(context),
+      borderRadius: BorderRadius.circular(42),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.PrimaryGreen,
+                  width: 1.5,
+                ),
+              ),
+              child: ClipOval(
+                child: _avatarImage(player.photoUrl),
               ),
             ),
-            child: ClipOval(
-              child: player.photoUrl != null && player.photoUrl!.isNotEmpty
-                  ? Image.network(
-                      player.photoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _fallbackAvatar(),
-                    )
-                  : _fallbackAvatar(),
+            const SizedBox(height: 8),
+            Text(
+              player.name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfilePublicPreviewScreen(
+          profile: ProfileSummary(
+            id: player.id,
+            name: player.name,
+            email: '',
+            photoUrl: player.photoUrl,
+            experiencePoints: 0,
+            category: player.category,
+            preferredClub: null,
+            preferredSide: null,
+            racketModel: null,
+            experienceLevel: null,
+            rankingPosition: player.rankingPosition,
+            matchesPlayed: 0,
+            wins: 0,
+            winRate: 0,
+            weeklyStreak: 0,
+            friendsCount: 0,
+            followersCount: 0,
+            followingCount: 0,
+            socialNotificationsCount: 0,
+            matchHistory: const [],
           ),
-          const SizedBox(height: 8),
-          Text(
-            player.name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -786,6 +843,24 @@ class _ScorePlayerCircle extends StatelessWidget {
         Icons.person,
         color: Colors.white,
       ),
+    );
+  }
+
+  Widget _avatarImage(String? photoUrl) {
+    final normalized = photoUrl?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return _fallbackAvatar();
+    }
+
+    final bytes = tryDecodeDataUrl(normalized);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    return Image.network(
+      normalized,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallbackAvatar(),
     );
   }
 }

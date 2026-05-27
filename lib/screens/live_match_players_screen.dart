@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'dart:convert';
 
@@ -30,7 +30,7 @@ class LiveMatchPlayersScreen extends StatefulWidget {
 }
 
 class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
-  static const _fallbackClubName = 'One Padel Olguin';
+  static const _fallbackClubName = 'One Padel Olguín';
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -376,7 +376,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                   const SizedBox(height: 4),
                   const Center(
                     child: Text(
-                      'Anadir jugadores',
+                      'Añadir jugadores',
                       style: TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 22,
@@ -387,7 +387,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                   const SizedBox(height: 2),
                   const Center(
                     child: Text(
-                      'Con quien juegas hoy?',
+                      '¿Con quién juegas hoy?',
                       style: TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 14,
@@ -455,7 +455,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                                     controller: _searchController,
                                     onChanged: _onSearchChanged,
                                     decoration: InputDecoration(
-                                      hintText: 'Nombre, correo electronico',
+                                      hintText: 'Nombre, correo electrónico',
                                       hintStyle: TextStyle(
                                         color: AppColors.SecondBlue.withValues(
                                           alpha: 0.55,
@@ -504,7 +504,7 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                     Text(
                       _searchController.text.trim().isEmpty
                           ? 'Sugerencias'
-                          : 'Resultados de busqueda',
+                          : 'Resultados de búsqueda',
                       style: const TextStyle(
                         color: AppColors.SecondBlue,
                         fontSize: 16,
@@ -519,8 +519,8 @@ class _LiveMatchPlayersScreenState extends State<LiveMatchPlayersScreen> {
                     else if (_displayUsers.isEmpty)
                       _InlineInfoCard(
                         message: _searchController.text.trim().isEmpty
-                            ? 'Aun no tienes companeros con los que hayas jugado.'
-                            : 'No encontramos jugadores con esa busqueda.',
+                            ? 'Aún no tienes compañeros con los que hayas jugado.'
+                            : 'No encontramos jugadores con esa búsqueda.',
                       )
                     else ...[
                       ..._visibleUsers.map(
@@ -867,7 +867,7 @@ class _CommunityUserCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    user.category ?? 'Sin categoria',
+                    user.category ?? 'Sin categoría',
                     style: TextStyle(
                       color: AppColors.SecondBlue.withValues(alpha: 0.72),
                       fontSize: 12,

@@ -6,16 +6,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
+import '../constants/typography.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/lima_padel_clubs.dart';
+import '../models/open_match_alert.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
+import '../services/open_match_alert_service.dart';
 import '../services/profile_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'activity_screen.dart';
+import 'open_match_alerts_screen.dart';
 import 'profile_history_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_description_screen.dart';
@@ -27,12 +31,14 @@ class HomeScreen extends StatefulWidget {
     this.showBottomNav = true,
     this.bottomNavigationBar,
     this.onTournamentsTap,
+    this.onAlertsTap,
     this.onProfileTap,
   });
 
   final bool showBottomNav;
   final Widget? bottomNavigationBar;
   final VoidCallback? onTournamentsTap;
+  final VoidCallback? onAlertsTap;
   final VoidCallback? onProfileTap;
 
   @override
@@ -41,14 +47,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const _onboardingPhonePrefix = 'profile_onboarding_phone_';
+  static const _onboardingSeenPrefix = 'profile_onboarding_seen_';
 
   ProfileSummary? _profile;
   List<TournamentRecord> _tournaments = const [];
+  List<OpenMatchAlert> _openMatchAlerts = const [];
   bool _isLoadingProfile = true;
   String? _profileError;
   bool _isUpdatingProfile = false;
   bool _hasShownProfileComplete = false;
   bool _hasShownProfileOnboarding = false;
+  bool _hasSeenProfileOnboarding = false;
   String _savedOnboardingPhone = '';
 
   @override
@@ -59,18 +68,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final results = await Future.wait([
-        ProfileService().getMyProfile(),
-        TournamentService().getTournaments(),
-      ]);
-      final profile = results[0] as ProfileSummary;
-      final tournaments = results[1] as List<TournamentRecord>;
+      final profileFuture = ProfileService().getMyProfile();
+      final tournamentsFuture = TournamentService().getTournaments();
+      final alertsFuture = OpenMatchAlertService().getAlerts().catchError(
+            (_) => const <OpenMatchAlert>[],
+          );
+      final profile = await profileFuture;
+      final tournaments = await tournamentsFuture;
+      final alerts = await alertsFuture;
       final savedPhone = await _readOnboardingPhone(profile.id);
+      final hasSeenOnboarding = await _readOnboardingSeen(profile.id);
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _tournaments = tournaments;
+        _openMatchAlerts = alerts;
         _savedOnboardingPhone = savedPhone;
+        _hasSeenProfileOnboarding = hasSeenOnboarding;
         _profileError = null;
       });
       _checkProfileCompletion();
@@ -98,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return 'No se pudo cargar tu perfil';
     }
 
-    return 'Estas a 1 partido de subir de categoria';
+    return 'Estás a 1 partido de subir de categoría';
   }
 
   String _buildGreetingName() {
@@ -126,6 +140,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return upcoming.isNotEmpty ? upcoming.first : null;
+  }
+
+  OpenMatchAlert? get _recommendedOpenMatch {
+    final profileCategory = _normalizeText(_profile?.category);
+    final preferredClub = _normalizeText(_profile?.preferredClub);
+    if (profileCategory.isEmpty || preferredClub.isEmpty) {
+      return null;
+    }
+
+    final matching = _openMatchAlerts
+        .where(
+          (item) =>
+              item.status == 'OPEN' &&
+              !item.hasJoined &&
+              !item.isOrganizer &&
+              item.missingPlayers > 0 &&
+              _normalizeText(item.category) == profileCategory &&
+              _normalizeText(item.club) == preferredClub,
+        )
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
+    return matching.isNotEmpty ? matching.first : null;
+  }
+
+  String _normalizeText(String? value) {
+    return (value ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   String _formatTournamentDate(DateTime value) {
@@ -318,15 +359,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return side.isNotEmpty && schedule.isNotEmpty && club.isNotEmpty;
   }
 
-  bool get _isOnboardingProfileComplete {
-    final profile = _profile;
-    if (profile == null) return false;
-    final hasName = profile.name.trim().isNotEmpty;
-    final hasPhoto = (profile.photoUrl ?? '').trim().isNotEmpty;
-    final hasPhone = _savedOnboardingPhone.trim().isNotEmpty;
-    return hasName && hasPhoto && hasPhone;
-  }
-
   void _checkProfileCompletion() {
     if (!_isProfileComplete || _hasShownProfileComplete) return;
     _hasShownProfileComplete = true;
@@ -343,11 +375,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void _checkProfileOnboarding() {
     if (_isLoadingProfile) return;
     if (_profile == null || _hasShownProfileOnboarding) return;
-    if (_isOnboardingProfileComplete) return;
+    if (_hasSeenProfileOnboarding) return;
 
     _hasShownProfileOnboarding = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _profile == null) return;
+
+      await _saveOnboardingSeen(_profile!.id);
+      if (!mounted) return;
+      setState(() {
+        _hasSeenProfileOnboarding = true;
+      });
 
       final result = await showDialog<_ProfileOnboardingResult>(
         context: context,
@@ -407,6 +445,16 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('$_onboardingPhonePrefix$userId', phone.trim());
   }
 
+  Future<bool> _readOnboardingSeen(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('$_onboardingSeenPrefix$userId') ?? false;
+  }
+
+  Future<void> _saveOnboardingSeen(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_onboardingSeenPrefix$userId', true);
+  }
+
   Future<void> _openRecommendedTournament() async {
     final tournament = _recommendedTournament;
     if (tournament == null) {
@@ -439,6 +487,65 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+    _loadProfile();
+  }
+
+  Future<void> _openAlertsSection() async {
+    if (widget.onAlertsTap != null) {
+      widget.onAlertsTap!();
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const OpenMatchAlertsScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+    _loadProfile();
+  }
+
+  Future<void> _openCreateOpenMatch() async {
+    final created = await Navigator.of(context).push<OpenMatchAlert>(
+      MaterialPageRoute(
+        builder: (context) => const CreateOpenMatchScreen(),
+      ),
+    );
+
+    if (created != null && mounted) {
+      setState(() {
+        _openMatchAlerts = [
+          created,
+          ..._openMatchAlerts.where((alert) => alert.id != created.id),
+        ];
+      });
+      _loadProfile();
+    }
+  }
+
+  Future<void> _openRecommendedOpenMatch() async {
+    final alert = _recommendedOpenMatch;
+    if (alert == null) {
+      await _openAlertsSection();
+      return;
+    }
+
+    final updated = await Navigator.of(context).push<OpenMatchAlert>(
+      MaterialPageRoute(
+        builder: (context) => OpenMatchDetailScreen(alert: alert),
+      ),
+    );
+
+    if (!mounted) return;
+    if (updated != null) {
+      setState(() {
+        _openMatchAlerts = [
+          updated,
+          ..._openMatchAlerts.where((item) => item.id != updated.id),
+        ];
+      });
+    }
     _loadProfile();
   }
 
@@ -509,7 +616,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.SecondBlue,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(30, 28, 30, 20),
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: MediaQuery.sizeOf(context).height -
@@ -519,14 +626,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeaderSection(),
-                        const SizedBox(height: 46),
-                        _isProfileComplete
-                            ? _buildProfileReadySection()
-                            : _buildCompleteProfileSection(),
-                        const SizedBox(height: 18),
-                        _buildSuggestionsSection(),
-                        const SizedBox(height: 18),
+                        _buildHomeHeroSection(),
+                        const SizedBox(height: 22),
+                        _buildQuickAccessSection(),
+                        const SizedBox(height: 28),
+                        _buildActivityOverviewCardV2(),
+                        const SizedBox(height: 28),
+                        _buildHomeRecommendationsSection(),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
@@ -549,6 +656,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       );
                     },
+                onAlertsTap: widget.onAlertsTap ?? _openAlertsSection,
                 onProfileTap: widget.onProfileTap ??
                     () {
                       Navigator.of(context).push(
@@ -569,24 +677,16 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Text(
             'Hola ${_buildGreetingName()},',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              color: AppColors.SecondBlue,
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              height: 1.0,
-              letterSpacing: -0.6,
-            ),
+            style: PgoTextStyles.screenTitle(),
           ),
         ),
         const SizedBox(height: 10),
         Text(
           _buildProfileSubtitle(),
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: PgoTextStyles.screenSubtitle(
             color: AppColors.SecondBlue.withValues(alpha: 0.45),
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
+            weight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 28),
@@ -610,11 +710,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: Text(
                     'REGISTRAR MATCH',
-                    style: GoogleFonts.inter(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.1,
-                    ),
+                    style: PgoTextStyles.button(weight: FontWeight.w900),
                   ),
                 ),
               ),
@@ -635,17 +731,864 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   child: Text(
-                    'Progreso a ${_profile?.category ?? '4ta'} categoria',
-                    style: const TextStyle(
+                    'Progreso a ${_profile?.category ?? '4ta'} categoría',
+                    style: PgoTextStyles.caption(
                       color: AppColors.SecondBlue,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      weight: FontWeight.w500,
                     ),
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHomeHeroSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hola ${_buildGreetingName()},',
+          style: PgoTextStyles.screenTitle(),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Listo para un nuevo partido?',
+          style: PgoTextStyles.screenSubtitle(
+            color: const Color(0xFF7D8795),
+            weight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickAccessSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Accesos rápidos',
+          style: PgoTextStyles.sectionTitle(
+            color: AppColors.SecondBlue,
+            weight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _QuickAccessButton(
+              assetPath: 'assets/images/quick_register_match.png',
+              label: 'Registrar\nmatch',
+              onTap: _openActivity,
+            ),
+            _QuickAccessButton(
+              assetPath: 'assets/images/quick_create_alert.png',
+              label: 'Crear\nalerta',
+              onTap: _openCreateOpenMatch,
+            ),
+            _QuickAccessButton(
+              assetPath: 'assets/images/quick_find_match.png',
+              label: 'Buscar\npartido',
+              onTap: _openAlertsSection,
+            ),
+            _QuickAccessButton(
+              assetPath: 'assets/images/quick_find_tournament.png',
+              label: 'Buscar\ntorneo',
+              onTap: _openTournamentsSection,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivityOverviewCardV2() {
+    final profile = _profile;
+    final category = profile?.category?.trim().isNotEmpty == true
+        ? profile!.category!
+        : '5ta categoría';
+    final matches = profile?.matchesPlayed ?? 0;
+    final winRate = (profile?.winRate ?? 0).round();
+    final monthlyMatches = profile?.weeklyStreak ?? 0;
+    final progress = (winRate / 100).clamp(0.08, 1.0);
+    final lastResult = _formatLastActivityResult(profile);
+
+    return Container(
+      height: 206,
+      padding: const EdgeInsets.fromLTRB(18, 15, 14, 14),
+      decoration: _homeCardDecoration(radius: 22),
+      child: Column(
+        children: [
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _MiniBadge(text: category),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tu actividad',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: PgoTextStyles.cardTitle(),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF9AC529),
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Último resultado: ',
+                            style: PgoTextStyles.caption(
+                              color: const Color(0xFF7A8492),
+                              weight: FontWeight.w800,
+                            ),
+                          ),
+                          Flexible(
+                            child: Text(
+                              lastResult.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: PgoTextStyles.caption(
+                                color: lastResult.isPositive
+                                    ? const Color(0xFF9AC529)
+                                    : const Color(0xFF7A8492),
+                                weight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      _buildActivityMetricRow(
+                        matches: matches,
+                        winRate: winRate,
+                        progress: progress,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 126,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Image.asset(
+                      'assets/images/home_activity_padel.png',
+                      width: 140,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE1E5EC)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                width: 27,
+                height: 27,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE9EDF3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.SecondBlue,
+                  size: 14,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'Este mes: ',
+                style: PgoTextStyles.caption(
+                  color: const Color(0xFF66717F),
+                  weight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                '$monthlyMatches partidos',
+                style: PgoTextStyles.caption(
+                  color: const Color(0xFF9AC529),
+                  weight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityMetricRow({
+    required int matches,
+    required int winRate,
+    required double progress,
+  }) {
+    return SizedBox(
+      height: 54,
+      child: FittedBox(
+        alignment: Alignment.centerLeft,
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/images/home_matches_icon.png',
+              width: 48,
+              height: 48,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.view_week_rounded,
+                color: AppColors.SecondBlue,
+                size: 38,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$matches',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                    height: 0.95,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'partidos',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 14),
+            Container(
+              width: 1,
+              height: 43,
+              color: const Color(0xFFE1E5EC),
+            ),
+            const SizedBox(width: 14),
+            SizedBox(
+              width: 38,
+              height: 38,
+              child: CircularProgressIndicator(
+                value: progress,
+                strokeWidth: 6,
+                backgroundColor: const Color(0xFFE6EAF0),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  Color(0xFF9BC62E),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$winRate%',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                    height: 0.95,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'win rate',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ({String label, bool isPositive}) _formatLastActivityResult(
+    ProfileSummary? profile,
+  ) {
+    final history = profile?.matchHistory ?? const <Map<String, dynamic>>[];
+    if (history.isEmpty) {
+      return (label: 'Aún sin resultados', isPositive: false);
+    }
+
+    final item = history.first;
+    final result = (item['result'] as String? ?? '').toUpperCase();
+    final score = (item['score'] ??
+            item['finalScore'] ??
+            item['setsScore'] ??
+            item['resultScore'] ??
+            '')
+        .toString()
+        .trim();
+
+    if (result == 'WIN') {
+      return (
+        label: score.isNotEmpty ? 'Ganaste $score' : 'Ganaste',
+        isPositive: true,
+      );
+    }
+
+    if (result == 'LOSS') {
+      return (
+        label: score.isNotEmpty ? 'Perdiste $score' : 'Perdiste',
+        isPositive: false,
+      );
+    }
+
+    return (label: 'Resultado pendiente', isPositive: false);
+  }
+
+  Widget _buildActivityOverviewCard() {
+    final profile = _profile;
+    final category = profile?.category?.trim().isNotEmpty == true
+        ? profile!.category!
+        : '5ta categoría';
+    final matches = profile?.matchesPlayed ?? 0;
+    final winRate = (profile?.winRate ?? 0).round();
+    final monthlyMatches = profile?.weeklyStreak ?? 0;
+    final progress = (winRate / 100).clamp(0.08, 1.0);
+    final lastResult = _formatLastActivityResult(profile);
+
+    return Container(
+      height: 198,
+      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+      decoration: _homeCardDecoration(radius: 22),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -4,
+            top: 0,
+            bottom: 24,
+            child: Image.asset(
+              'assets/images/home_activity_padel.png',
+              width: 136,
+              fit: BoxFit.contain,
+              alignment: Alignment.centerRight,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _MiniBadge(text: category),
+              const SizedBox(height: 8),
+              Text(
+                'Tu actividad',
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFF9AC529),
+                    size: 12,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Último resultado: ',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF7A8492),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      'Ganaste 2 - 0',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF9AC529),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 232,
+                height: 44,
+                child: FittedBox(
+                  alignment: Alignment.centerLeft,
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/home_matches_icon.png',
+                        width: 42,
+                        height: 42,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.view_week_rounded,
+                          color: AppColors.SecondBlue,
+                          size: 34,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '$matches',
+                        style: GoogleFonts.inter(
+                          color: AppColors.SecondBlue,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'partidos',
+                        style: GoogleFonts.inter(
+                          color: AppColors.SecondBlue,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          height: 1.05,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Container(
+                        width: 1,
+                        height: 42,
+                        color: const Color(0xFFE1E5EC),
+                      ),
+                      const SizedBox(width: 14),
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 7,
+                          backgroundColor: const Color(0xFFE6EAF0),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF9BC62E),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '$winRate%',
+                        style: GoogleFonts.inter(
+                          color: AppColors.SecondBlue,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'win rate',
+                        style: GoogleFonts.inter(
+                          color: AppColors.SecondBlue,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          height: 1.05,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1, color: Color(0xFFE1E5EC)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/images/home_matches_icon.png',
+                    width: 28,
+                    height: 28,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.calendar_month_rounded,
+                      color: AppColors.SecondBlue,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Este mes: ',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF66717F),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    '$monthlyMatches partidos',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF9AC529),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHomeRecommendationsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 14),
+          child: Text(
+            'Recomendaciones para ti',
+            style: GoogleFonts.inter(
+              color: AppColors.SecondBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildFeaturedTournamentCard(),
+        const SizedBox(height: 18),
+        _buildFeaturedOpenMatchCard(),
+      ],
+    );
+  }
+
+  Widget _buildFeaturedTournamentCard() {
+    final tournament = _recommendedTournament;
+    final title = tournament?.title ?? 'Torneo PGO';
+    final category =
+        tournament?.category ?? (_profile?.category ?? '5ta categoría');
+    final club = tournament?.location ?? 'One Padel Trigal';
+    final date = tournament == null
+        ? 'Lunes 19 Dic'
+        : _formatTournamentDate(tournament.startsAt);
+
+    return GestureDetector(
+      onTap: _openRecommendedTournament,
+      child: Container(
+        height: 172,
+        decoration: _homeCardDecoration(radius: 24),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _HomeRecommendationImage(
+              imageAsset: AppAssets.defaultTournamentImage,
+              photoUrl: tournament?.photoUrl,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.white,
+                    Colors.white.withValues(alpha: 0.94),
+                    Colors.white.withValues(alpha: 0.72),
+                    Colors.white.withValues(alpha: 0.20),
+                    Colors.transparent,
+                  ],
+                  stops: const [
+                    0,
+                    0.34,
+                    0.52,
+                    0.68,
+                    0.84,
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _MiniBadge(text: category),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: PgoTextStyles.cardTitle(),
+                        ),
+                        const SizedBox(height: 7),
+                        _TournamentMetaLine(
+                          icon: Icons.location_on,
+                          text: '$club · Surco',
+                          color: AppColors.SecondBlue,
+                        ),
+                        const SizedBox(height: 5),
+                        _TournamentMetaLine(
+                          icon: Icons.calendar_month_rounded,
+                          text: date,
+                          color: AppColors.SecondBlue,
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          width: 145,
+                          height: 32,
+                          child: ElevatedButton(
+                            onPressed: _openTournamentsSection,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.PrimaryGreen,
+                              foregroundColor: AppColors.SecondBlue,
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: Text(
+                              'Ver más torneos',
+                              textAlign: TextAlign.center,
+                              style: PgoTextStyles.buttonSecondary(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _WhiteInfoChip(
+                        icon: Icons.local_fire_department_rounded,
+                        text: tournament == null
+                            ? '1 buscando dupla'
+                            : '${tournament.soloRegistrationsCount} buscando dupla',
+                      ),
+                      const SizedBox(height: 7),
+                      _WhiteInfoChip(
+                        icon: Icons.local_fire_department_rounded,
+                        text:
+                            '${tournament?.registeredPlayers.length ?? 3} amigos inscritos',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturedOpenMatchCard() {
+    final alert = _recommendedOpenMatch;
+    final category = alert?.category ?? (_profile?.category ?? '4ta');
+    final format = alert?.format ?? 'Dobles';
+    final club = alert?.club ?? 'One Padel Trigal';
+    final time = alert == null ? '6:00 pm' : _formatTime(alert.startsAt);
+    final dayLabel = alert == null ? 'Hoy' : _formatShortDay(alert.startsAt);
+    final missing = alert?.missingPlayers ?? 2;
+
+    const suggestedGreen = Color(0xFFD5FF83);
+
+    return GestureDetector(
+      onTap: _openRecommendedOpenMatch,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 118),
+        padding: EdgeInsets.zero,
+        decoration: _homeCardDecoration(radius: 19),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 34, 16, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AvatarCircle(
+                    photoUrl: alert?.organizer.photoUrl,
+                    borderColor: suggestedGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$category · $format',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: PgoTextStyles.cardSubtitle(
+                            weight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 12,
+                              color: const Color(0xFF566170),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$dayLabel · $time',
+                              style: PgoTextStyles.cardDetail(
+                                color: const Color(0xFF566170),
+                                weight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 13,
+                              color: Color(0xFF566170),
+                            ),
+                            const SizedBox(width: 2),
+                            Expanded(
+                              child: Text(
+                                '$club · Surco',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: PgoTextStyles.cardDetail(
+                                  color: const Color(0xFF566170),
+                                  weight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 22),
+                    child: SizedBox(
+                      width: 112,
+                      height: 33,
+                      child: ElevatedButton(
+                        onPressed: _openRecommendedOpenMatch,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: suggestedGreen,
+                          foregroundColor: AppColors.SecondBlue,
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: Text(
+                          'Ver partido',
+                          style: PgoTextStyles.buttonSecondary(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 14,
+              top: 0,
+              child: _MiniBadge(
+                text: 'Partido sugerido para ti',
+                color: const Color(0xFFE9F8CB),
+              ),
+            ),
+            Positioned(
+              right: 14,
+              top: 8,
+              child: _MiniBadge(
+                text: 'Faltan $missing jugadores',
+                color: suggestedGreen,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final suffix = local.hour >= 12 ? 'pm' : 'am';
+    return '$hour:$minute $suffix';
+  }
+
+  String _formatShortDay(DateTime value) {
+    final now = DateTime.now();
+    final local = value.toLocal();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(local.year, local.month, local.day);
+    if (day == today) return 'Hoy';
+    if (day == today.add(const Duration(days: 1))) return 'Mañana';
+    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    return days[local.weekday - 1];
+  }
+
+  BoxDecoration _homeCardDecoration({required double radius}) {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(radius),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.16),
+          blurRadius: 18,
+          spreadRadius: 1,
+          offset: const Offset(0, 7),
         ),
       ],
     );
@@ -725,7 +1668,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final profile = _profile;
     final category = profile?.category?.isNotEmpty == true
         ? profile!.category!
-        : '4ta categoria';
+        : '4ta categoría';
     final side = profile?.preferredSide?.isNotEmpty == true
         ? profile!.preferredSide!
         : 'Drive';
@@ -753,7 +1696,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Tu perfil esta listo',
+            'Tu perfil está listo',
             style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 16,
@@ -902,7 +1845,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Text(
                                 tournament?.category ??
-                                    (_profile?.category ?? 'Sin categoria'),
+                                    (_profile?.category ?? 'Sin categoría'),
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 10,
@@ -939,7 +1882,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   child: const Text(
-                                    'Ver mas torneos',
+                                    'Ver más torneos',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
@@ -991,6 +1934,286 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _TournamentMetaLine extends StatelessWidget {
+  const _TournamentMetaLine({
+    required this.icon,
+    required this.text,
+    this.color = Colors.white,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 12),
+        const SizedBox(width: 3),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: color,
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickAccessButton extends StatelessWidget {
+  const _QuickAccessButton({
+    required this.assetPath,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String assetPath;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: SizedBox(
+        width: 76,
+        child: Column(
+          children: [
+            SizedBox(
+              height: 82,
+              child: OverflowBox(
+                maxWidth: 112,
+                maxHeight: 112,
+                child: Image.asset(
+                  assetPath,
+                  width: 108,
+                  height: 108,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.sports_tennis_rounded,
+                      color: AppColors.SecondBlue,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue,
+                fontSize: 8.6,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityMetric extends StatelessWidget {
+  const _ActivityMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.SecondBlue,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            color: AppColors.SecondBlue,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: AppColors.SecondBlue,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            height: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge({
+    required this.text,
+    this.color = const Color(0xFFE9F8CB),
+  });
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(
+          color: AppColors.SecondBlue,
+          fontSize: 7,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _WhiteInfoChip extends StatelessWidget {
+  const _WhiteInfoChip({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primaryOrange, size: 12),
+          const SizedBox(width: 3),
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              color: AppColors.SecondBlue,
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarCircle extends StatelessWidget {
+  const _AvatarCircle({
+    this.photoUrl,
+    this.borderColor = AppColors.PrimaryGreen,
+  });
+
+  final String? photoUrl;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = photoUrl?.trim();
+
+    return Container(
+      width: 58,
+      height: 58,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: borderColor,
+        shape: BoxShape.circle,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: ClipOval(
+          child: imageUrl != null && imageUrl.isNotEmpty
+              ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const _DefaultAvatar(),
+                )
+              : const _DefaultAvatar(),
+        ),
+      ),
+    );
+  }
+}
+
+class _DefaultAvatar extends StatelessWidget {
+  const _DefaultAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFE7EAF0),
+      child: const Icon(
+        Icons.person_rounded,
+        color: Color(0xFF8D96A4),
+        size: 34,
+      ),
     );
   }
 }
@@ -1167,7 +2390,7 @@ class _ProfileCompleteDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Tu perfil esta listo',
+              'Tu perfil está listo',
               style: TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 16,
@@ -1276,7 +2499,6 @@ class _CompleteProfileOnboardingDialogState
   bool get _canSubmit {
     return _nameController.text.trim().isNotEmpty &&
         _phoneController.text.trim().isNotEmpty &&
-        (_photoDataUrl ?? '').trim().isNotEmpty &&
         !_savingImage;
   }
 
@@ -1355,7 +2577,7 @@ class _CompleteProfileOnboardingDialogState
               ),
               const SizedBox(height: 8),
               Text(
-                'Anade tu foto y datos basicos para empezar a jugar',
+                'Añade tus datos básicos para empezar a jugar',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: AppColors.SecondBlue.withValues(alpha: 0.74),
@@ -1424,7 +2646,7 @@ class _CompleteProfileOnboardingDialogState
               ),
               const SizedBox(height: 14),
               Text(
-                'Haz que otros jugadores te reconozcan mas facil.',
+                'Haz que otros jugadores te reconozcan más fácil.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: AppColors.SecondBlue.withValues(alpha: 0.75),
@@ -1447,7 +2669,7 @@ class _CompleteProfileOnboardingDialogState
                 enabled: false,
               ),
               const SizedBox(height: 14),
-              _OnboardingFieldLabel(text: 'Numero de telefono'),
+              _OnboardingFieldLabel(text: 'Número de teléfono'),
               const SizedBox(height: 6),
               _OnboardingTextField(
                 controller: _phoneController,

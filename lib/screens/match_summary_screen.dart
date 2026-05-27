@@ -7,8 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/assets.dart';
 import '../constants/colors.dart';
 import '../models/match_record.dart';
+import '../models/profile_summary.dart';
 import '../models/selected_player.dart';
 import 'main_shell.dart';
+import 'match_score_screen.dart';
+import 'profile_public_preview_screen.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
@@ -93,7 +96,7 @@ class MatchSummaryScreen extends StatelessWidget {
                             match.description!.trim().isNotEmpty) ...[
                           const SizedBox(height: 14),
                           const Text(
-                            'Descripcion',
+                            'Descripción',
                             style: TextStyle(
                               color: AppColors.SecondBlue,
                               fontSize: 16,
@@ -115,6 +118,32 @@ class MatchSummaryScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         _buildPlayersRow(),
                         const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _editActivity(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.SecondBlue,
+                              side: const BorderSide(
+                                color: AppColors.SecondBlue,
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                            ),
+                            icon: const Icon(Icons.edit_outlined, size: 19),
+                            label: Text(
+                              'EDITAR ACTIVIDAD',
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -312,9 +341,6 @@ class MatchSummaryScreen extends StatelessWidget {
   }
 
   Widget _buildInfoCard() {
-    final winnerReference =
-        _winnerPlayers.isNotEmpty ? _winnerPlayers.first : null;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -342,25 +368,11 @@ class MatchSummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  winnerReference?.category ?? 'Sin categoria',
+                  _winnerPlayers.isNotEmpty
+                      ? _winnerPlayers.first.category ?? 'Sin categoría'
+                      : 'Sin categoría',
                   style: TextStyle(
                     color: AppColors.SecondBlue.withValues(alpha: 0.72),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  'Ranking',
-                  style: GoogleFonts.inter(
-                    color: AppColors.SecondBlue,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '#${winnerReference?.rankingPosition ?? 0}',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.48),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -377,7 +389,7 @@ class MatchSummaryScreen extends StatelessWidget {
             child: Row(
               children: [
                 Text(
-                  'Club',
+                  'Sede',
                   style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
                     fontWeight: FontWeight.w900,
@@ -424,6 +436,7 @@ class MatchSummaryScreen extends StatelessWidget {
       children: players
           .map(
             (player) => _SummaryPlayer(
+              player: player,
               label: player.name,
               imageUrl: player.photoUrl,
               selected: _winnerPlayers.any((winner) => winner.id == player.id),
@@ -448,6 +461,17 @@ class MatchSummaryScreen extends StatelessWidget {
     } catch (_) {
       return null;
     }
+  }
+
+  void _editActivity(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MatchScoreScreen(
+          match: match,
+          players: players,
+        ),
+      ),
+    );
   }
 }
 
@@ -479,11 +503,13 @@ class _GamePill extends StatelessWidget {
 }
 
 class _SummaryPlayer extends StatelessWidget {
+  final SelectedPlayer player;
   final String label;
   final String? imageUrl;
   final bool selected;
 
   const _SummaryPlayer({
+    required this.player,
     required this.label,
     this.imageUrl,
     this.selected = false,
@@ -491,50 +517,107 @@ class _SummaryPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? AppColors.PrimaryGreen : Colors.transparent,
-                width: 1.5,
-              ),
-            ),
-            child: Container(
-              decoration: const BoxDecoration(
+    return InkWell(
+      onTap: () => _openProfile(context),
+      borderRadius: BorderRadius.circular(42),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFAAB5CB),
+                border: Border.all(
+                  color: selected ? AppColors.PrimaryGreen : Colors.transparent,
+                  width: 1.5,
+                ),
               ),
-              child: imageUrl == null || imageUrl!.isEmpty
-                  ? null
-                  : ClipOval(
-                      child: Image.network(
-                        imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFAAB5CB),
+                ),
+                child: ClipOval(child: _avatarImage()),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarImage() {
+    final normalized = imageUrl?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return const Icon(Icons.person, color: Colors.white);
+    }
+
+    final bytes = _tryDecodeDataUrl(normalized);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    return Image.network(
+      normalized,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          const Icon(Icons.person, color: Colors.white),
+    );
+  }
+
+  Uint8List? _tryDecodeDataUrl(String value) {
+    if (!value.startsWith('data:image/')) return null;
+    final commaIndex = value.indexOf(',');
+    if (commaIndex == -1) return null;
+    try {
+      return base64Decode(value.substring(commaIndex + 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _openProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfilePublicPreviewScreen(
+          profile: ProfileSummary(
+            id: player.id,
+            name: player.name,
+            email: '',
+            photoUrl: player.photoUrl,
+            experiencePoints: 0,
+            category: player.category,
+            preferredClub: null,
+            preferredSide: null,
+            racketModel: null,
+            experienceLevel: null,
+            rankingPosition: player.rankingPosition,
+            matchesPlayed: 0,
+            wins: 0,
+            winRate: 0,
+            weeklyStreak: 0,
+            friendsCount: 0,
+            followersCount: 0,
+            followingCount: 0,
+            socialNotificationsCount: 0,
+            matchHistory: const [],
           ),
-        ],
+        ),
       ),
     );
   }

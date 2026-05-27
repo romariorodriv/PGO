@@ -11,6 +11,9 @@ class TournamentAdminBracketData {
   final int liveMatches;
   final Map<String, List<TournamentAdminBracketMatch>> stages;
 
+  List<String> get stageKeys => stages.keys.toList()
+    ..sort((left, right) => _stageRank(left).compareTo(_stageRank(right)));
+
   factory TournamentAdminBracketData.fromJson(Map<String, dynamic> json) {
     final summary = (json['summary'] as Map<String, dynamic>?) ?? const {};
     final stageJson = (json['stages'] as Map<String, dynamic>?) ?? const {};
@@ -31,12 +34,23 @@ class TournamentAdminBracketData {
       completedMatches: (summary['completedMatches'] as num?)?.toInt() ?? 0,
       liveMatches: (summary['liveMatches'] as num?)?.toInt() ?? 0,
       stages: {
-        'octavos': parseStage('octavos'),
-        'cuartos': parseStage('cuartos'),
-        'semis': parseStage('semis'),
-        'final': parseStage('final'),
+        for (final key in stageJson.keys) key: parseStage(key),
       },
     );
+  }
+
+  static int _stageRank(String stage) {
+    if (stage == 'final') return 999;
+    if (stage.startsWith('juego-')) {
+      final number = int.tryParse(stage.replaceFirst('juego-', ''));
+      return number ?? 900;
+    }
+    const legacy = {
+      'octavos': 1,
+      'cuartos': 2,
+      'semis': 3,
+    };
+    return legacy[stage] ?? 500;
   }
 }
 
@@ -48,6 +62,7 @@ class TournamentAdminBracketMatch {
     required this.teamOne,
     required this.teamTwo,
     required this.scheduledAt,
+    required this.startedAt,
     required this.status,
     required this.score,
     required this.winnerLabel,
@@ -59,6 +74,7 @@ class TournamentAdminBracketMatch {
   final String teamOne;
   final String teamTwo;
   final DateTime scheduledAt;
+  final DateTime? startedAt;
   final String status;
   final String? score;
   final String? winnerLabel;
@@ -73,6 +89,9 @@ class TournamentAdminBracketMatch {
       scheduledAt: DateTime.parse(
         json['scheduledAt'] as String? ?? DateTime.now().toIso8601String(),
       ),
+      startedAt: json['startedAt'] != null
+          ? DateTime.tryParse(json['startedAt'] as String)
+          : null,
       status: json['status'] as String? ?? 'PENDING',
       score: json['score'] as String?,
       winnerLabel: json['winnerLabel'] as String?,

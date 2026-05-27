@@ -27,7 +27,7 @@ class TournamentAdminBracketScreen extends StatefulWidget {
 
 class _TournamentAdminBracketScreenState
     extends State<TournamentAdminBracketScreen> {
-  _AdminBracketStage _stage = _AdminBracketStage.octavos;
+  String? _stageKey;
   TournamentAdminBracketData? _data;
   bool _isLoading = false;
   String? _error;
@@ -35,14 +35,67 @@ class _TournamentAdminBracketScreenState
   TournamentRecord get _tournament => widget.tournament;
 
   List<TournamentAdminBracketMatch> get _matches {
-    final stageKey = switch (_stage) {
-      _AdminBracketStage.octavos => 'octavos',
-      _AdminBracketStage.cuartos => 'cuartos',
-      _AdminBracketStage.semis => 'semis',
-      _AdminBracketStage.finalStage => 'final',
-    };
+    final stageKeys = _data?.stageKeys ?? const <String>[];
+    final stageKey =
+        _stageKey ?? (stageKeys.isNotEmpty ? stageKeys.first : null);
+    final matches =
+        _data?.stages[stageKey] ?? const <TournamentAdminBracketMatch>[];
+    return [...matches]..sort(_compareMatchesByCourt);
+  }
 
-    return _data?.stages[stageKey] ?? const <TournamentAdminBracketMatch>[];
+  int _compareMatchesByCourt(
+    TournamentAdminBracketMatch left,
+    TournamentAdminBracketMatch right,
+  ) {
+    final courtCompare =
+        _courtNumber(left.courtLabel).compareTo(_courtNumber(right.courtLabel));
+    if (courtCompare != 0) return courtCompare;
+    return left.scheduledAt.compareTo(right.scheduledAt);
+  }
+
+  int _courtNumber(String label) {
+    final match = RegExp(r'\d+').firstMatch(label);
+    return int.tryParse(match?.group(0) ?? '') ?? 999;
+  }
+
+  Future<void> _startVisiblePendingMatches() async {
+    final pending = _matches
+        .where(
+          (match) =>
+              match.status == 'PENDING' &&
+              match.teamOne.trim() != 'TBD' &&
+              match.teamTwo.trim() != 'TBD',
+        )
+        .toList();
+    if (pending.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('No hay partidos pendientes en esta ronda')),
+      );
+      return;
+    }
+
+    try {
+      for (final match in pending) {
+        await TournamentService().startAdminMatch(
+          tournamentId: _tournament.id,
+          matchId: match.id,
+        );
+      }
+      if (!mounted) return;
+      await _loadBracket();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${pending.length} partidos iniciados')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
   }
 
   @override
@@ -62,6 +115,9 @@ class _TournamentAdminBracketScreenState
       if (!mounted) return;
       setState(() {
         _data = data;
+        _stageKey = data.stageKeys.contains(_stageKey)
+            ? _stageKey
+            : (data.stageKeys.isNotEmpty ? data.stageKeys.first : null);
       });
     } catch (error) {
       if (!mounted) return;
@@ -124,14 +180,48 @@ class _TournamentAdminBracketScreenState
                   tournament: _tournament,
                 ),
                 const SizedBox(height: 12),
-                _StageFilterBar(
-                  selected: _stage,
-                  onChanged: (stage) => setState(() => _stage = stage),
-                ),
-                const SizedBox(height: 14),
+                if ((_data?.stageKeys.length ?? 0) > 1) ...[
+                  _StageFilterBar(
+                    stageKeys: _data?.stageKeys ?? const [],
+                    selected: _stageKey,
+                    onChanged: (stage) => setState(() => _stageKey = stage),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 const _InstructionCard(
                   label: 'Toca un partido para operar',
                 ),
+                if (_matches.any(
+                  (match) =>
+                      match.status == 'PENDING' &&
+                      match.teamOne.trim() != 'TBD' &&
+                      match.teamTwo.trim() != 'TBD',
+                )) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: _startVisiblePendingMatches,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.SecondBlue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text(
+                        'INICIAR RONDA COMPLETA',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 if (_isLoading)
                   const Center(child: CircularProgressIndicator())
@@ -160,8 +250,6 @@ class _TournamentAdminBracketScreenState
 }
 
 enum _AdminTournamentTab { summary, registrations, matches, bracket }
-
-enum _AdminBracketStage { octavos, cuartos, semis, finalStage }
 
 class _HeroCard extends StatelessWidget {
   const _HeroCard({
@@ -262,7 +350,7 @@ class _HeroCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${tournament.category.toUpperCase()} categoria',
+                    '${tournament.category.toUpperCase()} categoría',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -437,12 +525,14 @@ class _TabButton extends StatelessWidget {
 
 class _StageFilterBar extends StatelessWidget {
   const _StageFilterBar({
+    required this.stageKeys,
     required this.selected,
     required this.onChanged,
   });
 
-  final _AdminBracketStage selected;
-  final ValueChanged<_AdminBracketStage> onChanged;
+  final List<String> stageKeys;
+  final String? selected;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -454,30 +544,27 @@ class _StageFilterBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
-        children: [
-          _StageButton(
-            label: 'Octavos',
-            selected: selected == _AdminBracketStage.octavos,
-            onTap: () => onChanged(_AdminBracketStage.octavos),
-          ),
-          _StageButton(
-            label: 'Cuartos',
-            selected: selected == _AdminBracketStage.cuartos,
-            onTap: () => onChanged(_AdminBracketStage.cuartos),
-          ),
-          _StageButton(
-            label: 'Semis',
-            selected: selected == _AdminBracketStage.semis,
-            onTap: () => onChanged(_AdminBracketStage.semis),
-          ),
-          _StageButton(
-            label: 'Final',
-            selected: selected == _AdminBracketStage.finalStage,
-            onTap: () => onChanged(_AdminBracketStage.finalStage),
-          ),
-        ],
+        children: stageKeys
+            .map(
+              (stage) => _StageButton(
+                label: _stageLabel(stage),
+                selected: selected == stage,
+                onTap: () => onChanged(stage),
+              ),
+            )
+            .toList(),
       ),
     );
+  }
+
+  String _stageLabel(String stage) {
+    if (stage == 'final') return 'Final';
+    if (stage.startsWith('juego-')) {
+      final number = stage.replaceFirst('juego-', '');
+      return 'Juego $number';
+    }
+    if (stage == 'semis') return 'Semis';
+    return '${stage[0].toUpperCase()}${stage.substring(1)}';
   }
 }
 
@@ -701,23 +788,9 @@ class _BracketMatchCard extends StatelessWidget {
                     ),
                   ),
                   if (match.status == 'LIVE') ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF3D4A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'LIVE - ${match.score ?? ''}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                    _BracketLiveBadge(
+                      start: match.startedAt ?? match.scheduledAt,
+                      score: match.score,
                     ),
                   ],
                 ],
@@ -757,6 +830,73 @@ class _BracketMatchCard extends StatelessWidget {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '${weekDays[local.weekday - 1]} ${local.day} ${months[local.month - 1]} · $hour:$minute';
+  }
+}
+
+class _BracketLiveBadge extends StatefulWidget {
+  const _BracketLiveBadge({
+    required this.start,
+    required this.score,
+  });
+
+  final DateTime start;
+  final String? score;
+
+  @override
+  State<_BracketLiveBadge> createState() => _BracketLiveBadgeState();
+}
+
+class _BracketLiveBadgeState extends State<_BracketLiveBadge> {
+  late final ValueNotifier<DateTime> _now;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = ValueNotifier<DateTime>(DateTime.now());
+    _loop();
+  }
+
+  void _loop() async {
+    while (mounted) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      _now.value = DateTime.now();
+    }
+  }
+
+  @override
+  void dispose() {
+    _now.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _now,
+      builder: (context, now, _) {
+        final elapsed = now.difference(widget.start.toLocal());
+        final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+        final minutes = safeElapsed.inMinutes.toString().padLeft(2, '0');
+        final seconds = (safeElapsed.inSeconds % 60).toString().padLeft(2, '0');
+        final score = widget.score?.trim();
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF3D4A),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'LIVE $minutes:$seconds${score != null && score.isNotEmpty ? ' - $score' : ''}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

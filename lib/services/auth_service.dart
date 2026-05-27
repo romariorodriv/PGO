@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/auth_response.dart';
 import 'api_config.dart';
+import 'push_notification_service.dart';
 import 'session_service.dart';
 
 class AuthService {
@@ -65,7 +66,7 @@ class AuthService {
       return _handleAuthResponse(response);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro. Verifica que Nest este corriendo y que la URL sea correcta.',
+        'La conexión con el backend expiró. Verifica que Nest esté corriendo y que la URL sea correcta.',
       );
     } on http.ClientException {
       throw Exception(
@@ -95,7 +96,7 @@ class AuthService {
       return _handleAuthResponse(response);
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro. Verifica que Nest este corriendo y que la URL sea correcta.',
+        'La conexión con el backend expiró. Verifica que Nest esté corriendo y que la URL sea correcta.',
       );
     } on http.ClientException {
       throw Exception(
@@ -131,20 +132,20 @@ class AuthService {
     } on GoogleSignInException catch (error) {
       switch (error.code) {
         case GoogleSignInExceptionCode.canceled:
-          throw Exception('Se cancelo el inicio de sesion con Google');
+          throw Exception('Se canceló el inicio de sesión con Google');
         case GoogleSignInExceptionCode.clientConfigurationError:
           throw Exception(
-            'Google Sign-In no esta configurado correctamente. En Android revisa package name, SHA-1 y serverClientId.',
+            'Google Sign-In no está configurado correctamente. En Android revisa package name, SHA-1 y serverClientId.',
           );
         default:
           throw Exception(
             error.description ??
-                'No se pudo iniciar sesion con Google en este momento.',
+                'No se pudo iniciar sesión con Google en este momento.',
           );
       }
     } on TimeoutException {
       throw Exception(
-        'La conexion con el backend expiro. Verifica que Nest este corriendo y que la URL sea correcta.',
+        'La conexión con el backend expiró. Verifica que Nest esté corriendo y que la URL sea correcta.',
       );
     } on http.ClientException {
       throw Exception(
@@ -162,6 +163,7 @@ class AuthService {
 
     final authResponse = AuthResponse.fromJson(json);
     await _sessionService.saveAccessToken(authResponse.accessToken);
+    await PushNotificationService().registerCurrentDevice();
     return authResponse;
   }
 }

@@ -1,13 +1,17 @@
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
+import '../constants/typography.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
 import '../services/profile_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
+import '../utils/tournament_rules.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
@@ -24,6 +28,7 @@ class TournamentsScreen extends StatefulWidget {
     this.onBackTap,
     this.onHomeTap,
     this.onProfileTap,
+    this.isActive = true,
   });
 
   final bool showBottomNav;
@@ -31,12 +36,16 @@ class TournamentsScreen extends StatefulWidget {
   final VoidCallback? onBackTap;
   final VoidCallback? onHomeTap;
   final VoidCallback? onProfileTap;
+  final bool isActive;
 
   @override
   State<TournamentsScreen> createState() => _TournamentsScreenState();
 }
 
-class _TournamentsScreenState extends State<TournamentsScreen> {
+class _TournamentsScreenState extends State<TournamentsScreen>
+    with WidgetsBindingObserver {
+  static const _autoRefreshInterval = Duration(seconds: 25);
+
   final TextEditingController _searchController = TextEditingController();
 
   List<TournamentRecord> _tournaments = const [];
@@ -44,26 +53,65 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   bool _showMyTournaments = false;
   _MyTournamentTab _myTournamentTab = _MyTournamentTab.registered;
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String? _error;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(_onSearchChanged);
     _loadData();
+    _syncAutoRefreshTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant TournamentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isActive && widget.isActive) {
+      _loadData(showLoading: false);
+    }
+    if (oldWidget.isActive != widget.isActive) {
+      _syncAutoRefreshTimer();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.isActive) {
+      _loadData(showLoading: false);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autoRefreshTimer?.cancel();
     _searchController
       ..removeListener(_onSearchChanged)
       ..dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  void _syncAutoRefreshTimer() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+    if (!widget.isActive) return;
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      if (mounted && widget.isActive) {
+        _loadData(showLoading: false);
+      }
+    });
+  }
+
+  Future<void> _loadData({bool showLoading = true}) async {
+    if (_isRefreshing) return;
     setState(() {
-      _isLoading = true;
+      _isRefreshing = true;
+      if (showLoading) {
+        _isLoading = true;
+      }
       _error = null;
     });
 
@@ -87,6 +135,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isRefreshing = false;
         });
       }
     }
@@ -160,7 +209,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
           children: [
             Image.asset(
               'assets/images/pgoIconoAPP.png',
-              height: 64,
+              height: 56,
               fit: BoxFit.contain,
             ),
           ],
@@ -184,7 +233,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                       color: AppColors.SecondBlue,
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 120),
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 112),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -194,31 +243,21 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                                 Center(
                                   child: Text(
                                     'Torneos',
-                                    style: GoogleFonts.inter(
-                                      color: AppColors.SecondBlue,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: _RefreshButton(
-                                    isLoading: _isLoading,
-                                    onTap: _isLoading ? null : _loadData,
+                                    style: PgoTextStyles.screenTitle()
+                                        .copyWith(fontSize: 30),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             _buildSearchField(),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             _buildTabs(),
                             if (_showMyTournaments) ...[
                               const SizedBox(height: 10),
                               _buildMyTournamentTabs(),
                             ],
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 14),
                             if (_isLoading)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 42),
@@ -236,12 +275,10 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                               _StatusCard(
                                 title: _showMyTournaments
                                     ? _emptyMyTournamentsTitle
-                                    : 'Aun no hay torneos disponibles',
+                                    : 'Aún no hay torneos disponibles',
                                 message: _searchController.text.trim().isEmpty
-                                    ? 'Cuando crees o publiques torneos apareceran aqui.'
+                                    ? 'Cuando crees o publiques torneos aparecerán aquí.'
                                     : 'No encontramos torneos con ese criterio.',
-                                actionLabel: 'Actualizar',
-                                onTap: _loadData,
                               )
                             else
                               Column(
@@ -252,6 +289,15 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                                             const EdgeInsets.only(bottom: 18),
                                         child: _TournamentCard(
                                           tournament: tournament,
+                                          isRegistered: _showMyTournaments &&
+                                              _myTournamentTab ==
+                                                  _MyTournamentTab.registered,
+                                          isCreated: _showMyTournaments &&
+                                              _myTournamentTab ==
+                                                  _MyTournamentTab.created,
+                                          isDraft: _showMyTournaments &&
+                                              _myTournamentTab ==
+                                                  _MyTournamentTab.draft,
                                           onTap: () {
                                             final route = _showMyTournaments &&
                                                     _myTournamentTab ==
@@ -337,20 +383,20 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   }
 
   Widget _buildSearchField() {
-    return Center(
+    return SizedBox(
+      width: double.infinity,
       child: Container(
-        height: 36,
-        width: 300,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(13),
         ),
         child: Row(
           children: [
             Icon(
               Icons.search,
-              size: 18,
+              size: 17,
               color: AppColors.SecondBlue.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 8),
@@ -362,9 +408,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                   hintText: 'Nombre del torneo',
-                  hintStyle: TextStyle(
+                  hintStyle: PgoTextStyles.bodyLarge(
                     color: AppColors.SecondBlue.withValues(alpha: 0.72),
-                    fontSize: 15,
                   ),
                 ),
               ),
@@ -378,12 +423,12 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   Widget _buildTabs() {
     return Center(
       child: Container(
-        width: 224,
-        height: 38,
+        width: 238,
+        height: 40,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: const Color(0xFFE4E8EE),
-          borderRadius: BorderRadius.circular(19),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           children: [
@@ -399,17 +444,15 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                     color: !_showMyTournaments
                         ? AppColors.SecondBlue
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(17),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     'Disponibles',
-                    style: TextStyle(
+                    style: PgoTextStyles.tabLabel(
                       color: !_showMyTournaments
                           ? Colors.white
                           : AppColors.SecondBlue.withValues(alpha: 0.72),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
@@ -428,17 +471,15 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                     color: _showMyTournaments
                         ? AppColors.SecondBlue
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(17),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     'Mis torneos',
-                    style: TextStyle(
+                    style: PgoTextStyles.tabLabel(
                       color: _showMyTournaments
                           ? Colors.white
                           : AppColors.SecondBlue.withValues(alpha: 0.72),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
@@ -453,11 +494,11 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   String get _emptyMyTournamentsTitle {
     switch (_myTournamentTab) {
       case _MyTournamentTab.registered:
-        return 'Aun no estas inscrito en torneos';
+        return 'Aún no estás inscrito en torneos';
       case _MyTournamentTab.created:
-        return 'Aun no tienes torneos creados';
+        return 'Aún no tienes torneos creados';
       case _MyTournamentTab.draft:
-        return 'Aun no tienes borradores';
+        return 'Aún no tienes borradores';
     }
   }
 
@@ -543,71 +584,10 @@ class _MyTournamentTabButton extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           label,
-          style: TextStyle(
+          style: PgoTextStyles.filterLabel(
             color: selected
                 ? Colors.white
                 : AppColors.SecondBlue.withValues(alpha: 0.72),
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RefreshButton extends StatelessWidget {
-  const _RefreshButton({
-    required this.isLoading,
-    required this.onTap,
-  });
-
-  final bool isLoading;
-  final Future<void> Function()? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap == null ? null : () => onTap!.call(),
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.SecondBlue.withValues(alpha: 0.12),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isLoading)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                const Icon(
-                  Icons.refresh_rounded,
-                  size: 16,
-                  color: AppColors.SecondBlue,
-                ),
-              const SizedBox(width: 6),
-              Text(
-                'Actualizar',
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(
-                    alpha: onTap == null ? 0.5 : 1,
-                  ),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -648,10 +628,16 @@ class _TournamentCard extends StatelessWidget {
   const _TournamentCard({
     required this.tournament,
     required this.onTap,
+    this.isRegistered = false,
+    this.isCreated = false,
+    this.isDraft = false,
   });
 
   final TournamentRecord tournament;
   final VoidCallback onTap;
+  final bool isRegistered;
+  final bool isCreated;
+  final bool isDraft;
 
   String get _displayTitle => tournament.title
       .replaceFirst(RegExp(r'^\[DEMO\]\s*', caseSensitive: false), '');
@@ -660,10 +646,10 @@ class _TournamentCard extends StatelessWidget {
     const weekDays = [
       'Lunes',
       'Martes',
-      'Miercoles',
+      'Miércoles',
       'Jueves',
       'Viernes',
-      'Sabado',
+      'Sábado',
       'Domingo',
     ];
     const months = [
@@ -688,172 +674,309 @@ class _TournamentCard extends StatelessWidget {
   }
 
   String get _badgeText {
+    if (TournamentRules.isFull(tournament)) {
+      return 'cupos completos';
+    }
+
     final soloCount = tournament.soloRegistrationsCount;
     if (soloCount > 0) {
       return '$soloCount buscando dupla';
     }
 
-    switch (tournament.status) {
-      case 'DRAFT':
-        return 'borrador';
-      case 'PUBLISHED':
-        return 'inscripciones abiertas';
-      case 'COMPLETED':
-        return 'torneo finalizado';
-      case 'CANCELED':
-        return 'torneo cancelado';
-      default:
-        return 'torneo activo';
-    }
+    return TournamentRules.statusLabel(tournament);
   }
+
+  bool get _isFull => TournamentRules.isFull(tournament);
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 304,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
+    if (isRegistered) return _buildRegisteredCard();
+    if (isCreated) return _buildCreatedCard();
+    if (isDraft) return _buildDraftCard();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: 152,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(22)),
-              child: SizedBox(
-                height: 146,
-                width: double.infinity,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _TournamentCardImage(photoUrl: tournament.photoUrl),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        height: 84,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Color(0x1A132033),
-                              Color(0xA6132033),
+            SizedBox(
+              width: 145,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _TournamentCardImage(photoUrl: tournament.photoUrl),
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x0D132033),
+                          Color(0x1A132033),
+                          Color(0xAA132033),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(9),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.PrimaryGreen,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            tournament.category.toUpperCase(),
+                            style: PgoTextStyles.chip().copyWith(fontSize: 10),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.96),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isFull ? Icons.lock_outline : Icons.whatshot,
+                                size: 12,
+                                color: _isFull
+                                    ? const Color(0xFFC13A3A)
+                                    : AppColors.primaryOrange,
+                              ),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  _badgeText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: PgoTextStyles.chip()
+                                      .copyWith(fontSize: 10),
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 12, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Align(
-                            alignment: Alignment.topRight,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.96),
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.whatshot,
-                                    size: 12,
-                                    color: AppColors.primaryOrange,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _badgeText,
-                                    style: const TextStyle(
-                                      color: AppColors.SecondBlue,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          Text(
+                            _displayTitle.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: PgoTextStyles.cardTitle(
+                              color: AppColors.SecondBlue,
+                            ).copyWith(fontSize: 16, height: 1.0),
                           ),
-                          const Spacer(),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 11,
+                                color: AppColors.SecondBlue.withValues(
+                                    alpha: 0.72),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  '$_formattedDate · $_formattedTime',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: PgoTextStyles.cardDetail(
+                                    color: AppColors.SecondBlue.withValues(
+                                        alpha: 0.82),
+                                    weight: FontWeight.w600,
+                                  ).copyWith(fontSize: 10.5, height: 1.0),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.place_outlined,
+                                size: 11,
+                                color: AppColors.SecondBlue.withValues(
+                                    alpha: 0.72),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  tournament.location,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: PgoTextStyles.cardDetail(
+                                    color: AppColors.SecondBlue.withValues(
+                                        alpha: 0.82),
+                                    weight: FontWeight.w600,
+                                  ).copyWith(fontSize: 10.5, height: 1.0),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            height: 1,
+                            color: AppColors.SecondBlue.withValues(alpha: 0.12),
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              _TournamentStatCell(
+                                icon: Icons.groups_outlined,
+                                value: tournament.format,
+                                label: tournament.modality,
+                              ),
+                              _TournamentStatCell(
+                                icon: Icons.groups_outlined,
+                                value: '${tournament.playerCapacity}',
+                                label: 'Cupos',
+                              ),
+                              const _TournamentStatCell(
+                                icon: Icons.schedule_outlined,
+                                value: '2h',
+                                label: 'Duración',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 25,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: onTap,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.PrimaryGreen,
+                          foregroundColor: AppColors.SecondBlue,
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Ver torneo',
+                              style: PgoTextStyles.buttonSecondary(
+                                weight: FontWeight.w900,
+                              ).copyWith(fontSize: 10.5),
+                            ),
+                            const Spacer(),
+                            const Icon(Icons.chevron_right, size: 15),
+                            const SizedBox(width: 6),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegisteredCard() {
+    return Container(
+      width: double.infinity,
+      height: 170,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 118,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _TournamentCardImage(photoUrl: tournament.photoUrl),
+                    Padding(
+                      padding: const EdgeInsets.all(7),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 3,
-                            ),
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: AppColors.PrimaryGreen,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               tournament.category.toUpperCase(),
-                              style: const TextStyle(
-                                color: AppColors.SecondBlue,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              style:
+                                  PgoTextStyles.chip().copyWith(fontSize: 10),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _displayTitle.toUpperCase(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 21,
-                              fontWeight: FontWeight.w900,
-                              height: 0.94,
-                              letterSpacing: 0,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.white,
-                                  offset: Offset(0.5, 0),
-                                  blurRadius: 0,
-                                ),
-                                Shadow(
-                                  color: Colors.white,
-                                  offset: Offset(-0.5, 0),
-                                  blurRadius: 0,
-                                ),
-                                Shadow(
-                                  color: Colors.white,
-                                  offset: Offset(0, 0.5),
-                                  blurRadius: 0,
-                                ),
-                                Shadow(
-                                  color: Colors.white,
-                                  offset: Offset(0, -0.5),
-                                  blurRadius: 0,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formattedDate,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          const Spacer(),
+                          _StatusBadge(
+                            icon: Icons.whatshot,
+                            label: _badgeText,
+                            color: AppColors.primaryOrange,
                           ),
                         ],
                       ),
@@ -862,53 +985,821 @@ class _TournamentCard extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 11, 8, 10),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      tournament.location,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.SecondBlue,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.1,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _displayTitle.toUpperCase(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: PgoTextStyles.cardTitle(
+                                color: AppColors.SecondBlue,
+                              ).copyWith(fontSize: 16, height: 1.0),
+                            ),
+                            const SizedBox(height: 6),
+                            _InfoLine(
+                              icon: Icons.calendar_today_outlined,
+                              text: _formattedDate,
+                            ),
+                            const SizedBox(height: 4),
+                            _InfoLine(
+                              icon: Icons.schedule_outlined,
+                              text: _formattedTime,
+                            ),
+                            const SizedBox(height: 4),
+                            _InfoLine(
+                              icon: Icons.place_outlined,
+                              text: tournament.location,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Column(
+                        children: [
+                          const _StatusBadge(
+                            icon: Icons.check_circle_outline,
+                            label: 'Inscrito',
+                            color: Color(0xFF45A832),
+                            fill: Color(0xFFE8F8E5),
+                          ),
+                          const SizedBox(height: 9),
+                          SizedBox(
+                            width: 62,
+                            height: 29,
+                            child: OutlinedButton(
+                              onPressed: onTap,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.SecondBlue,
+                                side: BorderSide(
+                                  color: AppColors.SecondBlue.withValues(
+                                      alpha: 0.28),
+                                ),
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Ver',
+                                    style: PgoTextStyles.buttonSecondary()
+                                        .copyWith(fontSize: 10),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.chevron_right, size: 14),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 78,
-                    height: 32,
-                    child: ElevatedButton(
-                      onPressed: onTap,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.PrimaryGreen,
-                        foregroundColor: AppColors.SecondBlue,
-                        elevation: 0,
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+                  const Spacer(),
+                  Container(
+                    height: 1,
+                    color: AppColors.SecondBlue.withValues(alpha: 0.1),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      _RegisteredStatCell(
+                        icon: Icons.groups_outlined,
+                        value: tournament.format,
+                        label: tournament.modality,
                       ),
-                      child: const Text(
-                        'VER',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      const _StatDivider(),
+                      _RegisteredStatCell(
+                        icon: Icons.person_add_alt_1_outlined,
+                        value: '${tournament.playerCapacity}',
+                        label: 'Cupos',
                       ),
-                    ),
+                      const _StatDivider(),
+                      const _RegisteredStatCell(
+                        icon: Icons.calendar_month_outlined,
+                        value: 'Hoy',
+                        label: '',
+                        color: Color(0xFF67B83F),
+                      ),
+                      const _StatDivider(),
+                      _RegisteredStatCell(
+                        icon: Icons.whatshot,
+                        value: tournament.soloRegistrationsCount > 0
+                            ? 'Buscando'
+                            : _badgeText,
+                        label: '',
+                        color: AppColors.primaryOrange,
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreatedCard() {
+    return Container(
+      height: 224,
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 116,
+                  height: 116,
+                  child: _TournamentCardImage(photoUrl: tournament.photoUrl),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.PrimaryGreen,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            tournament.category.toUpperCase(),
+                            style: PgoTextStyles.chip().copyWith(fontSize: 8),
+                          ),
+                        ),
+                        const Spacer(),
+                        const _StatusBadge(
+                          icon: Icons.circle,
+                          label: 'Publicado',
+                          color: AppColors.SecondBlue,
+                          fill: AppColors.PrimaryGreen,
+                        ),
+                        Icon(
+                          Icons.more_vert,
+                          size: 18,
+                          color: AppColors.SecondBlue.withValues(alpha: 0.55),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      _displayTitle.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: PgoTextStyles.cardTitle(
+                        color: AppColors.SecondBlue,
+                      ).copyWith(fontSize: 16, height: 1),
+                    ),
+                    const SizedBox(height: 9),
+                    _InfoLine(
+                      icon: Icons.calendar_today_outlined,
+                      text: '$_formattedDate, $_formattedTime',
+                    ),
+                    const SizedBox(height: 5),
+                    _InfoLine(
+                      icon: Icons.place_outlined,
+                      text: tournament.location,
+                    ),
+                    const SizedBox(height: 5),
+                    _InfoLine(
+                      icon: Icons.sports_tennis,
+                      text:
+                          '${tournament.category} categoría · ${tournament.format}',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Container(
+            height: 1,
+            margin: const EdgeInsets.only(left: 128),
+            color: AppColors.SecondBlue.withValues(alpha: 0.12),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _CreatedMetric(
+                icon: Icons.groups_outlined,
+                value:
+                    '${tournament.registrationsCount}/${tournament.playerCapacity}',
+                label: 'inscritos',
+              ),
+              const _StatDivider(),
+              _CreatedMetric(
+                icon: Icons.whatshot,
+                value: '${tournament.soloRegistrationsCount}',
+                label: 'buscando dupla',
+              ),
+              const _StatDivider(),
+              const _CreatedMetric(
+                icon: Icons.calendar_today_outlined,
+                value: '4',
+                label: 'partidos programados',
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 30,
+                  child: ElevatedButton.icon(
+                    onPressed: onTap,
+                    icon: const Icon(Icons.settings_outlined, size: 15),
+                    label: Text(
+                      'Gestionar',
+                      style: PgoTextStyles.buttonSecondary()
+                          .copyWith(fontSize: 13),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor: AppColors.PrimaryGreen,
+                      foregroundColor: AppColors.SecondBlue,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Container(
+                width: 48,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F5F8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.bar_chart_outlined,
+                  color: AppColors.SecondBlue,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDraftCard() {
+    final missing = <String>[
+      if (tournament.location.trim().isEmpty) 'Falta sede',
+      if (tournament.startsAt.year < 2000) 'Falta fecha',
+      if (tournament.playerCapacity <= 0) 'Faltan cupos',
+    ];
+    final progress = missing.isEmpty ? 1.0 : 0.6;
+
+    return Container(
+      height: missing.isEmpty ? 214 : 176,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: missing.isEmpty ? 108 : 118,
+              height: double.infinity,
+              child: _TournamentCardImage(photoUrl: tournament.photoUrl),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _displayTitle.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: PgoTextStyles.cardTitle(
+                          color: AppColors.SecondBlue,
+                        ).copyWith(fontSize: 16, height: 1),
+                      ),
+                    ),
+                    const _DraftBadge(label: 'Borrador'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _InfoLine(
+                  icon: Icons.calendar_today_outlined,
+                  text: missing.contains('Falta fecha')
+                      ? 'Fecha por definir'
+                      : '$_formattedDate · $_formattedTime',
+                ),
+                const SizedBox(height: 5),
+                _InfoLine(
+                  icon: Icons.place_outlined,
+                  text: tournament.location.trim().isEmpty
+                      ? 'Sede por confirmar'
+                      : tournament.location,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 1,
+                  color: AppColors.SecondBlue.withValues(alpha: 0.1),
+                ),
+                const SizedBox(height: 8),
+                if (missing.isEmpty)
+                  Row(
+                    children: [
+                      _RegisteredStatCell(
+                        icon: Icons.groups_outlined,
+                        value: tournament.format,
+                        label: tournament.modality,
+                      ),
+                      const _StatDivider(),
+                      _RegisteredStatCell(
+                        icon: Icons.groups_outlined,
+                        value: '${tournament.playerCapacity}',
+                        label: 'cupos',
+                      ),
+                      const _StatDivider(),
+                      const _RegisteredStatCell(
+                        icon: Icons.schedule_outlined,
+                        value: 'Lista',
+                        label: 'para publicar',
+                      ),
+                    ],
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: missing
+                        .take(2)
+                        .map((item) => _DraftMissingChip(label: item))
+                        .toList(),
+                  ),
+                const Spacer(),
+                Text(
+                  'Completado ${(progress * 100).round()}%',
+                  style: PgoTextStyles.caption(
+                    color: AppColors.SecondBlue,
+                    weight: FontWeight.w900,
+                  ).copyWith(fontSize: 10),
+                ),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  borderRadius: BorderRadius.circular(999),
+                  color: progress == 1 ? AppColors.PrimaryGreen : Colors.orange,
+                  backgroundColor: AppColors.SecondBlue.withValues(alpha: 0.08),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 28,
+                        child: ElevatedButton(
+                          onPressed: onTap,
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: AppColors.PrimaryGreen,
+                            foregroundColor: AppColors.SecondBlue,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                          child: Text(
+                            missing.isEmpty ? 'Continuar' : 'Continuar edición',
+                            style: PgoTextStyles.buttonSecondary()
+                                .copyWith(fontSize: 11),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    if (missing.isEmpty)
+                      SizedBox(
+                        width: 90,
+                        height: 28,
+                        child: OutlinedButton.icon(
+                          onPressed: onTap,
+                          icon: const Icon(Icons.rocket_launch_outlined,
+                              size: 13),
+                          label: Text(
+                            'Publicar',
+                            style: PgoTextStyles.buttonSecondary()
+                                .copyWith(fontSize: 10),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.SecondBlue,
+                            side: const BorderSide(
+                              color: AppColors.PrimaryGreen,
+                            ),
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        width: 86,
+                        height: 30,
+                        child: TextButton(
+                          onPressed: () {},
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            foregroundColor: AppColors.SecondBlue,
+                          ),
+                          child: Text(
+                            'Descartar',
+                            style: PgoTextStyles.caption(
+                              color: AppColors.SecondBlue,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _formattedTime {
+    final date = tournament.startsAt.toLocal();
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'pm' : 'am';
+    return '$hour:$minute $period';
+  }
+}
+
+class _TournamentStatCell extends StatelessWidget {
+  const _TournamentStatCell({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 13,
+                color: AppColors.SecondBlue.withValues(alpha: 0.84),
+              ),
+              const SizedBox(width: 4),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PgoTextStyles.title(
+                      weight: FontWeight.w900,
+                    ).copyWith(
+                      fontSize: label.isEmpty ? 9.5 : 10,
+                      height: 1.0,
+                    ),
+                  ),
+                  if (label.isNotEmpty)
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: PgoTextStyles.caption(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                        weight: FontWeight.w600,
+                      ).copyWith(fontSize: 7.5, height: 1.0),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegisteredStatCell extends StatelessWidget {
+  const _RegisteredStatCell({
+    required this.icon,
+    required this.value,
+    required this.label,
+    this.color,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: color ?? AppColors.SecondBlue.withValues(alpha: 0.84),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: PgoTextStyles.title(weight: FontWeight.w900).copyWith(
+                fontSize: label.isEmpty ? 9.5 : 10.5,
+                height: 1,
+                color: color,
+              ),
+            ),
+            if (label.isNotEmpty)
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: PgoTextStyles.caption(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                  weight: FontWeight.w600,
+                ).copyWith(fontSize: 7.5, height: 1),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 23,
+      color: AppColors.SecondBlue.withValues(alpha: 0.1),
+    );
+  }
+}
+
+class _CreatedMetric extends StatelessWidget {
+  const _CreatedMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F4F7),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Icon(icon, size: 16, color: AppColors.SecondBlue),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PgoTextStyles.title(weight: FontWeight.w900)
+                      .copyWith(fontSize: 14, height: 1),
+                ),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: PgoTextStyles.caption(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.75),
+                    weight: FontWeight.w600,
+                  ).copyWith(fontSize: 9, height: 1),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DraftBadge extends StatelessWidget {
+  const _DraftBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F1F4),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: PgoTextStyles.caption(
+          color: AppColors.SecondBlue.withValues(alpha: 0.7),
+          weight: FontWeight.w800,
+        ).copyWith(fontSize: 9),
+      ),
+    );
+  }
+}
+
+class _DraftMissingChip extends StatelessWidget {
+  const _DraftMissingChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF0DD),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 11, color: Colors.orange),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: PgoTextStyles.caption(
+              color: const Color(0xFFE48A00),
+              weight: FontWeight.w900,
+            ).copyWith(fontSize: 8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 13,
+          color: AppColors.SecondBlue.withValues(alpha: 0.76),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: PgoTextStyles.cardDetail(
+              color: AppColors.SecondBlue.withValues(alpha: 0.75),
+              weight: FontWeight.w600,
+            ).copyWith(fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.fill,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color? fill;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: fill ?? Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: PgoTextStyles.chip().copyWith(
+                fontSize: 9,
+                color: color == AppColors.primaryOrange ? null : color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -952,14 +1843,14 @@ class _StatusCard extends StatelessWidget {
   const _StatusCard({
     required this.title,
     required this.message,
-    required this.actionLabel,
-    required this.onTap,
+    this.actionLabel,
+    this.onTap,
   });
 
   final String title;
   final String message;
-  final String actionLabel;
-  final Future<void> Function() onTap;
+  final String? actionLabel;
+  final Future<void> Function()? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -975,25 +1866,22 @@ class _StatusCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppColors.SecondBlue,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+            style: PgoTextStyles.title(),
           ),
           const SizedBox(height: 8),
           Text(
             message,
-            style: TextStyle(
+            style: PgoTextStyles.bodySecondary(
               color: AppColors.SecondBlue.withValues(alpha: 0.72),
-              height: 1.3,
             ),
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: onTap,
-            child: Text(actionLabel),
-          ),
+          if (actionLabel != null && onTap != null) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onTap,
+              child: Text(actionLabel!),
+            ),
+          ],
         ],
       ),
     );

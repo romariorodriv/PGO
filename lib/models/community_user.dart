@@ -6,6 +6,8 @@ class CommunityUser {
   final String? category;
   final int rankingPosition;
   final String? preferredClub;
+  final String? friendshipId;
+  final String? friendshipStatus;
 
   const CommunityUser({
     required this.id,
@@ -15,6 +17,8 @@ class CommunityUser {
     required this.category,
     required this.rankingPosition,
     required this.preferredClub,
+    required this.friendshipId,
+    required this.friendshipStatus,
   });
 
   factory CommunityUser.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,8 @@ class CommunityUser {
       category: profile?['category'] as String?,
       rankingPosition: (profile?['rankingPosition'] as num?)?.toInt() ?? 0,
       preferredClub: profile?['preferredClub'] as String?,
+      friendshipId: json['friendshipId'] as String?,
+      friendshipStatus: json['friendshipStatus'] as String?,
     );
   }
 }

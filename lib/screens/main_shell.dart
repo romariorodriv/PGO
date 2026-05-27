@@ -1,5 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,8 @@ import '../constants/colors.dart';
 import '../models/tournament_alert.dart';
 import '../services/tournament_service.dart';
 import '../widgets/pgo_bottom_nav.dart';
+import '../widgets/pgo_header_scaffold.dart';
+import 'open_match_alerts_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_description_screen.dart';
@@ -18,13 +21,21 @@ class MainShell extends StatefulWidget {
   const MainShell({
     super.key,
     this.initialTab = PgoNavTab.home,
+    this.openProfileFriendsOnStart = false,
   });
 
   final PgoNavTab initialTab;
+  final bool openProfileFriendsOnStart;
 
-  static Route<void> route({PgoNavTab initialTab = PgoNavTab.home}) {
+  static Route<void> route({
+    PgoNavTab initialTab = PgoNavTab.home,
+    bool openProfileFriendsOnStart = false,
+  }) {
     return MaterialPageRoute(
-      builder: (_) => MainShell(initialTab: initialTab),
+      builder: (_) => MainShell(
+        initialTab: initialTab,
+        openProfileFriendsOnStart: openProfileFriendsOnStart,
+      ),
     );
   }
 
@@ -48,21 +59,81 @@ class _MainShellState extends State<MainShell> {
 
   late PgoNavTab _currentTab;
   final TournamentService _tournamentService = TournamentService();
+  final AppLinks _appLinks = AppLinks();
   final Set<String> _seenAlertIds = <String>{};
   Timer? _alertsTimer;
+  StreamSubscription<Uri>? _linkSubscription;
   bool _isDialogOpen = false;
+  String? _lastHandledTournamentLink;
 
   @override
   void initState() {
     super.initState();
     _currentTab = widget.initialTab;
     _bootstrapAlerts();
+    _bootstrapDeepLinks();
   }
 
   @override
   void dispose() {
     _alertsTimer?.cancel();
+    _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _bootstrapDeepLinks() async {
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (!mounted) return;
+      if (initialLink != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(_handleIncomingLink(initialLink));
+          }
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos abrir ese torneo.')),
+      );
+    }
+
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      unawaited(_handleIncomingLink(uri));
+    });
+  }
+
+  Future<void> _handleIncomingLink(Uri uri) async {
+    final tournamentId = _extractTournamentId(uri);
+    if (tournamentId == null || tournamentId.isEmpty) return;
+    if (_lastHandledTournamentLink == tournamentId) return;
+
+    _lastHandledTournamentLink = tournamentId;
+    await _openTournamentDescription(tournamentId);
+  }
+
+  String? _extractTournamentId(Uri uri) {
+    if (uri.scheme == 'pgo' &&
+        (uri.host == 'tournaments' || uri.host == 'tournament') &&
+        uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.first;
+    }
+
+    if ((uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.pathSegments.length >= 3 &&
+        uri.pathSegments[0] == 'share' &&
+        uri.pathSegments[1] == 'tournaments') {
+      return uri.pathSegments[2];
+    }
+
+    if ((uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.pathSegments.length >= 2 &&
+        uri.pathSegments[0] == 'torneos') {
+      return uri.pathSegments[1];
+    }
+
+    return null;
   }
 
   Future<void> _bootstrapAlerts() async {
@@ -172,7 +243,12 @@ class _MainShellState extends State<MainShell> {
           builder: (_) => TournamentDescriptionScreen(tournament: tournament),
         ),
       );
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos abrir el partido del torneo.')),
+      );
+    }
   }
 
   Future<void> _openTournamentLive(String tournamentId) async {
@@ -202,32 +278,42 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F8),
-      body: IndexedStack(
-        index: PgoNavTab.values.indexOf(_currentTab),
-        children: [
-          HomeScreen(
-            showBottomNav: false,
-            onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
-            onProfileTap: () => _setTab(PgoNavTab.profile),
-          ),
-          TournamentsScreen(
-            showBottomNav: false,
-            onBackTap: () => _setTab(PgoNavTab.home),
-            onHomeTap: () => _setTab(PgoNavTab.home),
-            onProfileTap: () => _setTab(PgoNavTab.profile),
-          ),
-          ProfileScreen(
-            showBottomNav: false,
-            onBackTap: () => _setTab(PgoNavTab.home),
-            onHomeTap: () => _setTab(PgoNavTab.home),
-            onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
-          ),
-        ],
+      body: PgoFooterScope(
+        hasShellFooter: true,
+        child: IndexedStack(
+          index: PgoNavTab.values.indexOf(_currentTab),
+          children: [
+            HomeScreen(
+              showBottomNav: false,
+              onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
+              onAlertsTap: () => _setTab(PgoNavTab.alerts),
+              onProfileTap: () => _setTab(PgoNavTab.profile),
+            ),
+            TournamentsScreen(
+              showBottomNav: false,
+              isActive: _currentTab == PgoNavTab.tournaments,
+              onBackTap: () => _setTab(PgoNavTab.home),
+              onHomeTap: () => _setTab(PgoNavTab.home),
+              onProfileTap: () => _setTab(PgoNavTab.profile),
+            ),
+            OpenMatchAlertsScreen(
+              onBackTap: () => _setTab(PgoNavTab.home),
+            ),
+            ProfileScreen(
+              showBottomNav: false,
+              openFriendsOnStart: widget.openProfileFriendsOnStart,
+              onBackTap: () => _setTab(PgoNavTab.home),
+              onHomeTap: () => _setTab(PgoNavTab.home),
+              onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: PgoBottomNav(
         currentTab: _currentTab,
         onHomeTap: () => _setTab(PgoNavTab.home),
         onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
+        onAlertsTap: () => _setTab(PgoNavTab.alerts),
         onProfileTap: () => _setTab(PgoNavTab.profile),
       ),
     );
@@ -255,7 +341,7 @@ class _TournamentAlertDialog extends StatelessWidget {
     if (_isTournamentFinished) return 'Torneo finalizado';
     if (_isStarted) return 'Es tu turno';
     if (_isFinished) return 'Resultado registrado';
-    return 'Tu partido esta listo';
+    return 'Tu partido está listo';
   }
 
   String get _subtitle {
@@ -263,12 +349,12 @@ class _TournamentAlertDialog extends StatelessWidget {
       return 'Ya puedes revisar los resultados finales\ndel torneo';
     }
     if (_isStarted) {
-      return 'Tu partido esta por comenzar\nDirigete a la cancha asignada';
+      return 'Tu partido está por comenzar\nDirígete a la cancha asignada';
     }
     if (_isFinished) {
-      return 'Tu partido ha finalizado\nRevisa tu proximo cruce';
+      return 'Tu partido ha finalizado\nRevisa tu próximo cruce';
     }
-    return 'Ya se genero tu cruce para el torneo';
+    return 'Ya se generó tu cruce para el torneo';
   }
 
   String get _primaryLabel {
@@ -405,10 +491,10 @@ class _TournamentAlertDialog extends StatelessWidget {
                             _isTournamentFinished
                                 ? 'Finalizado'
                                 : _isStarted
-                                ? 'En curso'
-                                : _isFinished
                                     ? 'En curso'
-                                    : '${alert.tournament.registrationsCount} inscritos',
+                                    : _isFinished
+                                        ? 'En curso'
+                                        : '${alert.tournament.registrationsCount} inscritos',
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 11,
@@ -420,7 +506,7 @@ class _TournamentAlertDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${alert.tournament.category} categoria',
+                      '${alert.tournament.category} categoría',
                       style: const TextStyle(
                           fontSize: 13, color: Color(0xFF243753)),
                     ),
@@ -468,82 +554,82 @@ class _TournamentAlertDialog extends StatelessWidget {
                 ),
               if (!_isTournamentFinished)
                 Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF274F85), Color(0xFF132742)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      nextOrCurrent.courtLabel.toUpperCase(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: Colors.white,
-                      ),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF274F85), Color(0xFF132742)],
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nextOrCurrent.courtLabel.toUpperCase(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
                       ),
-                      child: Column(
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          children: [
+                            _teamLine(nextOrCurrent.teamOne),
+                            const Divider(
+                              color: Color(0xFFD7DEE9),
+                              height: 16,
+                              thickness: 1,
+                            ),
+                            _teamLine(nextOrCurrent.teamTwo),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
                         children: [
-                          _teamLine(nextOrCurrent.teamOne),
-                          const Divider(
-                            color: Color(0xFFD7DEE9),
-                            height: 16,
-                            thickness: 1,
+                          Expanded(
+                            child: Text(
+                              DateFormat('EEEE d MMM', 'es')
+                                  .format(nextOrCurrent.scheduledAt),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
-                          _teamLine(nextOrCurrent.teamTwo),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _matchStatusColor,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Text(
+                              _matchStatusLabel,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                                color: Color(0xFF132742),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            DateFormat('EEEE d MMM', 'es')
-                                .format(nextOrCurrent.scheduledAt),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _matchStatusColor,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Text(
-                            _matchStatusLabel,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
-                              color: Color(0xFF132742),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               if (_isTournamentFinished) ...[
                 const SizedBox(height: 10),
                 Text(

@@ -42,6 +42,7 @@ class TournamentAdminMatch {
     required this.status,
     required this.score,
     required this.winnerLabel,
+    required this.canManage,
   });
 
   final String id;
@@ -54,6 +55,7 @@ class TournamentAdminMatch {
   final String status;
   final String? score;
   final String? winnerLabel;
+  final bool canManage;
 
   factory TournamentAdminMatch.fromJson(Map<String, dynamic> json) {
     return TournamentAdminMatch(
@@ -71,6 +73,7 @@ class TournamentAdminMatch {
       status: json['status'] as String? ?? 'PENDING',
       score: json['score'] as String?,
       winnerLabel: json['winnerLabel'] as String?,
+      canManage: json['canManage'] as bool? ?? false,
     );
   }
 }

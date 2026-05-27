@@ -61,7 +61,7 @@ class ProfileHistoryMatch {
           DateTime.now(),
       matchType: json['matchType'] as String? ?? '',
       status: json['status'] as String? ?? '',
-      result: json['result'] as String? ?? 'PENDING',
+      result: (json['result'] as String? ?? 'PENDING').toUpperCase(),
       title: json['title'] as String? ?? 'Partido',
       subtitle: json['subtitle'] as String? ?? '',
       xpDelta: (json['xpDelta'] as num?)?.toInt() ?? 0,

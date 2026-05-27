@@ -1,9 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/assets.dart';
@@ -13,6 +14,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
+import '../utils/tournament_share_link.dart';
+import '../utils/tournament_rules.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'tournament_admin_screen.dart';
@@ -44,27 +47,28 @@ class _TournamentCreateFlowScreenState
   static const int _maxTournamentPhotoBytes = 650 * 1024;
 
   final ImagePicker _imagePicker = ImagePicker();
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Torneo PGO');
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _clubController =
-      TextEditingController(text: 'One Padel Olguin');
+      TextEditingController(text: 'One Padel Olguín');
   final TextEditingController _addressController =
-      TextEditingController(text: 'Av. Manuel Olguin 325');
+      TextEditingController(text: 'Av. Manuel Olguín 325');
   final TextEditingController _districtController =
       TextEditingController(text: 'Santiago de Surco');
   final TextEditingController _slotsController =
-      TextEditingController(text: '12');
-  final TextEditingController _descriptionController = TextEditingController(
-      text: 'Torneo de la comunidad "Pepito" amistoso...');
-  final TextEditingController _costController =
-      TextEditingController(text: 'S/. 50 x persona');
-  final TextEditingController _prizeController =
-      TextEditingController(text: '1 turno gratis');
+      TextEditingController(text: '16');
+  final TextEditingController _courtCountController =
+      TextEditingController(text: '4');
+  final TextEditingController _reservedCourtsController =
+      TextEditingController(text: '1, 2');
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _costController = TextEditingController();
+  final TextEditingController _prizeController = TextEditingController();
 
   _TournamentCreateStep _step = _TournamentCreateStep.intro;
   String _tournamentType = 'Americano';
+  String _pairingMode = 'FIXED';
   String _category = '4TA';
   String _modality = 'Masculino';
   String _city = 'Lima';
@@ -105,6 +109,7 @@ class _TournamentCreateFlowScreenState
       _selectedTime = const TimeOfDay(hour: 21, minute: 30);
       _applyClubDetails(limaPadelClubDetails.first);
     }
+    _syncCourtCountWithCapacity();
     _syncDateTimeControllers();
   }
 
@@ -117,6 +122,8 @@ class _TournamentCreateFlowScreenState
     _addressController.dispose();
     _districtController.dispose();
     _slotsController.dispose();
+    _courtCountController.dispose();
+    _reservedCourtsController.dispose();
     _descriptionController.dispose();
     _costController.dispose();
     _prizeController.dispose();
@@ -148,6 +155,7 @@ class _TournamentCreateFlowScreenState
     _costController.text = 'S/. ${tournament.entryFee} x persona';
     _prizeController.text = tournament.prize;
     _tournamentType = tournament.tournamentType;
+    _pairingMode = tournament.pairingMode;
     _category = tournament.category;
     _modality = tournament.modality;
     _city = tournament.city;
@@ -164,6 +172,7 @@ class _TournamentCreateFlowScreenState
     _selectedPhotoDataUrl = tournament.photoUrl;
     _selectedPhotoBytes = tryDecodeDataUrl(tournament.photoUrl);
     _syncSelectedClubDetails();
+    _syncCourtCountWithCapacity();
   }
 
   void _syncSelectedClubDetails() {
@@ -239,6 +248,90 @@ class _TournamentCreateFlowScreenState
     return parsed.clamp(0, 999);
   }
 
+  int _parseCourtCount() {
+    final digits = _courtCountController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final parsed = int.tryParse(digits) ?? 0;
+    return parsed.clamp(0, 99);
+  }
+
+  int get _capacityStep => _format == 'Dobles' ? 4 : 2;
+  int get _minimumCapacity => _capacityStep * 3;
+  int get _maximumCapacity => _capacityStep * 6;
+
+  String get _formatHelper => _format == 'Dobles'
+      ? 'Dobles usa parejas: cupos en múltiplos de 4 jugadores.'
+      : 'Singles usa jugadores individuales: cupos en múltiplos de 2.';
+
+  int get _inferredCourtCount =>
+      (_parsePlayerCapacity() / _capacityStep).floor().clamp(3, 6).toInt();
+
+  void _syncCourtCountWithCapacity() {
+    _courtCountController.text = '$_inferredCourtCount';
+  }
+
+  String get _descriptionPayload {
+    final baseDescription = _descriptionController.text.trim();
+    final courts = _parseCourtCount();
+    final reserved = _reservedCourtsController.text.trim();
+    final courtLine = courts > 0 || reserved.isNotEmpty
+        ? 'Canchas: ${courts > 0 ? courts : 'sin definir'} disponibles. Reservadas: ${reserved.isEmpty ? 'sin definir' : reserved}.'
+        : '';
+
+    return [
+      if (baseDescription.isNotEmpty) baseDescription,
+      if (courtLine.isNotEmpty) courtLine,
+    ].join('\n\n');
+  }
+
+  void _setFormat(String value) {
+    setState(() {
+      _format = value;
+      _normalizeCapacityForFormat();
+      _syncCourtCountWithCapacity();
+    });
+  }
+
+  void _setTournamentType(String value) {
+    setState(() {
+      _tournamentType = value;
+      if (!_isKingOfCourt) {
+        _pairingMode = 'FIXED';
+      }
+    });
+  }
+
+  bool get _isKingOfCourt =>
+      _tournamentType.toLowerCase().contains('rey de la cancha');
+
+  String get _pairingModeLabel =>
+      _pairingMode == 'ROTATING' ? 'Parejas rotativas' : 'Parejas fijas';
+
+  void _normalizeCapacityForFormat() {
+    final step = _capacityStep;
+    var capacity = _parsePlayerCapacity();
+    if (capacity < _minimumCapacity) {
+      capacity = _minimumCapacity;
+    }
+    if (capacity > _maximumCapacity) {
+      capacity = _maximumCapacity;
+    }
+    final remainder = capacity % step;
+    if (remainder != 0) {
+      capacity += step - remainder;
+    }
+    _slotsController.text = '$capacity';
+  }
+
+  void _adjustCapacity(int delta) {
+    final next = (_parsePlayerCapacity() + delta)
+        .clamp(_minimumCapacity, _maximumCapacity)
+        .toInt();
+    _slotsController.text = '$next';
+    _normalizeCapacityForFormat();
+    _syncCourtCountWithCapacity();
+    setState(() {});
+  }
+
   DateTime _buildStartsAt() {
     if (_selectedDate == null || _selectedTime == null) {
       return DateTime.now();
@@ -280,24 +373,25 @@ class _TournamentCreateFlowScreenState
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+    final picked = await showModalBottomSheet<TimeOfDay>(
       context: context,
-      initialTime: _selectedTime ?? const TimeOfDay(hour: 21, minute: 30),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.SecondBlue,
-              secondary: AppColors.PrimaryGreen,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _FriendlyTimePickerSheet(
+        initialTime: _selectedTime ?? const TimeOfDay(hour: 21, minute: 30),
+      ),
     );
     if (picked == null) return;
     setState(() {
       _selectedTime = picked;
+      _syncDateTimeControllers();
+    });
+  }
+
+  void _setQuickTime(int hour, int minute) {
+    setState(() {
+      _selectedTime = TimeOfDay(hour: hour, minute: minute);
       _syncDateTimeControllers();
     });
   }
@@ -316,7 +410,7 @@ class _TournamentCreateFlowScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'La imagen sigue siendo muy grande. Prueba con una foto mas ligera o recortada.',
+            'La imagen sigue siendo muy grande. Prueba con una foto más ligera o recortada.',
           ),
         ),
       );
@@ -330,7 +424,7 @@ class _TournamentCreateFlowScreenState
     });
   }
 
-  Future<void> _openDistrictInMaps() async {
+  Future<void> _openClubInMaps() async {
     final query = [
       _districtController.text.trim(),
       _city.trim(),
@@ -343,7 +437,7 @@ class _TournamentCreateFlowScreenState
         mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No pudimos abrir Google Maps en este dispositivo.'),
+          content: Text('No pudimos abrir Maps en este dispositivo.'),
         ),
       );
     }
@@ -374,8 +468,20 @@ class _TournamentCreateFlowScreenState
         }
         return true;
       case _TournamentCreateStep.settings:
-        if (_parsePlayerCapacity() < 4) {
-          _showValidation('Los cupos deben ser al menos 4.');
+        if (_parsePlayerCapacity() < _minimumCapacity) {
+          _showValidation('Los cupos deben ser al menos $_minimumCapacity.');
+          return false;
+        }
+        if (_parsePlayerCapacity() % _capacityStep != 0) {
+          _showValidation(_formatHelper);
+          return false;
+        }
+        if (_parseCourtCount() <= 0) {
+          _showValidation('Ingresa cuántas canchas tiene la sede.');
+          return false;
+        }
+        if (_reservedCourtsController.text.trim().isEmpty) {
+          _showValidation('Ingresa qué canchas tienes reservadas.');
           return false;
         }
         return true;
@@ -389,7 +495,45 @@ class _TournamentCreateFlowScreenState
     _next();
   }
 
+  bool _validatePublish() {
+    final existing = _createdTournament;
+    if (existing != null && !TournamentRules.canPublish(existing)) {
+      _showValidation('Este torneo ya no puede publicarse.');
+      return false;
+    }
+    if (_nameController.text.trim().isEmpty) {
+      _showValidation('Ingresa el nombre del torneo.');
+      return false;
+    }
+    if (_selectedDate == null || _selectedTime == null) {
+      _showValidation('Completa fecha y hora.');
+      return false;
+    }
+    if (_buildStartsAt().isBefore(DateTime.now())) {
+      _showValidation('La fecha y hora deben ser futuras.');
+      return false;
+    }
+    if (_clubController.text.trim().isEmpty ||
+        _addressController.text.trim().isEmpty ||
+        _districtController.text.trim().isEmpty) {
+      _showValidation('Completa sede, dirección y distrito.');
+      return false;
+    }
+    if (_parsePlayerCapacity() < _minimumCapacity ||
+        _parsePlayerCapacity() % _capacityStep != 0) {
+      _showValidation(_formatHelper);
+      return false;
+    }
+    if (_parseCourtCount() <= 0 ||
+        _reservedCourtsController.text.trim().isEmpty) {
+      _showValidation('Completa canchas disponibles y reservadas.');
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _submitTournament(String status) async {
+    if (status == 'PUBLISHED' && !_validatePublish()) return;
     setState(() {
       _isSubmitting = true;
     });
@@ -400,6 +544,7 @@ class _TournamentCreateFlowScreenState
           ? await service.createTournament(
               title: _nameController.text,
               tournamentType: _tournamentType,
+              pairingMode: _isKingOfCourt ? _pairingMode : 'FIXED',
               playerCapacity: _parsePlayerCapacity(),
               modality: _modality,
               format: _format,
@@ -411,7 +556,7 @@ class _TournamentCreateFlowScreenState
               prize: _prizeController.text,
               entryFee: _parseEntryFee(),
               category: _category,
-              description: _descriptionController.text,
+              description: _descriptionPayload,
               photoUrl: _selectedPhotoDataUrl,
               status: status,
             )
@@ -419,6 +564,7 @@ class _TournamentCreateFlowScreenState
               tournamentId: _createdTournament!.id,
               title: _nameController.text,
               tournamentType: _tournamentType,
+              pairingMode: _isKingOfCourt ? _pairingMode : 'FIXED',
               playerCapacity: _parsePlayerCapacity(),
               modality: _modality,
               format: _format,
@@ -430,7 +576,7 @@ class _TournamentCreateFlowScreenState
               prize: _prizeController.text,
               entryFee: _parseEntryFee(),
               category: _category,
-              description: _descriptionController.text,
+              description: _descriptionPayload,
               photoUrl: _selectedPhotoDataUrl,
               status: status,
             );
@@ -444,9 +590,8 @@ class _TournamentCreateFlowScreenState
       });
 
       if (status == 'DRAFT') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Borrador guardado correctamente')),
-        );
+        await _showDraftSavedDialog();
+        if (!mounted) return;
         Navigator.of(context).pop(true);
       }
     } catch (error) {
@@ -456,7 +601,7 @@ class _TournamentCreateFlowScreenState
       final friendlyMessage = normalized.contains('request entity too large') ||
               normalized.contains('payload too large') ||
               normalized.contains('413')
-          ? 'La imagen es muy pesada para subirla. Prueba con una foto mas ligera o recortada.'
+          ? 'La imagen es muy pesada para subirla. Prueba con una foto más ligera o recortada.'
           : rawMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -470,6 +615,38 @@ class _TournamentCreateFlowScreenState
         });
       }
     }
+  }
+
+  Future<void> _showDraftSavedDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Borrador guardado'),
+        content: const Text(
+          'Tu torneo se guardó como borrador. Puedes retomarlo desde Mis torneos.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _shareTournament() async {
+    final tournament = _createdTournament;
+    if (tournament == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Publica el torneo para compartirlo.')),
+      );
+      return;
+    }
+
+    final link = buildTournamentShareLink(tournament);
+    await Share.share(link, subject: _displayTitle);
   }
 
   @override
@@ -534,7 +711,7 @@ class _TournamentCreateFlowScreenState
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const _IntroStep(text: '1. Define tipo y categoria'),
+                  const _IntroStep(text: '1. Define tipo y categoría'),
                   const _IntroStep(text: '2. Agrega fecha, hora y sede'),
                   const _IntroStep(text: '3. Configura inscripciones'),
                   const _IntroStep(text: '4. Revisa y publica'),
@@ -572,7 +749,7 @@ class _TournamentCreateFlowScreenState
                   child: _SegmentButton(
                     label: 'Americano',
                     selected: _tournamentType == 'Americano',
-                    onTap: () => setState(() => _tournamentType = 'Americano'),
+                    onTap: () => _setTournamentType('Americano'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -580,14 +757,48 @@ class _TournamentCreateFlowScreenState
                   child: _SegmentButton(
                     label: 'Rey de la cancha',
                     selected: _tournamentType == 'Rey de la cancha',
-                    onTap: () =>
-                        setState(() => _tournamentType = 'Rey de la cancha'),
+                    onTap: () => _setTournamentType('Rey de la cancha'),
                   ),
                 ),
               ],
             ),
+            if (_isKingOfCourt) ...[
+              const SizedBox(height: 16),
+              const _FieldLabel(label: 'Tipo de parejas'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SegmentButton(
+                      label: 'Fijas',
+                      selected: _pairingMode == 'FIXED',
+                      onTap: () => setState(() => _pairingMode = 'FIXED'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _SegmentButton(
+                      label: 'Rotativas',
+                      selected: _pairingMode == 'ROTATING',
+                      onTap: () => setState(() => _pairingMode = 'ROTATING'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _pairingMode == 'ROTATING'
+                    ? 'Las parejas pueden mezclarse entre juegos según la lógica de rey de cancha.'
+                    : 'Las duplas se mantienen durante todo el torneo y suben o bajan juntas.',
+                style: TextStyle(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
-            const _FieldLabel(label: 'Categoria'),
+            const _FieldLabel(label: 'Categoría'),
             _DropdownBox(
               value: _category,
               items: const ['1RA', '2DA', '3RA', '4TA', '5TA', '6TA'],
@@ -637,6 +848,37 @@ class _TournamentCreateFlowScreenState
                 color: AppColors.SecondBlue,
               ),
             ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _TimeChip(
+                  label: '8:00 AM',
+                  selected:
+                      _selectedTime?.hour == 8 && _selectedTime?.minute == 0,
+                  onTap: () => _setQuickTime(8, 0),
+                ),
+                _TimeChip(
+                  label: '10:00 AM',
+                  selected:
+                      _selectedTime?.hour == 10 && _selectedTime?.minute == 0,
+                  onTap: () => _setQuickTime(10, 0),
+                ),
+                _TimeChip(
+                  label: '6:00 PM',
+                  selected:
+                      _selectedTime?.hour == 18 && _selectedTime?.minute == 0,
+                  onTap: () => _setQuickTime(18, 0),
+                ),
+                _TimeChip(
+                  label: '8:00 PM',
+                  selected:
+                      _selectedTime?.hour == 20 && _selectedTime?.minute == 0,
+                  onTap: () => _setQuickTime(20, 0),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Club/Sede'),
             _DropdownBox(
@@ -664,16 +906,16 @@ class _TournamentCreateFlowScreenState
                   Icons.map_rounded,
                   color: AppColors.SecondBlue,
                 ),
-                onPressed: _openDistrictInMaps,
+                onPressed: _openClubInMaps,
               ),
             ),
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: _openDistrictInMaps,
+                onPressed: _openClubInMaps,
                 icon: const Icon(Icons.near_me_rounded, size: 16),
-                label: const Text('Ver distrito en Google Maps'),
+                label: const Text('Ver club en Maps'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.SecondBlue,
                   textStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -691,19 +933,11 @@ class _TournamentCreateFlowScreenState
   Widget _buildSettings() {
     return _StepScaffold(
       currentStep: 3,
-      title: 'Configuracion',
+      title: 'Configuración',
       card: _WhiteCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _FieldLabel(label: 'Cupos'),
-            _TextFieldBox(
-              controller: _slotsController,
-              hintText: 'Ej. 12',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-            const SizedBox(height: 16),
             const _FieldLabel(label: 'Formato del torneo'),
             const SizedBox(height: 8),
             Row(
@@ -712,7 +946,7 @@ class _TournamentCreateFlowScreenState
                   child: _SegmentButton(
                     label: 'Singles',
                     selected: _format == 'Singles',
-                    onTap: () => setState(() => _format = 'Singles'),
+                    onTap: () => _setFormat('Singles'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -720,16 +954,47 @@ class _TournamentCreateFlowScreenState
                   child: _SegmentButton(
                     label: 'Dobles',
                     selected: _format == 'Dobles',
-                    onTap: () => setState(() => _format = 'Dobles'),
+                    onTap: () => _setFormat('Dobles'),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Text(
+              _formatHelper,
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 16),
-            const _FieldLabel(label: 'Descripcion', suffix: ' (opcional)'),
+            const _FieldLabel(label: 'Cantidad de jugadores'),
+            _CapacityStepper(
+              value: _parsePlayerCapacity(),
+              onDecrease: () => _adjustCapacity(-_capacityStep),
+              onIncrease: () => _adjustCapacity(_capacityStep),
+            ),
+            const SizedBox(height: 16),
+            const _FieldLabel(label: 'Canchas disponibles en la sede'),
+            _TextFieldBox(
+              controller: _courtCountController,
+              hintText: 'Calculado automáticamente',
+              readOnly: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            ),
+            const SizedBox(height: 16),
+            const _FieldLabel(label: 'Canchas reservadas'),
+            _TextFieldBox(
+              controller: _reservedCourtsController,
+              hintText: 'Ej. 1, 2 y 3',
+            ),
+            const SizedBox(height: 16),
+            const _FieldLabel(label: 'Descripción', suffix: ' (opcional)'),
             _TextFieldBox(controller: _descriptionController, maxLines: 3),
             const SizedBox(height: 16),
-            const _FieldLabel(label: 'Costo de inscripcion'),
+            const _FieldLabel(label: 'Costo de inscripción'),
             _TextFieldBox(controller: _costController),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Premio'),
@@ -777,7 +1042,7 @@ class _TournamentCreateFlowScreenState
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'Se mostrara en la ficha del torneo',
+                            'Se mostrará en la ficha del torneo',
                             style: TextStyle(
                               color: AppColors.gray,
                               fontSize: 11,
@@ -860,7 +1125,7 @@ class _TournamentCreateFlowScreenState
         children: [
           _ReviewHeroCard(
             title: _displayTitle,
-            subtitle: '${_dateController.text} · ${_timeController.text}',
+            subtitle: '${_dateController.text} ? ${_timeController.text}',
             club: _displayLocation,
             photoUrl: _createdTournament?.photoUrl ?? _selectedPhotoDataUrl,
           ),
@@ -870,7 +1135,8 @@ class _TournamentCreateFlowScreenState
             onTap: () => setState(() => _step = _TournamentCreateStep.basic),
             lines: [
               'Tipo: $_tournamentType',
-              'Categoria: ${_category.toLowerCase()}',
+              if (_isKingOfCourt) 'Parejas: $_pairingModeLabel',
+              'Categoría: ${_category.toLowerCase()}',
               'Modalidad: $_modality',
             ],
           ),
@@ -880,15 +1146,17 @@ class _TournamentCreateFlowScreenState
             onTap: () => setState(() => _step = _TournamentCreateStep.settings),
             lines: [
               'Cupos: ${_slotsController.text}',
-              'Tipo de inscripcion: ${_format.toLowerCase()}',
-              'Costo de inscripcion: S/. $_displayEntryFee x persona',
+              'Tipo de inscripción: ${_format.toLowerCase()}',
+              'Canchas disponibles: ${_courtCountController.text}',
+              'Canchas reservadas: ${_reservedCourtsController.text}',
+              'Costo de inscripción: S/. $_displayEntryFee x persona',
               'Premio: $_displayPrize',
               'Distrito: ${_districtController.text}',
             ],
           ),
           const SizedBox(height: 18),
           Text(
-            'Al publicar, las inscripciones se abriran automaticamente',
+            'Al publicar, las inscripciones se abrirán automáticamente',
             style: TextStyle(
               color: AppColors.SecondBlue.withValues(alpha: 0.62),
               fontSize: 13,
@@ -922,7 +1190,7 @@ class _TournamentCreateFlowScreenState
           ),
           const SizedBox(height: 20),
           const Text(
-            '¡Torneo publicado!',
+            '¿Torneo publicado!',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.SecondBlue,
@@ -932,7 +1200,7 @@ class _TournamentCreateFlowScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'Tu torneo ya esta visible y las inscripciones\nestan abiertas',
+            'Tu torneo ya esta visible y las inscripciones\nestán abiertas',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.SecondBlue.withValues(alpha: 0.72),
@@ -946,9 +1214,9 @@ class _TournamentCreateFlowScreenState
               children: [
                 _ReviewHeroCard(
                   title: _displayTitle,
-                  subtitle: '${_dateController.text} · ${_timeController.text}',
+                  subtitle: '${_dateController.text} ? ${_timeController.text}',
                   club: _displayLocation,
-                  badge: 'Inscripciones abiertas',
+                  badge: 'Inscripciónes abiertas',
                   compact: true,
                   photoUrl:
                       _createdTournament?.photoUrl ?? _selectedPhotoDataUrl,
@@ -969,7 +1237,7 @@ class _TournamentCreateFlowScreenState
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                            'Aun no se pudo cargar el torneo publicado.',
+                            'Aún no se pudo cargar el torneo publicado.',
                           ),
                         ),
                       );
@@ -985,7 +1253,11 @@ class _TournamentCreateFlowScreenState
                   },
                 ),
                 const SizedBox(height: 10),
-                const _SecondaryActionButton(label: 'Compartir'),
+                _SecondaryActionButton(
+                  label: 'Compartir',
+                  enabled: !_isSubmitting,
+                  onTap: _shareTournament,
+                ),
                 const SizedBox(height: 10),
                 _SecondaryActionButton(
                   label: 'Ir a mis torneos',
@@ -1308,6 +1580,508 @@ class _DropdownBox extends StatelessWidget {
               .toList(),
           onChanged: onChanged,
         ),
+      ),
+    );
+  }
+}
+
+class _TimeChip extends StatelessWidget {
+  const _TimeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: AppColors.PrimaryGreen,
+      backgroundColor: const Color(0xFFE8EBF0),
+      labelStyle: TextStyle(
+        color: AppColors.SecondBlue,
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      side: BorderSide.none,
+    );
+  }
+}
+
+class _FriendlyTimePickerSheet extends StatefulWidget {
+  const _FriendlyTimePickerSheet({
+    required this.initialTime,
+  });
+
+  final TimeOfDay initialTime;
+
+  @override
+  State<_FriendlyTimePickerSheet> createState() =>
+      _FriendlyTimePickerSheetState();
+}
+
+class _FriendlyTimePickerSheetState extends State<_FriendlyTimePickerSheet> {
+  late int _hour12;
+  late int _minute;
+  late bool _isPm;
+
+  @override
+  void initState() {
+    super.initState();
+    _isPm = widget.initialTime.hour >= 12;
+    _hour12 = widget.initialTime.hourOfPeriod == 0
+        ? 12
+        : widget.initialTime.hourOfPeriod;
+    _minute = _nearestFive(widget.initialTime.minute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 52,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD8DDE5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Hora del torneo',
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Elige una hora rapida o ajustala manualmente.',
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.55),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _QuickTimeButton(
+                  label: '8:00 AM',
+                  selected: _matches(8, 0),
+                  onTap: () => _setTime(8, 0),
+                ),
+                _QuickTimeButton(
+                  label: '10:00 AM',
+                  selected: _matches(10, 0),
+                  onTap: () => _setTime(10, 0),
+                ),
+                _QuickTimeButton(
+                  label: '6:00 PM',
+                  selected: _matches(18, 0),
+                  onTap: () => _setTime(18, 0),
+                ),
+                _QuickTimeButton(
+                  label: '8:00 PM',
+                  selected: _matches(20, 0),
+                  onTap: () => _setTime(20, 0),
+                ),
+                _QuickTimeButton(
+                  label: '9:30 PM',
+                  selected: _matches(21, 30),
+                  onTap: () => _setTime(21, 30),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _TimeDropdown(
+                    label: 'Hora',
+                    value: _hour12,
+                    items: List<int>.generate(12, (index) => index + 1),
+                    formatter: (value) => value.toString().padLeft(2, '0'),
+                    onChanged: (value) => setState(() => _hour12 = value),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _TimeDropdown(
+                    label: 'Minutos',
+                    value: _minute,
+                    items: List<int>.generate(12, (index) => index * 5),
+                    formatter: (value) => value.toString().padLeft(2, '0'),
+                    onChanged: (value) => setState(() => _minute = value),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _MeridiemToggle(
+                  isPm: _isPm,
+                  onChanged: (value) => setState(() => _isPm = value),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F3F7),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Text(
+                _previewLabel,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(_timeOfDay),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD7FF59),
+                      foregroundColor: AppColors.SecondBlue,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    child: const Text(
+                      'Guardar hora',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  TimeOfDay get _timeOfDay {
+    final hour = _isPm
+        ? (_hour12 == 12 ? 12 : _hour12 + 12)
+        : (_hour12 == 12 ? 0 : _hour12);
+    return TimeOfDay(hour: hour, minute: _minute);
+  }
+
+  String get _previewLabel {
+    final suffix = _isPm ? 'PM' : 'AM';
+    return '${_hour12.toString().padLeft(2, '0')}:'
+        '${_minute.toString().padLeft(2, '0')} $suffix';
+  }
+
+  bool _matches(int hour, int minute) {
+    return _timeOfDay.hour == hour && _timeOfDay.minute == minute;
+  }
+
+  void _setTime(int hour, int minute) {
+    setState(() {
+      _isPm = hour >= 12;
+      _hour12 = hour % 12 == 0 ? 12 : hour % 12;
+      _minute = minute;
+    });
+  }
+
+  int _nearestFive(int minute) {
+    final rounded = (minute / 5).round() * 5;
+    if (rounded >= 60) return 55;
+    return rounded;
+  }
+}
+
+class _QuickTimeButton extends StatelessWidget {
+  const _QuickTimeButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFD7FF59) : const Color(0xFFF0F3F7),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFD7FF59)
+                : AppColors.SecondBlue.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeDropdown extends StatelessWidget {
+  const _TimeDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.formatter,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final List<int> items;
+  final String Function(int value) formatter;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 6, 10, 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3F7),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+          items: items
+              .map(
+                (item) => DropdownMenuItem(
+                  value: item,
+                  child: Text(formatter(item)),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
+          selectedItemBuilder: (context) => items
+              .map(
+                (item) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.48),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      formatter(item),
+                      style: const TextStyle(
+                        color: AppColors.SecondBlue,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _MeridiemToggle extends StatelessWidget {
+  const _MeridiemToggle({
+    required this.isPm,
+    required this.onChanged,
+  });
+
+  final bool isPm;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 72,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3F7),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        children: [
+          _MeridiemOption(
+            label: 'AM',
+            selected: !isPm,
+            onTap: () => onChanged(false),
+          ),
+          const SizedBox(height: 4),
+          _MeridiemOption(
+            label: 'PM',
+            selected: isPm,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MeridiemOption extends StatelessWidget {
+  const _MeridiemOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.SecondBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: selected ? Colors.white : AppColors.SecondBlue,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CapacityStepper extends StatelessWidget {
+  const _CapacityStepper({
+    required this.value,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final int value;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8EBF0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _StepperButton(icon: Icons.remove_rounded, onTap: onDecrease),
+          Expanded(
+            child: Text(
+              '$value jugadores',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          _StepperButton(icon: Icons.add_rounded, onTap: onIncrease),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  const _StepperButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, color: AppColors.SecondBlue),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }

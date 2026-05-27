@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -8,7 +8,6 @@ import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
-import 'tournament_admin_bracket_screen.dart';
 import 'tournament_admin_registrations_screen.dart';
 import 'tournament_admin_screen.dart';
 
@@ -30,24 +29,228 @@ class TournamentAdminMatchesScreen extends StatefulWidget {
 class _TournamentAdminMatchesScreenState
     extends State<TournamentAdminMatchesScreen> {
   _AdminMatchFilter _filter = _AdminMatchFilter.all;
+  String? _stageKey;
   TournamentAdminMatchesData? _data;
   bool _isLoading = false;
   String? _error;
 
   TournamentRecord get _tournament => widget.tournament;
 
-  List<TournamentAdminMatch> get _matches {
+  List<TournamentAdminMatch> get _stageMatches {
     final all = _data?.matches ?? const <TournamentAdminMatch>[];
-    switch (_filter) {
-      case _AdminMatchFilter.all:
-        return all;
-      case _AdminMatchFilter.pending:
-        return all.where((match) => match.status == 'PENDING').toList();
-      case _AdminMatchFilter.live:
-        return all.where((match) => match.status == 'LIVE').toList();
-      case _AdminMatchFilter.finished:
-        return all.where((match) => match.status == 'FINISHED').toList();
+    final selectedStage = _selectedStageKey;
+    return selectedStage == null
+        ? all
+        : all
+            .where((match) =>
+                _stageKeyFromLabel(match.stageLabel) == selectedStage)
+            .toList();
+  }
+
+  List<TournamentAdminMatch> get _matches {
+    final stageMatches = _stageMatches;
+    final filtered = switch (_filter) {
+      _AdminMatchFilter.all => stageMatches,
+      _AdminMatchFilter.pending =>
+        stageMatches.where((match) => match.status == 'PENDING').toList(),
+      _AdminMatchFilter.live =>
+        stageMatches.where((match) => match.status == 'LIVE').toList(),
+      _AdminMatchFilter.finished =>
+        stageMatches.where((match) => match.status == 'FINISHED').toList(),
+    };
+    return [...filtered]..sort(_compareMatchesByCourt);
+  }
+
+  bool get _selectedStageHasPending =>
+      _stageMatches.any((match) => match.status == 'PENDING');
+
+  bool get _canDeleteBracket {
+    final matches = _data?.matches ?? const <TournamentAdminMatch>[];
+    if (matches.isEmpty) return false;
+
+    return matches.every(
+      (match) => match.status == 'PENDING' && match.startedAt == null,
+    );
+  }
+
+  List<String> get _generatedStageKeys {
+    final keys = (_data?.matches ?? const <TournamentAdminMatch>[])
+        .map((match) => _stageKeyFromLabel(match.stageLabel))
+        .where((stage) => stage.isNotEmpty)
+        .toSet()
+        .toList();
+    keys.sort((left, right) => _stageRank(left).compareTo(_stageRank(right)));
+    return keys;
+  }
+
+  List<String> get _stageTabs {
+    final generated = _generatedStageKeys;
+    final hasProgressiveGames =
+        generated.any((stage) => stage.startsWith('juego-'));
+    if (!hasProgressiveGames) {
+      return generated;
     }
+
+    return [
+      for (var index = 1; index <= 5; index++) 'juego-$index',
+      if (generated.contains('final')) 'final',
+    ];
+  }
+
+  String? get _selectedStageKey {
+    final generated = _generatedStageKeys;
+    if (generated.isEmpty) {
+      return null;
+    }
+    if (_stageKey != null && generated.contains(_stageKey)) {
+      return _stageKey;
+    }
+    return generated.first;
+  }
+
+  int _compareMatchesByCourt(
+    TournamentAdminMatch left,
+    TournamentAdminMatch right,
+  ) {
+    final courtCompare =
+        _courtNumber(left.courtLabel).compareTo(_courtNumber(right.courtLabel));
+    if (courtCompare != 0) return courtCompare;
+    return left.scheduledAt.compareTo(right.scheduledAt);
+  }
+
+  int _courtNumber(String label) {
+    final match = RegExp(r'\d+').firstMatch(label);
+    return int.tryParse(match?.group(0) ?? '') ?? 999;
+  }
+
+  String _stageKeyFromLabel(String label) {
+    final normalized = label.trim().toLowerCase();
+    if (normalized == 'final') return 'final';
+    final gameMatch = RegExp(r'juego\s*(\d+)').firstMatch(normalized);
+    if (gameMatch != null) {
+      return 'juego-${gameMatch.group(1)}';
+    }
+    return normalized.replaceAll(RegExp(r'\s+'), '-');
+  }
+
+  int _stageRank(String stage) {
+    if (stage == 'final') return 999;
+    if (stage.startsWith('juego-')) {
+      final number = int.tryParse(stage.replaceFirst('juego-', ''));
+      return number ?? 900;
+    }
+    const legacy = {
+      'octavos': 1,
+      'cuartos': 2,
+      'semis': 3,
+    };
+    return legacy[stage] ?? 500;
+  }
+
+  String _stageLabel(String stage) {
+    if (stage == 'final') return 'Final';
+    if (stage.startsWith('juego-')) {
+      final number = stage.replaceFirst('juego-', '');
+      return 'Juego $number';
+    }
+    if (stage == 'semis') return 'Semis';
+    return '${stage[0].toUpperCase()}${stage.substring(1)}';
+  }
+
+  void _handleStageTap(String stage) {
+    if (_generatedStageKeys.contains(stage)) {
+      setState(() => _stageKey = stage);
+      return;
+    }
+
+    _showStageLockedSheet(stage);
+  }
+
+  Future<void> _showStageLockedSheet(String stage) async {
+    final currentStage = _selectedStageKey == null
+        ? 'la etapa inicial'
+        : _stageLabel(_selectedStageKey!).toLowerCase();
+    final requestedStage = _stageLabel(stage).toLowerCase();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC6CDD8),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Icon(
+              Icons.lock_clock_rounded,
+              color: AppColors.SecondBlue,
+              size: 34,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Partidos aún no disponibles',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'El torneo se encuentra en $currentStage. Cuando termine, podrás ver los partidos de $requestedStage.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD7FF59),
+                  foregroundColor: AppColors.SecondBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Entendido',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -81,6 +284,10 @@ class _TournamentAdminMatchesScreenState
       if (!mounted) return;
       setState(() {
         _data = data;
+        final generated = _generatedStageKeys;
+        if (!generated.contains(_stageKey)) {
+          _stageKey = generated.isEmpty ? null : generated.first;
+        }
       });
     } catch (error) {
       if (!mounted) return;
@@ -118,15 +325,55 @@ class _TournamentAdminMatchesScreenState
     }
   }
 
+  Future<void> _startAllPendingMatches() async {
+    final pending =
+        _stageMatches.where((match) => match.status == 'PENDING').toList();
+    if (pending.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('No hay partidos pendientes en este juego')),
+      );
+      return;
+    }
+
+    try {
+      for (final match in pending) {
+        await TournamentService().startAdminMatch(
+          tournamentId: _tournament.id,
+          matchId: match.id,
+        );
+      }
+      if (!mounted) return;
+      await _loadMatches();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${pending.length} partidos iniciados en ${_selectedStageKey == null ? 'esta etapa' : _stageLabel(_selectedStageKey!).toLowerCase()}',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   Future<void> _finishMatch(
     TournamentAdminMatch match,
     String winnerLabel,
+    String? score,
   ) async {
     try {
       await TournamentService().finishAdminMatch(
         tournamentId: _tournament.id,
         matchId: match.id,
         winnerLabel: winnerLabel,
+        score: score,
       );
       if (!mounted) return;
       await _loadMatches();
@@ -147,18 +394,63 @@ class _TournamentAdminMatchesScreenState
   Future<void> _correctMatchResult(
     TournamentAdminMatch match,
     String winnerLabel,
+    String? score,
   ) async {
     try {
       await TournamentService().correctAdminMatchResult(
         tournamentId: _tournament.id,
         matchId: match.id,
         winnerLabel: winnerLabel,
+        score: score,
       );
       if (!mounted) return;
       await _loadMatches();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Resultado corregido: $winnerLabel')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteBracket() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar cruces'),
+        content: const Text(
+          'Se eliminarán todos los partidos generados para este torneo. Podrás volver a generar cruces para pruebas.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    try {
+      await TournamentService().deleteBracket(_tournament.id);
+      if (!mounted) return;
+      await _loadMatches();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cruces eliminados')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -221,6 +513,68 @@ class _TournamentAdminMatchesScreenState
                   filter: _filter,
                   onChanged: (filter) => setState(() => _filter = filter),
                 ),
+                if (_stageTabs.length > 1) ...[
+                  const SizedBox(height: 10),
+                  _StageFilterBar(
+                    stageKeys: _stageTabs,
+                    selected: _selectedStageKey,
+                    availableStages: _generatedStageKeys.toSet(),
+                    onChanged: _handleStageTap,
+                    stageLabel: _stageLabel,
+                  ),
+                ],
+                if (_canDeleteBracket) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: _deleteBracket,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE7EBF0),
+                        foregroundColor: AppColors.SecondBlue,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                      label: const Text(
+                        'ELIMINAR CRUCES',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (_selectedStageHasPending) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: _startAllPendingMatches,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.SecondBlue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text(
+                        'INICIAR TODOS LOS PARTIDOS',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 if (_isLoading)
                   const Center(child: CircularProgressIndicator())
@@ -235,10 +589,10 @@ class _TournamentAdminMatchesScreenState
                       child: _AdminMatchCard(
                         match: match,
                         onStart: () => _startMatch(match),
-                        onFinish: (winnerLabel) =>
-                            _finishMatch(match, winnerLabel),
-                        onCorrectResult: (winnerLabel) =>
-                            _correctMatchResult(match, winnerLabel),
+                        onFinish: (winnerLabel, score) =>
+                            _finishMatch(match, winnerLabel, score),
+                        onCorrectResult: (winnerLabel, score) =>
+                            _correctMatchResult(match, winnerLabel, score),
                       ),
                     ),
                   ),
@@ -251,7 +605,7 @@ class _TournamentAdminMatchesScreenState
   }
 }
 
-enum _AdminTournamentTab { summary, registrations, matches, bracket }
+enum _AdminTournamentTab { summary, registrations, matches, table }
 
 enum _AdminMatchFilter { all, pending, live, finished }
 
@@ -328,7 +682,7 @@ class _HeroCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
-                    '$completed de $total partidos completados · $live partidos en curso',
+                    '$completed de $total partidos completados ? $live partidos en curso',
                     style: const TextStyle(
                       color: AppColors.SecondBlue,
                       fontSize: 10,
@@ -354,7 +708,7 @@ class _HeroCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${tournament.category.toUpperCase()} categoria',
+                    '${tournament.category.toUpperCase()} categoría',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -413,7 +767,7 @@ class _HeroCard extends StatelessWidget {
     final local = date.toLocal();
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
-    return '${weekDays[local.weekday - 1]} ${local.day} ${months[local.month - 1]} · $hour:$minute';
+    return '${weekDays[local.weekday - 1]} ${local.day} ${months[local.month - 1]} ? $hour:$minute';
   }
 }
 
@@ -469,13 +823,14 @@ class _AdminTopTabs extends StatelessWidget {
             onTap: () {},
           ),
           _TabButton(
-            label: 'Bracket',
-            selected: current == _AdminTournamentTab.bracket,
+            label: 'Tabla',
+            selected: current == _AdminTournamentTab.table,
             onTap: () {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => TournamentAdminBracketScreen(
+                  builder: (context) => TournamentAdminScreen(
                     tournament: tournament,
+                    initialTabIndex: 3,
                   ),
                 ),
               );
@@ -573,6 +928,81 @@ class _MatchFilterBar extends StatelessWidget {
   }
 }
 
+class _StageFilterBar extends StatelessWidget {
+  const _StageFilterBar({
+    required this.stageKeys,
+    required this.selected,
+    required this.availableStages,
+    required this.onChanged,
+    required this.stageLabel,
+  });
+
+  final List<String> stageKeys;
+  final String? selected;
+  final Set<String> availableStages;
+  final ValueChanged<String> onChanged;
+  final String Function(String stage) stageLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: stageKeys.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final stage = stageKeys[index];
+          final isAvailable = availableStages.contains(stage);
+          final isSelected = selected == stage;
+
+          return InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => onChanged(stage),
+            child: Container(
+              width: 92,
+              decoration: BoxDecoration(
+                gradient: isSelected ? AppColors.secondaryGradient : null,
+                color: isSelected ? null : const Color(0xFFE6EAF0),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!isAvailable) ...[
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 12,
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.SecondBlue.withValues(alpha: 0.52),
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                  Text(
+                    stageLabel(stage),
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.SecondBlue.withValues(
+                              alpha: isAvailable ? 0.82 : 0.52,
+                            ),
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.w900 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _FilterButton extends StatelessWidget {
   const _FilterButton({
     required this.label,
@@ -623,8 +1053,9 @@ class _AdminMatchCard extends StatelessWidget {
 
   final TournamentAdminMatch match;
   final Future<void> Function() onStart;
-  final Future<void> Function(String winnerLabel) onFinish;
-  final Future<void> Function(String winnerLabel) onCorrectResult;
+  final Future<void> Function(String winnerLabel, String? score) onFinish;
+  final Future<void> Function(String winnerLabel, String? score)
+      onCorrectResult;
 
   @override
   Widget build(BuildContext context) {
@@ -1078,7 +1509,7 @@ class _StartMatchDialogState extends State<_StartMatchDialog> {
                   fontWeight: FontWeight.w500,
                 ),
                 children: const [
-                  TextSpan(text: 'Este partido pasara a estado '),
+                  TextSpan(text: 'Este partido pasará a estado '),
                   TextSpan(
                     text: '"En curso"',
                     style: TextStyle(fontWeight: FontWeight.w900),
@@ -1174,7 +1605,7 @@ class _RegisterWinnerDialog extends StatefulWidget {
   });
 
   final TournamentAdminMatch match;
-  final Future<void> Function(String winnerLabel) onConfirm;
+  final Future<void> Function(String winnerLabel, String? score) onConfirm;
 
   @override
   State<_RegisterWinnerDialog> createState() => _RegisterWinnerDialogState();
@@ -1182,12 +1613,20 @@ class _RegisterWinnerDialog extends StatefulWidget {
 
 class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
   late String _selectedWinner;
+  final TextEditingController _scoreController = TextEditingController();
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
     _selectedWinner = widget.match.teamOne;
+    _scoreController.text = widget.match.score ?? '';
+  }
+
+  @override
+  void dispose() {
+    _scoreController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1226,7 +1665,7 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
             ),
             const SizedBox(height: 14),
             const Text(
-              '¿Quien gano el partido?',
+              '¿Quién gan? el partido?',
               style: TextStyle(
                 color: AppColors.SecondBlue,
                 fontSize: 14,
@@ -1248,8 +1687,10 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
                   setState(() => _selectedWinner = widget.match.teamTwo),
             ),
             const SizedBox(height: 10),
+            _ScoreInput(controller: _scoreController),
+            const SizedBox(height: 10),
             Text(
-              'El cuadro se actualizara automaticamente',
+              'Puedes registrar un puntaje libre, por ejemplo 6-4, 4-2 o 11-9.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.SecondBlue.withValues(alpha: 0.7),
@@ -1296,7 +1737,10 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
                           : () async {
                               setState(() => _submitting = true);
                               try {
-                                await widget.onConfirm(_selectedWinner);
+                                await widget.onConfirm(
+                                  _selectedWinner,
+                                  _scoreController.text.trim(),
+                                );
                                 if (!context.mounted) return;
                                 Navigator.of(context).pop();
                               } finally {
@@ -1389,6 +1833,46 @@ class _WinnerOption extends StatelessWidget {
   }
 }
 
+class _ScoreInput extends StatelessWidget {
+  const _ScoreInput({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.text,
+      decoration: InputDecoration(
+        labelText: 'Puntaje',
+        hintText: 'Ej. 6-4, 4-2, 11-9',
+        labelStyle: const TextStyle(
+          color: AppColors.SecondBlue,
+          fontWeight: FontWeight.w800,
+        ),
+        hintStyle: TextStyle(
+          color: AppColors.SecondBlue.withValues(alpha: 0.42),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF2F4F8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      style: const TextStyle(
+        color: AppColors.SecondBlue,
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
 class _MatchResultDialog extends StatelessWidget {
   const _MatchResultDialog({
     required this.match,
@@ -1396,7 +1880,8 @@ class _MatchResultDialog extends StatelessWidget {
   });
 
   final TournamentAdminMatch match;
-  final Future<void> Function(String winnerLabel) onCorrectResult;
+  final Future<void> Function(String winnerLabel, String? score)
+      onCorrectResult;
 
   @override
   Widget build(BuildContext context) {
@@ -1596,7 +2081,7 @@ class _CorrectMatchResultDialog extends StatefulWidget {
   });
 
   final TournamentAdminMatch match;
-  final Future<void> Function(String winnerLabel) onConfirm;
+  final Future<void> Function(String winnerLabel, String? score) onConfirm;
 
   @override
   State<_CorrectMatchResultDialog> createState() =>
@@ -1605,6 +2090,7 @@ class _CorrectMatchResultDialog extends StatefulWidget {
 
 class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
   late String _selectedWinner;
+  final TextEditingController _scoreController = TextEditingController();
   bool _submitting = false;
 
   @override
@@ -1614,6 +2100,13 @@ class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
         widget.match.winnerLabel?.replaceFirst('Ganador: ', '').trim();
     _selectedWinner =
         (winner != null && winner.isNotEmpty) ? winner : widget.match.teamOne;
+    _scoreController.text = widget.match.score ?? '';
+  }
+
+  @override
+  void dispose() {
+    _scoreController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1701,8 +2194,10 @@ class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
                   setState(() => _selectedWinner = widget.match.teamTwo),
             ),
             const SizedBox(height: 12),
+            _ScoreInput(controller: _scoreController),
+            const SizedBox(height: 12),
             Text(
-              'El bracket se actualizara automaticamente',
+              'El bracket se actualizara automáticamente',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.SecondBlue.withValues(alpha: 0.7),
@@ -1747,7 +2242,10 @@ class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
                           : () async {
                               setState(() => _submitting = true);
                               try {
-                                await widget.onConfirm(_selectedWinner);
+                                await widget.onConfirm(
+                                  _selectedWinner,
+                                  _scoreController.text.trim(),
+                                );
                                 if (!context.mounted) return;
                                 Navigator.of(context).pop();
                               } finally {

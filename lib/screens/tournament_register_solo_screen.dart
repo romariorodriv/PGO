@@ -1,19 +1,26 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/tournament_record.dart';
+import '../services/profile_service.dart';
 import '../services/tournament_service.dart';
+import '../utils/tournament_rules.dart';
 import '../widgets/pgo_header_scaffold.dart';
+import '../widgets/pgo_options_menu.dart';
 import 'tournament_registration_result_screen.dart';
 
 class TournamentRegisterSoloScreen extends StatefulWidget {
   const TournamentRegisterSoloScreen({
     super.key,
     this.tournament,
+    this.isModal = false,
+    this.scrollController,
   });
 
   final TournamentRecord? tournament;
+  final bool isModal;
+  final ScrollController? scrollController;
 
   @override
   State<TournamentRegisterSoloScreen> createState() =>
@@ -23,6 +30,7 @@ class TournamentRegisterSoloScreen extends StatefulWidget {
 class _TournamentRegisterSoloScreenState
     extends State<TournamentRegisterSoloScreen> {
   final TournamentService _tournamentService = TournamentService();
+  final ProfileService _profileService = ProfileService();
   String _preferredSide = 'Drive';
   String _availability = 'Flexible';
   bool _acceptedPending = false;
@@ -65,30 +73,37 @@ class _TournamentRegisterSoloScreenState
   Future<void> _submit() async {
     final tournament = _tournament;
     if (tournament == null) return;
+    if (!TournamentRules.canJoin(tournament)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(TournamentRules.joinLabel(tournament))),
+      );
+      return;
+    }
 
     setState(() {
       _isSubmitting = true;
     });
 
     try {
+      final profile = await _profileService.getMyProfile();
       await _tournamentService.registerSolo(
         tournamentId: tournament.id,
         preferredSide: _preferredSide,
         availability: _availability,
       );
       if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => TournamentRegistrationResultScreen(
-            tournament: tournament,
-            title: 'Solicitud registrada',
-            message:
-                'Estamos buscando una pareja para ti.\nTu participación será confirmada\ncuando completemos tu dupla',
-            badge: 'Pendiente de pareja',
-            primaryLabel: 'VER TORNEO',
-            secondaryLabel: 'IR A MIS TORNEOS',
-            statusTitle: 'Buscando dupla',
-          ),
+      await _showResultSheet(
+        TournamentRegistrationResultScreen(
+          tournament: tournament,
+          title: 'Solicitud registrada',
+          message:
+              'Estamos buscando una pareja para ti.\nTu participación será confirmada\ncuando completemos tu dupla',
+          badge: 'Pendiente de pareja',
+          primaryLabel: 'VER TORNEO',
+          secondaryLabel: 'IR A MIS TORNEOS',
+          statusTitle: 'Buscando dupla',
+          primaryPhotoUrl: profile.photoUrl,
+          isModal: true,
         ),
       );
       if (!mounted) return;
@@ -96,7 +111,8 @@ class _TournamentRegisterSoloScreenState
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
     } finally {
       if (mounted) {
@@ -109,6 +125,13 @@ class _TournamentRegisterSoloScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isModal) {
+      return Material(
+        color: Colors.transparent,
+        child: _buildContent(),
+      );
+    }
+
     return PgoHeaderScaffold(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -122,55 +145,78 @@ class _TournamentRegisterSoloScreenState
           fontWeight: FontWeight.w800,
         ),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () {},
-        ),
+      actions: const [
+        PgoOptionsMenuButton(),
       ],
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF2F3F5),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 140,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFB6C0D0),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+      body: _buildContent(),
+    );
+  }
+
+  Widget _buildContent() {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF2F3F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+      ),
+      child: SingleChildScrollView(
+        controller: widget.scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 140,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB6C0D0),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const SizedBox(height: 34),
-              const Center(
-                child: Text(
-                  'Inscripcion torneo',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
+            ),
+            const SizedBox(height: 34),
+            const Center(
+              child: Text(
+                'Inscripción torneo',
+                style: TextStyle(
+                  color: AppColors.SecondBlue,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 18),
-              Container(
-                width: double.infinity,
-                height: 1,
-                color: const Color(0xFFD3DAE3),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(),
-            ],
-          ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: const Color(0xFFD3DAE3),
+            ),
+            const SizedBox(height: 20),
+            _buildCard(),
+          ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _showResultSheet(Widget child) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.78,
+        minChildSize: 0.42,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            child: child,
+          );
+        },
       ),
     );
   }
@@ -257,6 +303,24 @@ class _TournamentRegisterSoloScreenState
                     color: AppColors.SecondBlue.withValues(alpha: 0.8),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    'Estas preferencias nos ayudan a emparejarte mejor. Procuraremos asignarte alguien que haga match contigo; si no hay compatibilidad exacta, te emparejaremos con una dupla disponible.',
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -352,7 +416,8 @@ class _TournamentRegisterSoloScreenState
                         child: RichText(
                           text: TextSpan(
                             style: GoogleFonts.inter(
-                              color: AppColors.SecondBlue.withValues(alpha: 0.8),
+                              color:
+                                  AppColors.SecondBlue.withValues(alpha: 0.8),
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -367,8 +432,7 @@ class _TournamentRegisterSoloScreenState
                                 ),
                               ),
                               const TextSpan(
-                                text:
-                                    ' de confirmación hasta encontrar pareja',
+                                text: ' de confirmación hasta encontrar pareja',
                               ),
                             ],
                           ),

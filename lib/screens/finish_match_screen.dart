@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -9,6 +9,7 @@ import '../constants/colors.dart';
 import '../models/match_record.dart';
 import '../models/selected_player.dart';
 import '../services/match_service.dart';
+import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'match_summary_screen.dart';
@@ -43,6 +44,17 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
   bool _isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    _descriptionController.text = widget.match.description ?? '';
+    final photoUrl = widget.match.photoUrl?.trim();
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      _encodedPhoto = photoUrl;
+      _selectedPhotoBytes = tryDecodeDataUrl(photoUrl);
+    }
+  }
+
+  @override
   void dispose() {
     _descriptionController.dispose();
     super.dispose();
@@ -60,15 +72,17 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
         .map((player) => player.category)
         .whereType<String>()
         .map((value) => value.trim())
-        .firstWhere((value) => value.isNotEmpty, orElse: () => '4ta categoria');
-    return category.toLowerCase().contains('categoria')
+        .firstWhere((value) => value.isNotEmpty, orElse: () => '4ta categoría');
+    final normalizedCategory = category.toLowerCase();
+    return normalizedCategory.contains('categoría') ||
+            normalizedCategory.contains('categoría')
         ? category
-        : '$category categoria';
+        : '$category categoría';
   }
 
-  Future<void> _pickPhoto() async {
+  Future<void> _pickPhoto(ImageSource source) async {
     final image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 45,
       maxWidth: 720,
       maxHeight: 720,
@@ -84,7 +98,7 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'La imagen sigue siendo muy grande. Prueba con una foto mas ligera o recortada.',
+            'La imagen sigue siendo muy grande. Prueba con una foto más ligera o recortada.',
           ),
         ),
       );
@@ -97,6 +111,48 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
       _selectedPhotoBytes = bytes;
       _encodedPhoto = 'data:$mimeType;base64,${base64Encode(bytes)}';
     });
+  }
+
+  Future<void> _choosePhotoSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Añadir foto',
+              style: TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _PhotoSourceTile(
+              icon: Icons.photo_camera_outlined,
+              label: 'Tomar foto',
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            const SizedBox(height: 10),
+            _PhotoSourceTile(
+              icon: Icons.photo_library_outlined,
+              label: 'Elegir de galería',
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+    await _pickPhoto(source);
   }
 
   Future<void> _finishMatch() async {
@@ -130,7 +186,7 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
       final friendlyMessage = normalized.contains('request entity too large') ||
               normalized.contains('payload too large') ||
               normalized.contains('413')
-          ? 'La imagen es muy pesada para subirla. Prueba con una foto mas ligera o recortada.'
+          ? 'La imagen es muy pesada para subirla. Prueba con una foto más ligera o recortada.'
           : rawMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -298,7 +354,7 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
           Text(
             _winnerCategory,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.SecondBlue,
               fontSize: 17,
               fontFamily: 'Inter',
@@ -319,26 +375,13 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Text(
-                '+14 PCM',
-                style: TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                '+2 ranking',
-                style: TextStyle(
-                  color: AppColors.SecondBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+          const Text(
+            '+14 PCM',
+            style: TextStyle(
+              color: AppColors.SecondBlue,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),
@@ -355,19 +398,22 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
       ),
       alignment: Alignment.center,
       child: Text(
-        widget.match.clubName,
+        'Sede: ${widget.match.clubName}',
         style: const TextStyle(
           color: AppColors.SecondBlue,
           fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 
   Widget _buildPhotoCard() {
+    final remotePhoto =
+        _encodedPhoto?.startsWith('http') == true ? _encodedPhoto : null;
+
     return InkWell(
-      onTap: _pickPhoto,
+      onTap: _choosePhotoSource,
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
@@ -395,26 +441,57 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
                   fit: BoxFit.cover,
                 ),
               )
-            : const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.photo_camera,
-                    size: 50,
-                    color: Color(0xFFA6B0C1),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Subir foto',
-                    style: TextStyle(
-                      color: AppColors.SecondBlue,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
+            : remotePhoto != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.network(
+                      remotePhoto,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _photoPlaceholder(),
                     ),
+                  )
+                : const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.photo_camera,
+                        size: 50,
+                        color: Color(0xFFA6B0C1),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'Añadir foto',
+                        style: TextStyle(
+                          color: AppColors.SecondBlue,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
       ),
+    );
+  }
+
+  Widget _photoPlaceholder() {
+    return const Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.photo_camera,
+          size: 50,
+          color: Color(0xFFA6B0C1),
+        ),
+        SizedBox(height: 10),
+        Text(
+          'Añadir foto',
+          style: TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 
@@ -439,6 +516,37 @@ class _FinishMatchScreenState extends State<FinishMatchScreen> {
             horizontal: 16,
             vertical: 10,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoSourceTile extends StatelessWidget {
+  const _PhotoSourceTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+      tileColor: const Color(0xFFF2F4F8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      leading: Icon(icon, color: AppColors.SecondBlue),
+      title: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.SecondBlue,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
