@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -19,9 +19,11 @@ class TournamentBracketScreen extends StatefulWidget {
   const TournamentBracketScreen({
     super.key,
     this.tournament,
+    this.embedded = false,
   });
 
   final TournamentRecord? tournament;
+  final bool embedded;
 
   @override
   State<TournamentBracketScreen> createState() =>
@@ -122,6 +124,8 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) return _buildEmbeddedContent();
+
     return PgoHeaderScaffold(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -195,6 +199,53 @@ class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmbeddedContent() {
+    if (_stageTabs.length > 1) {
+      return Column(
+        children: [
+          _buildStageTabs(),
+          const SizedBox(height: 16),
+          _buildBracketContent(),
+        ],
+      );
+    }
+    return _buildBracketContent();
+  }
+
+  Widget _buildBracketContent() {
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 28),
+          child: CircularProgressIndicator(color: AppColors.SecondBlue),
+        ),
+      );
+    }
+    if (_error != null) {
+      return _buildEmptyCard(
+        title: 'No se pudo cargar el bracket',
+        message: _error!,
+      );
+    }
+    if (_matches.isEmpty) {
+      return _buildEmptyCard(
+        title: 'Bracket aún no disponible',
+        message:
+            'Cuando el administrador genere los cruces, las rondas aparecerán aquí.',
+      );
+    }
+    return Column(
+      children: [
+        ..._matches.map(
+          (match) => Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _PublicBracketMatchCard(match: match),
+          ),
+        ),
+      ],
     );
   }
 

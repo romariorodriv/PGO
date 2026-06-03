@@ -182,7 +182,7 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
             Wrap(
               spacing: 7,
               runSpacing: 7,
-              children: ['Dobles', 'Mixto', 'Americano', 'Rey de cancha']
+              children: ['Dobles', 'Mixto', 'Americano']
                   .map(
                     (item) => _ChoicePill(
                       label: item,

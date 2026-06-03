@@ -39,7 +39,7 @@ class ConfirmarActividadScreen extends StatelessWidget {
             .toList() ??
         const ['6 - 2', '7 - 5', '5 - 7', '10 - 3'];
     final leftPlayers = [
-      (data['team1Player1'] ?? 'Romario').toString(),
+      (data['team1Player1'] ?? 'Jugador').toString(),
       (data['team1Player2'] ?? 'Arom').toString(),
     ];
     final rightPlayers = [

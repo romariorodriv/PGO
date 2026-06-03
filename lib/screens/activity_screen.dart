@@ -91,7 +91,18 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 8),
+                Text(
+                  'Registra jugadores, marcador y resumen para guardar tu historial.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.56),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 40),
                 _ActionButton(
                   label: 'Registrar actividad',
                   filled: true,
@@ -115,9 +126,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   String _buildFirstName() {
-    final fullName = (_profile?.name ?? 'Romario').trim();
+    final fullName = (_profile?.name ?? 'Jugador').trim();
     if (fullName.isEmpty) {
-      return 'Romario';
+      return 'Jugador';
     }
     return fullName.split(RegExp(r'\s+')).first;
   }

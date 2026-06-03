@@ -66,6 +66,7 @@ class MatchService {
     required String matchType,
     required List<String> participantIds,
     String? photoUrl,
+    String? openMatchAlertId,
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
@@ -86,6 +87,8 @@ class MatchService {
               'matchType': matchType,
               'participantIds': participantIds,
               if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+              if (openMatchAlertId != null && openMatchAlertId.isNotEmpty)
+                'openMatchAlertId': openMatchAlertId,
             }),
           )
           .timeout(_requestTimeout);

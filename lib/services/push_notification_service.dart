@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/main_shell.dart';
 import '../screens/confirmar_actividad_screen.dart';
@@ -20,6 +21,15 @@ import 'open_match_alert_service.dart';
 import 'session_service.dart';
 import 'tournament_service.dart';
 
+@pragma('vm:entry-point')
+Future<void> pgoFirebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
+  await Firebase.initializeApp();
+  if (kDebugMode) {
+    debugPrint('push_background type=${message.data['type'] ?? ''}');
+  }
+}
+
 class PushNotificationService {
   PushNotificationService({
     http.Client? client,
@@ -28,6 +38,7 @@ class PushNotificationService {
         _sessionService = sessionService ?? SessionService();
 
   static const _requestTimeout = Duration(seconds: 15);
+  static const _fcmSenderResetKey = 'fcm_sender_reset_id';
   static const _androidChannel = AndroidNotificationChannel(
     'pgo_default_sound',
     'PGO',
@@ -56,6 +67,11 @@ class PushNotificationService {
     await _localNotifications.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@drawable/ic_pgo_notification'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        ),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
@@ -72,14 +88,30 @@ class PushNotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(_androidChannel);
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
 
     final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(
+    final permission = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    _logPushDebug(
+      'permission platform=${defaultTargetPlatform.name} '
+      'status=${permission.authorizationStatus.name}',
+    );
+    await messaging.setForegroundNotificationPresentationOptions(
       alert: true,
       badge: true,
       sound: true,
     );
 
+    FirebaseMessaging.onBackgroundMessage(
+      pgoFirebaseMessagingBackgroundHandler,
+    );
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
     unawaited(messaging.getInitialMessage().then((message) {
@@ -101,11 +133,22 @@ class PushNotificationService {
       final accessToken = await _sessionService.getAccessToken();
       if (accessToken == null || accessToken.isEmpty) return;
 
+      await _resetTokenIfFirebaseSenderChanged();
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final apnsToken = await _waitForApnsToken();
+        _logPushDebug('apns_token=${_maskToken(apnsToken)}');
+      }
       final fcmToken =
           tokenOverride ?? await FirebaseMessaging.instance.getToken();
-      if (fcmToken == null || fcmToken.isEmpty) return;
+      if (fcmToken == null || fcmToken.isEmpty) {
+        _logPushDebug('fcm_token=null platform=${defaultTargetPlatform.name}');
+        return;
+      }
+      _logPushDebug(
+        'fcm_token=${_maskToken(fcmToken)} platform=${defaultTargetPlatform.name}',
+      );
 
-      await _client
+      final response = await _client
           .post(
             Uri.parse('${ApiConfig.baseUrl}/notifications/devices'),
             headers: {
@@ -118,16 +161,51 @@ class PushNotificationService {
             }),
           )
           .timeout(_requestTimeout);
+      _logPushDebug(
+        'push_register status=${response.statusCode} '
+        'platform=${defaultTargetPlatform.name}',
+      );
     } catch (error) {
       debugPrint('Push device registration skipped: $error');
       // No bloquea login ni navegacion si el registro push falla.
     }
   }
 
+  Future<void> _resetTokenIfFirebaseSenderChanged() async {
+    final senderId = Firebase.app().options.messagingSenderId ?? '';
+    if (senderId.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(_fcmSenderResetKey) == senderId) return;
+
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } catch (_) {}
+    await prefs.setString(_fcmSenderResetKey, senderId);
+  }
+
+  Future<String?> _waitForApnsToken() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final token = await FirebaseMessaging.instance.getAPNSToken();
+      if (token != null && token.isNotEmpty) return token;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    return null;
+  }
+
+  static void _logPushDebug(String message) {
+    if (kDebugMode) debugPrint('pgo_push $message');
+  }
+
+  static String _maskToken(String? token) {
+    if (token == null || token.isEmpty) return 'null';
+    if (token.length <= 12) return '${token.substring(0, 2)}...';
+    return '${token.substring(0, 6)}...${token.substring(token.length - 6)}';
+  }
+
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
     final notification = message.notification;
-    final android = notification?.android;
-    if (notification == null || android == null) return;
+    if (notification == null) return;
 
     await _localNotifications.show(
       id: notification.hashCode,
@@ -144,6 +222,11 @@ class PushNotificationService {
           priority: Priority.high,
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('pgo_notification'),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
         ),
       ),
     );

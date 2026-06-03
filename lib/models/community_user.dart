@@ -8,6 +8,9 @@ class CommunityUser {
   final String? preferredClub;
   final String? friendshipId;
   final String? friendshipStatus;
+  final bool? isActive;
+  final bool? allowsMatchInvites;
+  final bool? hasScheduleConflict;
 
   const CommunityUser({
     required this.id,
@@ -19,6 +22,9 @@ class CommunityUser {
     required this.preferredClub,
     required this.friendshipId,
     required this.friendshipStatus,
+    this.isActive,
+    this.allowsMatchInvites,
+    this.hasScheduleConflict,
   });
 
   factory CommunityUser.fromJson(Map<String, dynamic> json) {
@@ -34,6 +40,10 @@ class CommunityUser {
       preferredClub: profile?['preferredClub'] as String?,
       friendshipId: json['friendshipId'] as String?,
       friendshipStatus: json['friendshipStatus'] as String?,
+      isActive: json['isActive'] as bool?,
+      allowsMatchInvites:
+          json['allowsMatchInvites'] as bool? ?? json['allowInvites'] as bool?,
+      hasScheduleConflict: json['hasScheduleConflict'] as bool?,
     );
   }
 }

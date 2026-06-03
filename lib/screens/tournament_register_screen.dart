@@ -21,8 +21,8 @@ class TournamentRegisterScreen extends StatelessWidget {
   final bool isModal;
   final ScrollController? scrollController;
 
-  String get _title => tournament?.title ?? 'Torneo PGO';
-  String get _location => tournament?.location ?? 'One Padel Trigal';
+  String get _title => tournament?.title ?? '';
+  String get _location => tournament?.location ?? '';
   int get _entryFee => tournament?.entryFee ?? 60;
 
   String get _formattedDate {
@@ -347,7 +347,7 @@ class TournamentRegisterScreen extends StatelessWidget {
 
   void _showBlockedRegistration(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(TournamentRules.joinLabel(tournament))),
+      SnackBar(content: Text(TournamentRules.joinBlockedReason(tournament))),
     );
   }
 }

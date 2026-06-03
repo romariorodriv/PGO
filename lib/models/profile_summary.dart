@@ -18,6 +18,15 @@ class ProfileSummary {
   final int followersCount;
   final int followingCount;
   final int socialNotificationsCount;
+  final bool? hasSeenHomeGuide;
+  final bool? hasCompletedInitialOnboarding;
+  final String? categorySuggested;
+  final String? categoryPreliminary;
+  final String? categoryMaxApplied;
+  final int? categoryScore;
+  final Map<String, dynamic>? categoryQuizAnswers;
+  final bool? categoryIsProvisional;
+  final String? categoryOrigin;
   final List<Map<String, dynamic>> matchHistory;
 
   const ProfileSummary({
@@ -40,6 +49,15 @@ class ProfileSummary {
     required this.followersCount,
     required this.followingCount,
     required this.socialNotificationsCount,
+    this.hasSeenHomeGuide,
+    this.hasCompletedInitialOnboarding,
+    this.categorySuggested,
+    this.categoryPreliminary,
+    this.categoryMaxApplied,
+    this.categoryScore,
+    this.categoryQuizAnswers,
+    this.categoryIsProvisional,
+    this.categoryOrigin,
     required this.matchHistory,
   });
 
@@ -63,6 +81,15 @@ class ProfileSummary {
     int? followersCount,
     int? followingCount,
     int? socialNotificationsCount,
+    bool? hasSeenHomeGuide,
+    bool? hasCompletedInitialOnboarding,
+    String? categorySuggested,
+    String? categoryPreliminary,
+    String? categoryMaxApplied,
+    int? categoryScore,
+    Map<String, dynamic>? categoryQuizAnswers,
+    bool? categoryIsProvisional,
+    String? categoryOrigin,
     List<Map<String, dynamic>>? matchHistory,
   }) {
     return ProfileSummary(
@@ -86,6 +113,17 @@ class ProfileSummary {
       followingCount: followingCount ?? this.followingCount,
       socialNotificationsCount:
           socialNotificationsCount ?? this.socialNotificationsCount,
+      hasSeenHomeGuide: hasSeenHomeGuide ?? this.hasSeenHomeGuide,
+      hasCompletedInitialOnboarding:
+          hasCompletedInitialOnboarding ?? this.hasCompletedInitialOnboarding,
+      categorySuggested: categorySuggested ?? this.categorySuggested,
+      categoryPreliminary: categoryPreliminary ?? this.categoryPreliminary,
+      categoryMaxApplied: categoryMaxApplied ?? this.categoryMaxApplied,
+      categoryScore: categoryScore ?? this.categoryScore,
+      categoryQuizAnswers: categoryQuizAnswers ?? this.categoryQuizAnswers,
+      categoryIsProvisional:
+          categoryIsProvisional ?? this.categoryIsProvisional,
+      categoryOrigin: categoryOrigin ?? this.categoryOrigin,
       matchHistory: matchHistory ?? this.matchHistory,
     );
   }
@@ -112,6 +150,18 @@ class ProfileSummary {
       followingCount: (json['followingCount'] as num?)?.toInt() ?? 0,
       socialNotificationsCount:
           (json['socialNotificationsCount'] as num?)?.toInt() ?? 0,
+      hasSeenHomeGuide: json['hasSeenHomeGuide'] as bool?,
+      hasCompletedInitialOnboarding:
+          json['hasCompletedInitialOnboarding'] as bool?,
+      categorySuggested: json['categorySuggested'] as String?,
+      categoryPreliminary: json['categoryPreliminary'] as String?,
+      categoryMaxApplied: json['categoryMaxApplied'] as String?,
+      categoryScore: (json['categoryScore'] as num?)?.toInt(),
+      categoryQuizAnswers: json['categoryQuizAnswers'] is Map
+          ? Map<String, dynamic>.from(json['categoryQuizAnswers'] as Map)
+          : null,
+      categoryIsProvisional: json['categoryIsProvisional'] as bool?,
+      categoryOrigin: json['categoryOrigin'] as String?,
       matchHistory: ((json['matchHistory'] as List?) ?? const [])
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList(),

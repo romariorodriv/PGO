@@ -218,9 +218,7 @@ class MatchSummaryScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                match.matchType == 'RANKED'
-                    ? 'Match competitivo'
-                    : 'Match amistoso',
+                _contextualMatchTitle(match.playedAt),
                 style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 18,
@@ -473,6 +471,29 @@ class MatchSummaryScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _contextualMatchTitle(DateTime playedAt) {
+  final hour = playedAt.toLocal().hour;
+  final moment = hour < 12
+      ? 'mañana'
+      : hour < 19
+          ? 'tarde'
+          : 'noche';
+  return 'Partido de ${_weekdayLabel(playedAt)} por la $moment';
+}
+
+String _weekdayLabel(DateTime date) {
+  const days = [
+    'lunes',
+    'martes',
+    'miércoles',
+    'jueves',
+    'viernes',
+    'sábado',
+    'domingo',
+  ];
+  return days[date.toLocal().weekday - 1];
 }
 
 class _GamePill extends StatelessWidget {

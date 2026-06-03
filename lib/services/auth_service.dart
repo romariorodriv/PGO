@@ -105,6 +105,29 @@ class AuthService {
     }
   }
 
+  Future<void> forgotPassword({required String email}) async {
+    final normalizedEmail = email.toLowerCase().trim();
+
+    try {
+      final response = await _client
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/auth/forgot-password'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': normalizedEmail}),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(json['message'] ?? 'No se pudo enviar la solicitud');
+      }
+    } on TimeoutException {
+      throw Exception('La conexión con el backend expiró.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend.');
+    }
+  }
+
   Future<AuthResponse> loginWithGoogle() async {
     try {
       await _ensureGoogleInitialized();

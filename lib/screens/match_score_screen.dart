@@ -26,6 +26,59 @@ class MatchScoreScreen extends StatefulWidget {
   State<MatchScoreScreen> createState() => _MatchScoreScreenState();
 }
 
+class _ScoreCounter extends StatelessWidget {
+  const _ScoreCounter({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.max = 10,
+  });
+
+  final String label;
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              onPressed: value <= 0 ? null : () => onChanged(value - 1),
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+            Text(
+              '$value',
+              style: const TextStyle(
+                color: AppColors.SecondBlue,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            IconButton(
+              onPressed: value >= max ? null : () => onChanged(value + 1),
+              icon: const Icon(Icons.add_circle_outline),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _MatchScoreScreenState extends State<MatchScoreScreen> {
   late DateTime _selectedDate;
   bool _isSaving = false;
@@ -157,127 +210,126 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   }
 
   Future<void> _editGame(int index) async {
-    final controller1 = TextEditingController(text: '${_games[index][0]}');
-    final controller2 = TextEditingController(text: '${_games[index][1]}');
+    var team1 = _games[index][0];
+    var team2 = _games[index][1];
 
     await showDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Editar set ${index + 1}'),
-          content: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller1,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Equipo 1'),
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text('Editar set ${index + 1}'),
+            content: Row(
+              children: [
+                Expanded(
+                  child: _ScoreCounter(
+                    label: 'Equipo 1',
+                    value: team1,
+                    onChanged: (value) => setDialogState(() => team1 = value),
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ScoreCounter(
+                    label: 'Equipo 2',
+                    value: team2,
+                    onChanged: (value) => setDialogState(() => team2 = value),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: controller2,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Equipo 2'),
-                ),
+              TextButton(
+                onPressed: () {
+                  final validation =
+                      PadelRules.validateCompletedSetScore(team1, team2);
+                  if (!validation.isValid) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Set invalido. Usa 6-0 a 6-4, 7-5 o 7-6.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  setState(() => _games[index] = [team1, team2]);
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Guardar'),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                final team1 = int.tryParse(controller1.text) ?? 0;
-                final team2 = int.tryParse(controller2.text) ?? 0;
-                final validation =
-                    PadelRules.validateCompletedSetScore(team1, team2);
-                if (!validation.isValid) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Set invalido. Ingresa el marcador final del set: 6-0 a 6-4, 7-5 o 7-6.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                setState(() {
-                  _games[index] = [team1, team2];
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
         );
       },
     );
   }
 
   Future<void> _editFinalSets() async {
-    final controller1 =
-        TextEditingController(text: _finalTeam1Sets?.toString() ?? '');
-    final controller2 =
-        TextEditingController(text: _finalTeam2Sets?.toString() ?? '');
+    var team1 = _finalTeam1Sets ?? 2;
+    var team2 = _finalTeam2Sets ?? 0;
 
     await showDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar resultado final'),
-          content: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller1,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Equipo 1'),
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Editar resultado final'),
+            content: Row(
+              children: [
+                Expanded(
+                  child: _ScoreCounter(
+                    label: 'Equipo 1',
+                    value: team1,
+                    max: 2,
+                    onChanged: (value) => setDialogState(() => team1 = value),
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ScoreCounter(
+                    label: 'Equipo 2',
+                    value: team2,
+                    max: 2,
+                    onChanged: (value) => setDialogState(() => team2 = value),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: controller2,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Equipo 2'),
-                ),
+              TextButton(
+                onPressed: () {
+                  if (!((team1 == 2 && team2 == 1) ||
+                      (team1 == 1 && team2 == 2) ||
+                      (team1 == 2 && team2 == 0) ||
+                      (team1 == 0 && team2 == 2))) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Resultado invalido. Usa 2-1, 1-2, 2-0 o 0-2.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  setState(() {
+                    _finalTeam1Sets = team1;
+                    _finalTeam2Sets = team2;
+                  });
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Guardar'),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                final team1 = int.tryParse(controller1.text);
-                final team2 = int.tryParse(controller2.text);
-                if (!((team1 == 2 && team2 == 1) ||
-                    (team1 == 1 && team2 == 2) ||
-                    (team1 == 2 && team2 == 0) ||
-                    (team1 == 0 && team2 == 2))) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('Resultado invalido. Usa 2-1, 1-2, 2-0 o 0-2.'),
-                    ),
-                  );
-                  return;
-                }
-                setState(() {
-                  _finalTeam1Sets = team1;
-                  _finalTeam2Sets = team2;
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
         );
       },
     );

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -9,6 +9,7 @@ import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
+import '../widgets/score_picker.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_bracket_screen.dart';
@@ -19,9 +20,11 @@ class TournamentLiveScreen extends StatefulWidget {
   const TournamentLiveScreen({
     super.key,
     this.tournament,
+    this.embedded = false,
   });
 
   final TournamentRecord? tournament;
+  final bool embedded;
 
   @override
   State<TournamentLiveScreen> createState() => _TournamentLiveScreenState();
@@ -115,6 +118,8 @@ class _TournamentLiveScreenState extends State<TournamentLiveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) return _buildEmbeddedContent();
+
     return PgoHeaderScaffold(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -199,6 +204,49 @@ class _TournamentLiveScreenState extends State<TournamentLiveScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmbeddedContent() {
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 28),
+          child: CircularProgressIndicator(color: AppColors.SecondBlue),
+        ),
+      );
+    }
+    if (_error != null) {
+      return _buildLiveStateCard(
+        title: 'No se pudieron cargar los partidos',
+        message: _error!,
+      );
+    }
+    if (_matches.isEmpty) {
+      return _buildLiveStateCard(
+        title: 'Aún no hay partidos generados',
+        message:
+            'Cuando el administrador genere los cruces, los partidos aparecerán aquí.',
+      );
+    }
+    return Column(
+      children: [
+        _buildSummaryStrip(),
+        const SizedBox(height: 14),
+        ..._matches.map(
+          (match) => Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _PublicMatchCard(
+              match: match,
+              onStart: match.canManage ? () => _startMyMatch(match) : null,
+              onFinish: match.canManage
+                  ? (winnerLabel, score) =>
+                      _finishMyMatch(match, winnerLabel, score)
+                  : null,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -710,7 +758,7 @@ class _PublicMatchCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           match.status == 'FINISHED'
-                              ? 'Ganador: ${match.winnerLabel ?? 'Por definir'}${(match.score ?? '').trim().isNotEmpty ? ' ? ${match.score!.trim()}' : ''}'
+                              ? 'Ganador: ${match.winnerLabel ?? 'Por definir'}${(match.score ?? '').trim().isNotEmpty ? ' - ${match.score!.trim()}' : ''}'
                               : _formatDate(match.scheduledAt),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -900,31 +948,7 @@ class _FinishTournamentMatchSheetState
               onTap: () => setState(() => _winnerLabel = widget.match.teamTwo),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _scoreController,
-              textInputAction: TextInputAction.done,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                hintText: 'Puntaje, ej. 6-4, 3-6, 10-8',
-                hintStyle: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.45),
-                  fontWeight: FontWeight.w600,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-              ),
-              style: const TextStyle(
-                color: AppColors.SecondBlue,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            ScorePicker(controller: _scoreController),
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
@@ -957,6 +981,20 @@ class _FinishTournamentMatchSheetState
     if (score.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ingresa el puntaje del partido')),
+      );
+      return;
+    }
+    final leader = tournamentScoreLeader(score);
+    final expectedWinner = leader == 1
+        ? widget.match.teamOne
+        : leader == 2
+            ? widget.match.teamTwo
+            : null;
+    if (expectedWinner == null || expectedWinner != _winnerLabel) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El ganador debe coincidir con los sets ganados'),
+        ),
       );
       return;
     }

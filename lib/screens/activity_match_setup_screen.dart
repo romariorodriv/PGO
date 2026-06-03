@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'dart:convert';
 
@@ -691,8 +691,8 @@ class _ActivityMatchSetupScreenState extends State<ActivityMatchSetupScreen> {
                     const SizedBox(height: 16),
                     Text(
                       widget.isCompetitive
-                          ? 'Este match se registrará como competitivo'
-                          : 'Este match se registrará como amistoso',
+                          ? 'Se guardará con seguimiento de resultado'
+                          : 'Se guardará como partido amistoso',
                       style: TextStyle(
                         color: AppColors.SecondBlue.withValues(alpha: 0.62),
                         fontSize: 13,
@@ -1099,7 +1099,7 @@ class _VenueCard extends StatelessWidget {
     final name = club?.name ?? fallbackName;
     final detail = club == null
         ? 'Toca para cambiar la sede'
-        : '${club!.district} ? ${club!.address}';
+        : '${club!.district} · ${club!.address}';
 
     return InkWell(
       onTap: onTap,
@@ -1221,7 +1221,7 @@ class _ClubPickerSheet extends StatelessWidget {
                       ),
                     ),
                     subtitle: Text(
-                      '${club.district} ? ${club.address}',
+                      '${club.district} · ${club.address}',
                       style: TextStyle(
                         color: AppColors.SecondBlue.withValues(alpha: 0.62),
                         fontSize: 12,

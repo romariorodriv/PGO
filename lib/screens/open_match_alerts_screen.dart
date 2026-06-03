@@ -1,19 +1,27 @@
-﻿import 'dart:math' as math;
+import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/colors.dart';
+import '../constants/lima_padel_clubs.dart';
 import '../constants/typography.dart';
+import '../models/community_user.dart';
+import '../models/selected_player.dart';
 import '../models/open_match_alert.dart';
+import '../services/community_service.dart';
+import '../services/match_service.dart';
 import '../services/open_match_alert_service.dart';
 import '../services/profile_service.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'main_shell.dart';
+import 'match_score_screen.dart';
+import 'qr_scanner_screen.dart';
 
 class OpenMatchAlertsScreen extends StatefulWidget {
   const OpenMatchAlertsScreen({
@@ -76,7 +84,6 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
   _OpenMatchTabType _selectedTab = _OpenMatchTabType.available;
   final Set<_OpenMatchFilterType> _selectedFilters = {};
   final Set<String> _localCreatedAlertIds = {};
-  bool _hasLocationPermission = false;
 
   @override
   void initState() {
@@ -92,6 +99,9 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
 
   List<OpenMatchAlert> get _visibleAlerts {
     final query = _searchController.text.trim().toLowerCase();
+    final districtFilter = _filterDistrict.toLowerCase();
+    final categoryFilter = _filterCategory.toLowerCase();
+    final formatFilter = _filterFormat.toLowerCase();
     return _alerts.where((alert) {
       final matchesTab = switch (_selectedTab) {
         _OpenMatchTabType.available => alert.status.toUpperCase() == 'OPEN' &&
@@ -100,7 +110,8 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
             !alert.isOrganizer,
         _OpenMatchTabType.myAlerts =>
           alert.isOrganizer || _localCreatedAlertIds.contains(alert.id),
-        _OpenMatchTabType.myMatches => alert.hasJoined,
+        _OpenMatchTabType.myMatches =>
+          alert.hasJoined && alert.status.toUpperCase() != 'COMPLETED',
       };
       if (!matchesTab) return false;
 
@@ -110,17 +121,20 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
       }
       if (_selectedTab == _OpenMatchTabType.available &&
           _selectedFilters.contains(_OpenMatchFilterType.nearMe) &&
-          !alert.district.toLowerCase().contains('surco')) {
+          districtFilter.isNotEmpty &&
+          !alert.district.toLowerCase().contains(districtFilter)) {
         return false;
       }
       if (_selectedTab == _OpenMatchTabType.available &&
           _selectedFilters.contains(_OpenMatchFilterType.fourth) &&
-          alert.category.toLowerCase() != '4ta') {
+          categoryFilter.isNotEmpty &&
+          alert.category.toLowerCase() != categoryFilter) {
         return false;
       }
       if (_selectedTab == _OpenMatchTabType.available &&
           _selectedFilters.contains(_OpenMatchFilterType.doubles) &&
-          alert.format.toLowerCase() != 'dobles') {
+          formatFilter.isNotEmpty &&
+          alert.format.toLowerCase() != formatFilter) {
         return false;
       }
 
@@ -130,6 +144,27 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
           alert.category.toLowerCase().contains(query) ||
           alert.format.toLowerCase().contains(query);
     }).toList();
+  }
+
+  Iterable<OpenMatchAlert> get _availableAlerts => _alerts.where((alert) =>
+      alert.status.toUpperCase() == 'OPEN' &&
+      alert.missingPlayers > 0 &&
+      !alert.hasJoined &&
+      !alert.isOrganizer);
+
+  String get _filterDistrict => _firstAvailableValue((alert) => alert.district);
+  String get _filterCategory => _firstAvailableValue((alert) => alert.category);
+  String get _filterFormat => _firstAvailableValue((alert) => alert.format);
+
+  String _firstAvailableValue(String Function(OpenMatchAlert alert) select) {
+    final values = _availableAlerts
+        .map(select)
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return values.isEmpty ? '' : values.first;
   }
 
   Future<void> _loadAlerts() async {
@@ -186,7 +221,7 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
   }
 
   Future<void> _openDetail(OpenMatchAlert alert) async {
-    final updated = await Navigator.of(context).push<OpenMatchAlert>(
+    final updated = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => OpenMatchDetailScreen(alert: alert),
       ),
@@ -196,57 +231,8 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
     }
   }
 
-  Future<bool> _ensureLocationPermission() async {
-    if (_hasLocationPermission) return true;
-
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Activa la ubicación del celular para ver partidos cerca de ti.',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return false;
-    }
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    final allowed = permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
-    if (!mounted) return false;
-    setState(() => _hasLocationPermission = allowed);
-
-    if (!allowed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Necesitamos permiso de ubicación para filtrar partidos cercanos.',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-
-    return allowed;
-  }
-
   Future<void> _toggleFilter(_OpenMatchFilterType filter) async {
     if (_selectedTab != _OpenMatchTabType.available) return;
-
-    if (filter == _OpenMatchFilterType.nearMe &&
-        !_selectedFilters.contains(filter)) {
-      final allowed = await _ensureLocationPermission();
-      if (!allowed) return;
-    }
 
     setState(() {
       if (_selectedFilters.contains(filter)) {
@@ -345,7 +331,7 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
         (alert.isOrganizer || _localCreatedAlertIds.contains(alert.id));
 
     final card = Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: _OpenMatchCard(
         alert: alert,
         onTap: () => _openDetail(alert),
@@ -355,7 +341,7 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
     if (!canDelete) return card;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Dismissible(
         key: ValueKey('open-match-alert-${alert.id}'),
         direction: DismissDirection.endToStart,
@@ -385,14 +371,6 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF2F3F5),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openCreate,
-        backgroundColor: AppColors.PrimaryGreen,
-        foregroundColor: AppColors.SecondBlue,
-        elevation: 5,
-        child: const Icon(Icons.add_rounded, size: 34),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: _OpenMatchFooter(
         currentTab: PgoNavTab.alerts,
         onBackTap: widget.onBackTap,
@@ -401,135 +379,156 @@ class _OpenMatchAlertsScreenState extends State<OpenMatchAlertsScreen> {
         decoration: const BoxDecoration(gradient: AppColors.headerGradient),
         child: SafeArea(
           bottom: false,
-          child: Column(
+          child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 10, 14, 8),
-                child: Column(
-                  children: [
-                    Row(
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 14, 8),
+                    child: Column(
                       children: [
-                        IconButton(
-                          constraints: const BoxConstraints(
-                            minWidth: 30,
-                            minHeight: 40,
-                          ),
-                          padding: EdgeInsets.zero,
-                          onPressed: widget.onBackTap ??
-                              () => Navigator.of(context).pop(),
-                          icon: const Icon(
-                            Icons.arrow_back,
+                        Row(
+                          children: [
+                            IconButton(
+                              constraints: const BoxConstraints(
+                                minWidth: 30,
+                                minHeight: 40,
+                              ),
+                              padding: EdgeInsets.zero,
+                              onPressed: widget.onBackTap ??
+                                  () => Navigator.of(context).pop(),
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Partidos',
+                                style: PgoTextStyles.screenTitle(
+                                  color: Colors.white,
+                                  weight: FontWeight.w900,
+                                ).copyWith(fontSize: 25, height: 1),
+                              ),
+                            ),
+                            const PgoOptionsMenuButton(),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          height: 38,
+                          margin: const EdgeInsets.only(left: 14, right: 4),
+                          decoration: BoxDecoration(
                             color: Colors.white,
-                            size: 22,
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding:
+                                  const EdgeInsets.only(top: 8, right: 12),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 38,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search_rounded,
+                                color:
+                                    AppColors.SecondBlue.withValues(alpha: 0.9),
+                                size: 16,
+                              ),
+                              hintText: 'Buscar partido, club o distrito',
+                              hintStyle: PgoTextStyles.bodySecondary(
+                                color: AppColors.SecondBlue.withValues(
+                                    alpha: 0.65),
+                                weight: FontWeight.w500,
+                              ).copyWith(fontSize: 12),
+                            ),
+                            style: PgoTextStyles.body(
+                              color: AppColors.SecondBlue,
+                              weight: FontWeight.w600,
+                            ).copyWith(fontSize: 12),
                           ),
                         ),
-                        Expanded(
-                          child: Text(
-                            'Partidos',
-                            style: PgoTextStyles.screenTitle(
-                              color: Colors.white,
-                              weight: FontWeight.w900,
-                            ).copyWith(fontSize: 25, height: 1),
-                          ),
-                        ),
-                        const PgoOptionsMenuButton(),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      height: 38,
-                      margin: const EdgeInsets.only(left: 14, right: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(13),
+                  ),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF2F3F5),
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(18)),
                       ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding:
-                              const EdgeInsets.only(top: 8, right: 12),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 40,
-                            minHeight: 38,
+                      child: Column(
+                        children: [
+                          _OpenMatchTabs(
+                            selectedTab: _selectedTab,
+                            onChanged: (tab) => setState(() {
+                              _selectedTab = tab;
+                              if (tab != _OpenMatchTabType.available) {
+                                _selectedFilters.clear();
+                              }
+                            }),
                           ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: AppColors.SecondBlue.withValues(alpha: 0.9),
-                            size: 16,
+                          if (_selectedTab == _OpenMatchTabType.available)
+                            _OpenMatchFilters(
+                              selectedFilters: _selectedFilters,
+                              districtLabel: _filterDistrict.isEmpty
+                                  ? 'Zona'
+                                  : _filterDistrict,
+                              categoryLabel: _filterCategory.isEmpty
+                                  ? 'Nivel'
+                                  : _filterCategory,
+                              formatLabel: _filterFormat.isEmpty
+                                  ? 'Formato'
+                                  : _filterFormat,
+                              onToggle: _toggleFilter,
+                            ),
+                          Expanded(
+                            child: RefreshIndicator(
+                              onRefresh: _loadAlerts,
+                              color: AppColors.SecondBlue,
+                              child: ListView(
+                                padding:
+                                    const EdgeInsets.fromLTRB(14, 14, 14, 112),
+                                children: [
+                                  if (_isLoading)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 76),
+                                      child: Center(
+                                          child: CircularProgressIndicator()),
+                                    )
+                                  else if (_error != null)
+                                    _EmptyAlertsCard(text: _error!)
+                                  else if (_visibleAlerts.isEmpty)
+                                    const _EmptyAlertsCard(
+                                      text:
+                                          'Aún no hay partidos abiertos disponibles.',
+                                    )
+                                  else
+                                    ..._visibleAlerts.map(
+                                      _buildAlertListItem,
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                          hintText: 'Buscar sede, zona o nivel',
-                          hintStyle: PgoTextStyles.bodySecondary(
-                            color: AppColors.SecondBlue.withValues(alpha: 0.65),
-                            weight: FontWeight.w500,
-                          ).copyWith(fontSize: 12),
-                        ),
-                        style: PgoTextStyles.body(
-                          color: AppColors.SecondBlue,
-                          weight: FontWeight.w600,
-                        ).copyWith(fontSize: 12),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF2F3F5),
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(18)),
-                  ),
-                  child: Column(
-                    children: [
-                      _OpenMatchTabs(
-                        selectedTab: _selectedTab,
-                        onChanged: (tab) => setState(() {
-                          _selectedTab = tab;
-                          if (tab != _OpenMatchTabType.available) {
-                            _selectedFilters.clear();
-                          }
-                        }),
-                      ),
-                      if (_selectedTab == _OpenMatchTabType.available)
-                        _OpenMatchFilters(
-                          selectedFilters: _selectedFilters,
-                          onToggle: _toggleFilter,
-                        ),
-                      Expanded(
-                        child: RefreshIndicator(
-                          onRefresh: _loadAlerts,
-                          color: AppColors.SecondBlue,
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 88),
-                            children: [
-                              if (_isLoading)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 76),
-                                  child: Center(
-                                      child: CircularProgressIndicator()),
-                                )
-                              else if (_error != null)
-                                _EmptyAlertsCard(text: _error!)
-                              else if (_visibleAlerts.isEmpty)
-                                const _EmptyAlertsCard(
-                                  text:
-                                      'Aún no hay partidos abiertos disponibles.',
-                                )
-                              else
-                                ..._visibleAlerts.map(
-                                  _buildAlertListItem,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              Positioned(
+                right: 18,
+                bottom: 124,
+                child: _CreateOpenMatchFab(onTap: _openCreate),
               ),
             ],
           ),
@@ -549,6 +548,458 @@ enum _OpenMatchTabType { available, myAlerts, myMatches }
 
 enum _OpenMatchFilterType { today, nearMe, fourth, doubles }
 
+class _TimePickerSheet extends StatefulWidget {
+  const _TimePickerSheet({required this.initialTime});
+
+  final TimeOfDay initialTime;
+
+  @override
+  State<_TimePickerSheet> createState() => _TimePickerSheetState();
+}
+
+class _TimePickerSheetState extends State<_TimePickerSheet> {
+  late int _hour = widget.initialTime.hourOfPeriod == 0
+      ? 12
+      : widget.initialTime.hourOfPeriod;
+  late int _minute = widget.initialTime.minute ~/ 15 * 15;
+  late bool _isPm = widget.initialTime.period == DayPeriod.pm;
+
+  TimeOfDay get _value {
+    final hour =
+        _isPm ? (_hour == 12 ? 12 : _hour + 12) : (_hour == 12 ? 0 : _hour);
+    return TimeOfDay(hour: hour, minute: _minute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 58,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD5DAE3),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Hora del partido',
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _TimeWheel(
+                    values: const [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                    selected: _hour,
+                    labelBuilder: (value) => value.toString().padLeft(2, '0'),
+                    onChanged: (value) => setState(() => _hour = value),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _TimeWheel(
+                    values: const [0, 15, 30, 45],
+                    selected: _minute,
+                    labelBuilder: (value) => value.toString().padLeft(2, '0'),
+                    onChanged: (value) => setState(() => _minute = value),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _PeriodButton(
+                        label: 'am',
+                        selected: !_isPm,
+                        onTap: () => setState(() => _isPm = false),
+                      ),
+                      const SizedBox(height: 8),
+                      _PeriodButton(
+                        label: 'pm',
+                        selected: _isPm,
+                        onTap: () => setState(() => _isPm = true),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _PrimaryButton(
+              label: 'Usar ${_formatTimeOfDay(_value)}',
+              onTap: () => Navigator.of(context).pop(_value),
+              height: 44,
+              fontSize: 13.5,
+              borderRadius: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeWheel extends StatelessWidget {
+  const _TimeWheel({
+    required this.values,
+    required this.selected,
+    required this.labelBuilder,
+    required this.onChanged,
+  });
+
+  final List<int> values;
+  final int selected;
+  final String Function(int value) labelBuilder;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 156,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6F9),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: ListWheelScrollView.useDelegate(
+        itemExtent: 42,
+        physics: const FixedExtentScrollPhysics(),
+        perspective: 0.003,
+        diameterRatio: 1.4,
+        controller: FixedExtentScrollController(
+          initialItem: values.indexOf(selected).clamp(0, values.length - 1),
+        ),
+        onSelectedItemChanged: (index) => onChanged(values[index]),
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: values.length,
+          builder: (context, index) {
+            final value = values[index];
+            final isSelected = value == selected;
+            return Center(
+              child: Text(
+                labelBuilder(value),
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: isSelected ? 24 : 16,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodButton extends StatelessWidget {
+  const _PeriodButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 54,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFD7FF4F) : const Color(0xFFF4F6F9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            color: AppColors.SecondBlue,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerSearchSheet extends StatefulWidget {
+  const _PlayerSearchSheet({
+    required this.selectedUserIds,
+    this.currentUserId,
+  });
+
+  final String? currentUserId;
+  final Set<String> selectedUserIds;
+
+  @override
+  State<_PlayerSearchSheet> createState() => _PlayerSearchSheetState();
+}
+
+class _PlayerSearchSheetState extends State<_PlayerSearchSheet> {
+  final CommunityService _communityService = CommunityService();
+  final _controller = TextEditingController();
+  List<CommunityUser> _results = const [];
+  bool _isSearching = false;
+  String? _error;
+
+  List<CommunityUser> _filterUsers(List<CommunityUser> users) {
+    final currentUserId = widget.currentUserId?.trim().toLowerCase();
+    final selectedIds = widget.selectedUserIds
+        .map((id) => id.trim().toLowerCase())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    return users.where((user) {
+      final userId = user.id.trim().toLowerCase();
+      if (userId.isEmpty) return false;
+      if (user.isActive == false ||
+          user.allowsMatchInvites == false ||
+          user.hasScheduleConflict == true) {
+        return false;
+      }
+      if (currentUserId != null &&
+          currentUserId.isNotEmpty &&
+          userId == currentUserId) {
+        return false;
+      }
+      return !selectedIds.contains(userId);
+    }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSuggestions();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSuggestions() async {
+    setState(() {
+      _isSearching = true;
+      _error = null;
+    });
+    try {
+      final users = await _communityService.getSuggestions();
+      if (!mounted) return;
+      setState(() => _results = _filterUsers(users));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _results = const []);
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _search() async {
+    final query = _controller.text.trim();
+    if (query.isEmpty) {
+      await _loadSuggestions();
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _error = null;
+    });
+    try {
+      final users = await _communityService.searchCommunity(query);
+      if (!mounted) return;
+      setState(() {
+        _results = _filterUsers(users);
+        if (_results.isEmpty) _error = 'No encontramos jugadores con ese dato';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _results = const [];
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          20 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 54,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD5DAE3),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const _SectionTitle(
+              icon: Icons.person_add_alt_1,
+              title: 'Agregar jugador',
+              subtitle: 'Busca por nombre, correo o ID de jugador',
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 42,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E4E9),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search_rounded,
+                            color: AppColors.SecondBlue, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            autofocus: true,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => _search(),
+                            decoration: const InputDecoration.collapsed(
+                              hintText: 'Nombre, correo o ID',
+                            ),
+                            style: GoogleFonts.inter(
+                              color: AppColors.SecondBlue,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: _isSearching ? null : _search,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.PrimaryGreen,
+                      foregroundColor: AppColors.SecondBlue,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Buscar',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (_isSearching)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              _InviteMessage(text: _error!)
+            else if (_results.isEmpty)
+              const _InviteMessage(text: 'Busca un jugador para invitarlo')
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 420),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _results.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final user = _results[index];
+                    return _PlayerResultTile(
+                      user: user,
+                      onTap: () => Navigator.of(context).pop(user),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateOpenMatchFab extends StatelessWidget {
+  const _CreateOpenMatchFab({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 54,
+        height: 54,
+        decoration: const BoxDecoration(
+          color: Color(0xFFD7FF59),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.add_rounded,
+          color: AppColors.SecondBlue,
+          size: 34,
+        ),
+      ),
+    );
+  }
+}
+
 class _OpenMatchTabs extends StatelessWidget {
   const _OpenMatchTabs({
     required this.selectedTab,
@@ -560,39 +1011,40 @@ class _OpenMatchTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF2F3F5),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFC9D0DB), width: 1),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFDDE3EC)),
         ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _OpenMatchTab(
-              label: 'Disponibles',
-              selected: selectedTab == _OpenMatchTabType.available,
-              onTap: () => onChanged(_OpenMatchTabType.available),
+        child: Row(
+          children: [
+            Expanded(
+              child: _OpenMatchTab(
+                label: 'Disponibles',
+                selected: selectedTab == _OpenMatchTabType.available,
+                onTap: () => onChanged(_OpenMatchTabType.available),
+              ),
             ),
-          ),
-          Expanded(
-            child: _OpenMatchTab(
-              label: 'Mis alertas',
-              selected: selectedTab == _OpenMatchTabType.myAlerts,
-              onTap: () => onChanged(_OpenMatchTabType.myAlerts),
+            Expanded(
+              child: _OpenMatchTab(
+                label: 'Mis alertas',
+                selected: selectedTab == _OpenMatchTabType.myAlerts,
+                onTap: () => onChanged(_OpenMatchTabType.myAlerts),
+              ),
             ),
-          ),
-          Expanded(
-            child: _OpenMatchTab(
-              label: 'Mis partidos',
-              selected: selectedTab == _OpenMatchTabType.myMatches,
-              onTap: () => onChanged(_OpenMatchTabType.myMatches),
+            Expanded(
+              child: _OpenMatchTab(
+                label: 'Mis partidos',
+                selected: selectedTab == _OpenMatchTabType.myMatches,
+                onTap: () => onChanged(_OpenMatchTabType.myMatches),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -613,35 +1065,27 @@ class _OpenMatchTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          Center(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: selected
-                    ? const Color(0xFF31577F)
-                    : AppColors.SecondBlue.withValues(alpha: 0.48),
-                fontSize: 11.1,
-                fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
-              ),
-            ),
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFD7FF4F) : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.inter(
+            color: selected
+                ? AppColors.SecondBlue
+                : AppColors.SecondBlue.withValues(alpha: 0.56),
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
           ),
-          if (selected)
-            FractionallySizedBox(
-              widthFactor: 0.56,
-              child: Container(
-                height: 2.4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF31577F),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -650,10 +1094,16 @@ class _OpenMatchTab extends StatelessWidget {
 class _OpenMatchFilters extends StatelessWidget {
   const _OpenMatchFilters({
     required this.selectedFilters,
+    required this.districtLabel,
+    required this.categoryLabel,
+    required this.formatLabel,
     required this.onToggle,
   });
 
   final Set<_OpenMatchFilterType> selectedFilters;
+  final String districtLabel;
+  final String categoryLabel;
+  final String formatLabel;
   final ValueChanged<_OpenMatchFilterType> onToggle;
 
   @override
@@ -675,19 +1125,19 @@ class _OpenMatchFilters extends StatelessWidget {
               onTap: () => onToggle(_OpenMatchFilterType.today),
             ),
             _FilterChipPgo(
-              label: 'Cerca de mí',
+              label: districtLabel,
               icon: Icons.location_on,
               selected: selectedFilters.contains(_OpenMatchFilterType.nearMe),
               onTap: () => onToggle(_OpenMatchFilterType.nearMe),
             ),
             _FilterChipPgo(
-              label: '4ta',
+              label: categoryLabel,
               icon: Icons.bar_chart_rounded,
               selected: selectedFilters.contains(_OpenMatchFilterType.fourth),
               onTap: () => onToggle(_OpenMatchFilterType.fourth),
             ),
             _FilterChipPgo(
-              label: 'Dobles',
+              label: formatLabel,
               icon: Icons.groups_rounded,
               selected: selectedFilters.contains(_OpenMatchFilterType.doubles),
               onTap: () => onToggle(_OpenMatchFilterType.doubles),
@@ -766,7 +1216,10 @@ class CreateOpenMatchScreen extends StatefulWidget {
 }
 
 class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
+  static const bool _backendSupportsInvitations = true;
+
   final OpenMatchAlertService _service = OpenMatchAlertService();
+  final CommunityService _communityService = CommunityService();
   final ProfileService _profileService = ProfileService();
   final TextEditingController _costController =
       TextEditingController(text: '25');
@@ -775,20 +1228,20 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
         'Partido tranquilo para sumar gente, nivel intermedio, ideal puntualidad.',
   );
   static const List<String> _categories = ['3ra', '4ta', '5ta', '6ta'];
-  static const List<({String club, String district})> _clubs = [
-    (club: 'One Padel Trigal', district: 'Surco'),
-    (club: 'One Padel Olguín', district: 'Surco'),
-    (club: 'Lima Padel', district: 'Surco'),
-    (club: 'Mad Padel', district: 'La Molina'),
-    (club: 'Padel 360', district: 'Surco'),
+  static final List<({String club, String district})> _clubs = [
+    for (final club in limaPadelClubDetails)
+      (club: club.name, district: club.district),
   ];
   String _category = '4ta';
   String _club = 'One Padel Trigal';
   String _district = 'Surco';
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
+  String? _playerId;
+  String? _playerEmail;
   String _playerName = 'Jugador';
   String? _playerPhotoUrl;
+  final List<CommunityUser> _selectedPlayers = [];
   bool _isDoubles = true;
   bool _courtReserved = true;
   int _missingPlayers = 2;
@@ -819,6 +1272,8 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
       final profile = await _profileService.getMyProfile();
       if (!mounted) return;
       setState(() {
+        _playerId = profile.id;
+        _playerEmail = profile.email;
         _playerName = profile.name.trim().isEmpty ? 'Jugador' : profile.name;
         _playerPhotoUrl = profile.photoUrl;
         if ((profile.category ?? '').trim().isNotEmpty) {
@@ -849,8 +1304,18 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
     setState(() => _isSaving = true);
     try {
       final startsAt = _startsAt;
-      if (!startsAt.isAfter(DateTime.now())) {
-        throw Exception('Elige una fecha y hora futura para publicar.');
+      if (!startsAt.isAfter(DateTime.now().add(const Duration(minutes: 30)))) {
+        throw Exception('El partido debe iniciar al menos en 30 minutos.');
+      }
+      final cost = int.tryParse(_costController.text.trim());
+      if (cost == null || cost < 0) {
+        throw Exception('Ingresa un costo válido.');
+      }
+      if (!_isDoubles && _missingPlayers != 1) {
+        throw Exception('Singles solo permite 1 jugador faltante.');
+      }
+      if (_commentController.text.trim().length > 240) {
+        throw Exception('El comentario no puede superar 240 caracteres.');
       }
       final created = await _service.createAlert(
         category: _category,
@@ -860,9 +1325,10 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
         district: _district,
         courtStatus: _courtReserved ? 'Reservada' : 'Por confirmar',
         missingPlayers: _missingPlayers,
-        costPerPerson: int.tryParse(_costController.text.trim()) ?? 25,
+        costPerPerson: cost,
         paymentLabel: _payOrganizer ? 'Con coordinador' : 'Pago en sede',
         comment: _commentController.text,
+        invitedUserIds: _selectedPlayers.map((user) => user.id).toList(),
       );
       if (!mounted) return;
       Navigator.of(context).pop(created);
@@ -916,15 +1382,174 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
   }
 
   Future<void> _selectTime() async {
-    final picked = await showTimePicker(
+    final picked = await showModalBottomSheet<TimeOfDay>(
       context: context,
-      initialTime: _selectedTime,
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
-        child: child ?? const SizedBox.shrink(),
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      builder: (context) => _TimePickerSheet(initialTime: _selectedTime),
     );
     if (picked != null) setState(() => _selectedTime = picked);
+  }
+
+  Future<void> _searchPlayer() async {
+    final user = await showModalBottomSheet<CommunityUser>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.78,
+        child: _PlayerSearchSheet(
+          currentUserId: _playerId,
+          selectedUserIds: _selectedPlayers.map((user) => user.id).toSet(),
+        ),
+      ),
+    );
+    if (user == null) return;
+    _addSelectedPlayer(user);
+  }
+
+  Future<void> _scanPlayerQr() async {
+    final value = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+    if (value == null || value.trim().isEmpty) return;
+    try {
+      await _addPlayerByQuery(_extractPlayerQrQuery(value));
+    } catch (error) {
+      _showPlayerMessage(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _addPlayerByQuery(String query) async {
+    try {
+      final users = await _communityService.searchCommunity(query);
+      if (!mounted) return;
+      CommunityUser? user;
+      for (final item in users) {
+        final q = query.trim().toLowerCase();
+        if (item.id == query ||
+            (item.email ?? '').toLowerCase() == q ||
+            item.name.toLowerCase().contains(q)) {
+          user = item;
+          break;
+        }
+      }
+      user ??= users.isNotEmpty ? users.first : null;
+      if (user == null) throw Exception('No encontramos un jugador');
+      _addSelectedPlayer(user);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  String _extractPlayerQrQuery(String raw) {
+    try {
+      final decoded = jsonDecode(raw.trim());
+      if (decoded is Map<String, dynamic>) {
+        final type = decoded['type']?.toString().trim().toLowerCase();
+        if (type != 'player') {
+          throw Exception('Escanea un QR de jugador PGO valido.');
+        }
+
+        for (final key in const ['id', 'email', 'name']) {
+          final value = decoded[key]?.toString().trim();
+          if (value != null && value.isNotEmpty) return value;
+        }
+      }
+    } catch (_) {}
+
+    throw Exception('Escanea un QR de jugador PGO valido.');
+  }
+
+  void _addSelectedPlayer(CommunityUser user) {
+    final userId = user.id.trim();
+    if (userId.isEmpty) {
+      _showPlayerMessage('No pudimos validar ese jugador.');
+      return;
+    }
+    if (_isCurrentPlayer(user)) {
+      _showPlayerMessage('No puedes invitarte a ti mismo.');
+      return;
+    }
+    if (user.isActive == false) {
+      _showPlayerMessage('Ese jugador no esta activo.');
+      return;
+    }
+    if (user.allowsMatchInvites == false) {
+      _showPlayerMessage('Ese jugador no permite invitaciones.');
+      return;
+    }
+    if (user.hasScheduleConflict == true) {
+      _showPlayerMessage('Ese jugador ya tiene un partido en ese horario.');
+      return;
+    }
+    if (_selectedPlayers.any((item) => item.id == user.id)) {
+      _showPlayerMessage('Ese jugador ya fue agregado');
+      return;
+    }
+    if (_selectedPlayers.length >= _missingPlayers) {
+      _showPlayerMessage('No hay más cupos para agregar jugadores');
+      return;
+    }
+    final compatibilityMessage = _categoryCompatibilityMessage(user);
+    if (compatibilityMessage != null) {
+      _showPlayerMessage(compatibilityMessage);
+      return;
+    }
+    setState(() => _selectedPlayers.add(user));
+  }
+
+  void _removeSelectedPlayer(CommunityUser user) {
+    setState(() => _selectedPlayers.removeWhere((item) => item.id == user.id));
+  }
+
+  bool _isCurrentPlayer(CommunityUser user) {
+    final userId = user.id.trim().toLowerCase();
+    final currentId = _playerId?.trim().toLowerCase();
+    if (currentId != null && currentId.isNotEmpty && userId == currentId) {
+      return true;
+    }
+
+    final email = user.email?.trim().toLowerCase();
+    final currentEmail = _playerEmail?.trim().toLowerCase();
+    return email != null &&
+        email.isNotEmpty &&
+        currentEmail != null &&
+        currentEmail.isNotEmpty &&
+        email == currentEmail;
+  }
+
+  String? _categoryCompatibilityMessage(CommunityUser user) {
+    final alertCategory = _categoryRank(_category);
+    final userCategory = _categoryRank(user.category);
+    if (alertCategory == null || userCategory == null) return null;
+
+    if ((alertCategory - userCategory).abs() > 1) {
+      return 'Ese jugador no coincide con el nivel del partido.';
+    }
+    return null;
+  }
+
+  int? _categoryRank(String? value) {
+    final match = RegExp(r'\d+').firstMatch(value ?? '');
+    return match == null ? null : int.tryParse(match.group(0)!);
+  }
+
+  void _showPlayerMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<T?> _showOptionSheet<T>({
@@ -934,50 +1559,59 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
   }) {
     return showModalBottomSheet<T>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 58,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD5DAE3),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  color: AppColors.SecondBlue,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              for (final value in values)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    labelBuilder(value),
-                    style: GoogleFonts.inter(
-                      color: AppColors.SecondBlue,
-                      fontWeight: FontWeight.w800,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: values.length > 4 ? 0.58 : 0.42,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 58,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD5DAE3),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  onTap: () => Navigator.of(context).pop(value),
                 ),
-            ],
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final value in values)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            labelBuilder(value),
+                            style: GoogleFonts.inter(
+                              color: AppColors.SecondBlue,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          onTap: () => Navigator.of(context).pop(value),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1055,7 +1689,14 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
                           left: 'Singles',
                           right: 'Dobles',
                           rightSelected: _isDoubles,
-                          onLeft: () => setState(() => _isDoubles = false),
+                          onLeft: () => setState(() {
+                            _isDoubles = false;
+                            _missingPlayers = 1;
+                            if (_selectedPlayers.length > 1) {
+                              _selectedPlayers.removeRange(
+                                  1, _selectedPlayers.length);
+                            }
+                          }),
                           onRight: () => setState(() => _isDoubles = true),
                         ),
                       ),
@@ -1084,15 +1725,24 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
                       _row(
                         'Faltan',
                         _threeSegment(
-                          values: const [1, 2, 3],
+                          values: _isDoubles ? const [1, 2, 3] : const [1],
                           selected: _missingPlayers,
-                          labels: const [
-                            '1 jugador',
-                            '2 jugadores',
-                            '3 jugadores',
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _missingPlayers = value),
+                          labels: _isDoubles
+                              ? const [
+                                  '1 jugador',
+                                  '2 jugadores',
+                                  '3 jugadores'
+                                ]
+                              : const ['1 jugador'],
+                          onChanged: (value) => setState(() {
+                            _missingPlayers = _isDoubles ? value : 1;
+                            if (_selectedPlayers.length > _missingPlayers) {
+                              _selectedPlayers.removeRange(
+                                _missingPlayers,
+                                _selectedPlayers.length,
+                              );
+                            }
+                          }),
                         ),
                       ),
                       _row(
@@ -1198,6 +1848,121 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
   }
 
   Widget _playersSection() {
+    final remaining = _missingPlayers - _selectedPlayers.length;
+    final totalOpenSlots = _isDoubles ? 3 : 1;
+    final missingText = remaining <= 0
+        ? 'Equipo completo'
+        : remaining == 1
+            ? 'Falta 1 jugador'
+            : 'Faltan $remaining jugadores';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F6F9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.SecondBlue.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.group_add_rounded,
+                    color: AppColors.SecondBlue,
+                    size: 17,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      'Jugadores invitados',
+                      style: GoogleFonts.inter(
+                        color: AppColors.SecondBlue,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  _InviteCounter(
+                    selected: _selectedPlayers.length,
+                    total: _missingPlayers,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$missingText. Puedes invitar hasta ${math.max(remaining, 0)} jugador${remaining == 1 ? '' : 'es'} más.',
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const _InviteNotice(
+                text: _backendSupportsInvitations
+                    ? 'La invitacion requiere aceptacion del jugador antes de confirmar el cupo.'
+                    : 'Seleccionar jugadores no reserva cupos todavia. Quita los invitados para publicar.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _InviteActionButton(
+                      label: 'Buscar jugador',
+                      icon: Icons.search_rounded,
+                      onTap: _selectedPlayers.length >= _missingPlayers
+                          ? null
+                          : _searchPlayer,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _InviteQrButton(
+                    onTap: _selectedPlayers.length >= _missingPlayers
+                        ? null
+                        : _scanPlayerQr,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PlayerSelectionCard(
+                    name: _playerName,
+                    imageUrl: _playerPhotoUrl,
+                    label: 'Organizador',
+                  ),
+                  for (final user in _selectedPlayers)
+                    _PlayerSelectionCard(
+                      name: user.name,
+                      imageUrl: user.photoUrl,
+                      label: user.category ?? 'Invitado',
+                      onRemove: () => _removeSelectedPlayer(user),
+                    ),
+                  for (var i = _selectedPlayers.length; i < totalOpenSlots; i++)
+                    _EmptyInviteSlot(
+                      label: i < _missingPlayers ? 'Cupo libre' : 'Sin cupo',
+                      onTap: i < _missingPlayers ? _searchPlayer : null,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ignore: unused_element
+  Widget _playersSectionLegacy() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1213,24 +1978,31 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
         Row(
           children: [
             Expanded(
-              child: _input('Nombre del jugador', icon: Icons.search_rounded),
+              child: _tappableInput(
+                'Nombre, correo o ID',
+                icon: Icons.search_rounded,
+                onTap: _searchPlayer,
+              ),
             ),
             const SizedBox(width: 8),
-            SizedBox(
-              width: 48,
-              height: 38,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E4E9),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Center(
-                  child: Text(
-                    'QR',
-                    style: GoogleFonts.inter(
-                      color: AppColors.SecondBlue,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+            GestureDetector(
+              onTap: _scanPlayerQr,
+              child: SizedBox(
+                width: 48,
+                height: 38,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E4E9),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'QR',
+                      style: GoogleFonts.inter(
+                        color: AppColors.SecondBlue,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -1246,9 +2018,13 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
               name: _playerName,
               imageUrl: _playerPhotoUrl,
             ),
-            const _EmptyPlayerSlot(label: 'Jugador 2'),
-            const _EmptyPlayerSlot(label: 'Jugador 3'),
-            const _EmptyPlayerSlot(label: 'Jugador 4'),
+            for (var i = 0; i < _missingPlayers; i++)
+              i < _selectedPlayers.length
+                  ? _PlayerBubble(
+                      name: _selectedPlayers[i].name,
+                      imageUrl: _selectedPlayers[i].photoUrl,
+                    )
+                  : _EmptyPlayerSlot(label: 'Jugador ${i + 2}'),
           ],
         ),
       ],
@@ -1311,13 +2087,30 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
   final OpenMatchAlertService _service = OpenMatchAlertService();
   late OpenMatchAlert _alert = widget.alert;
   bool _isJoining = false;
+  bool _isLeaving = false;
   bool _isUpdatingCoordination = false;
   String? _selectedCoordinationStatus;
 
   bool get _isMyMatch => _alert.hasJoined || _alert.isOrganizer;
   bool get _isFull =>
       _alert.status.toUpperCase() == 'FULL' || _alert.missingPlayers == 0;
-  bool get _resultPending => _isFull && DateTime.now().isAfter(_alert.startsAt);
+  bool get _isCompleted => _alert.status.toUpperCase() == 'COMPLETED';
+  bool get _isCanceled => _alert.status.toUpperCase() == 'CANCELED';
+  bool get _canLeaveMatch =>
+      _alert.hasJoined && !_alert.isOrganizer && !_isCompleted && !_isCanceled;
+  bool get _resultPending =>
+      !_isCompleted && _isFull && DateTime.now().isAfter(_alert.startsAt);
+  String? get _resultUnavailableMessage {
+    if (_isCompleted) return 'Este partido ya tiene resultado registrado.';
+    if (!_isFull) return 'El partido aún no está completo.';
+    if (DateTime.now().isBefore(_alert.startsAt)) {
+      return 'El partido aún no empezó.';
+    }
+    if (!_isMyMatch) {
+      return 'Debes participar en el partido para registrar resultado.';
+    }
+    return null;
+  }
 
   Future<void> _confirmJoin() async {
     final confirmed = await showDialog<bool>(
@@ -1346,6 +2139,45 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
       barrierDismissible: true,
       builder: (_) => _JoinSuccessDialog(alert: _alert),
     );
+  }
+
+  Future<void> _confirmLeave() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Salir del partido'),
+        content: const Text('Tu cupo quedará libre para otro jugador.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _isLeaving) return;
+    setState(() => _isLeaving = true);
+    try {
+      await _service.leaveAlert(_alert.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saliste del partido.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLeaving = false);
+    }
   }
 
   Future<void> _updateCoordination(String status) async {
@@ -1377,14 +2209,14 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
     return [
       _OpenMatchHeroCard(alert: _alert),
       if ((_alert.comment ?? '').trim().isNotEmpty) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _OpenMatchCommentCard(comment: _alert.comment!.trim()),
       ],
-      const SizedBox(height: 10),
+      const SizedBox(height: 14),
       _OpenMatchCreatorCard(alert: _alert),
-      const SizedBox(height: 10),
+      const SizedBox(height: 14),
       _OpenMatchConfirmedCard(alert: _alert),
-      const SizedBox(height: 10),
+      const SizedBox(height: 14),
       _InfoBlock(
         rows: [
           ('Formato', _alert.format, Icons.groups),
@@ -1417,6 +2249,7 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
   }
 
   List<Widget> _myMatchChildren() {
+    final resultUnavailableMessage = _resultUnavailableMessage;
     return [
       _MyOpenMatchHeroCard(alert: _alert, resultPending: _resultPending),
       const SizedBox(height: 16),
@@ -1429,6 +2262,10 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
           onSelected: _updateCoordination,
           isUpdating: _isUpdatingCoordination,
         ),
+      if (!_resultPending && resultUnavailableMessage != null) ...[
+        const SizedBox(height: 16),
+        _OpenMatchResultUnavailableCard(message: resultUnavailableMessage),
+      ],
       const SizedBox(height: 16),
       _QuickChatCard(alert: _alert),
       const SizedBox(height: 16),
@@ -1457,19 +2294,22 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
         const SizedBox(height: 42),
         _PrimaryButton(
           label: 'Registrar resultado',
-          onTap: () {},
+          onTap: _openResultPendingNotice,
           height: 38,
           fontSize: 16,
           borderRadius: 22,
         ),
         const SizedBox(height: 8),
         Center(
-          child: Text(
-            'Volver a partidos',
-            style: GoogleFonts.inter(
-              color: AppColors.SecondBlue.withValues(alpha: 0.76),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          child: TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'Volver a partidos',
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue.withValues(alpha: 0.76),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -1477,10 +2317,23 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
         const SizedBox(height: 18),
         _PrimaryButton(
           label: 'Voy en camino',
-          onTap: () {},
+          onTap: () => _updateCoordination('ON_THE_WAY'),
           height: 38,
           fontSize: 16,
           borderRadius: 22,
+        ),
+      ],
+      if (_canLeaveMatch) ...[
+        const SizedBox(height: 18),
+        TextButton(
+          onPressed: _isLeaving ? null : _confirmLeave,
+          child: Text(
+            _isLeaving ? 'Saliendo...' : 'Salir del partido',
+            style: GoogleFonts.inter(
+              color: const Color(0xFFFF334B),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ],
     ];
@@ -1559,6 +2412,67 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openResultPendingNotice() async {
+    final users = <OpenMatchUser>[
+      _alert.organizer,
+      ..._alert.participants,
+    ].where((user) => user.id.isNotEmpty).toList();
+    final unique = <String, OpenMatchUser>{
+      for (final user in users) user.id: user,
+    }.values.toList();
+
+    if (unique.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Se necesitan 4 jugadores para registrar resultado.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final profile = await ProfileService().getMyProfile();
+      if (!unique.any((user) => user.id == profile.id)) {
+        throw Exception(
+            'Debes participar en el partido para registrar resultado');
+      }
+      final match = await MatchService().createMatch(
+        clubName: _alert.club,
+        playedAt: _alert.startsAt,
+        matchType: 'FRIENDLY',
+        participantIds: unique.map((user) => user.id).toList(),
+        openMatchAlertId: _alert.id,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MatchScoreScreen(
+            match: match,
+            players: unique
+                .map(
+                  (user) => SelectedPlayer(
+                    id: user.id,
+                    name: user.name,
+                    photoUrl: user.photoUrl,
+                    category: null,
+                    rankingPosition: 0,
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 }
 
@@ -1888,11 +2802,11 @@ class _JoinConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1900,33 +2814,34 @@ class _JoinConfirmDialog extends StatelessWidget {
               'Confirmar unión',
               style: GoogleFonts.inter(
                 color: AppColors.SecondBlue,
-                fontSize: 13.5,
+                fontSize: 15,
                 fontWeight: FontWeight.w900,
                 height: 1.05,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               'Vas a unirte a este partido abierto.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 color: AppColors.SecondBlue.withValues(alpha: 0.72),
-                fontSize: 9.5,
+                fontSize: 10.8,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const Divider(height: 20),
+            const Divider(height: 24),
             _MiniMatchSummary(alert: alert, compact: true),
-            const Divider(height: 20),
+            const Divider(height: 24),
             Text(
               'Tu cupo quedará confirmado al instante.',
+              textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 color: AppColors.SecondBlue.withValues(alpha: 0.75),
-                fontSize: 10,
+                fontSize: 10.8,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
@@ -2194,7 +3109,7 @@ class _MyOpenMatchHeroCard extends StatelessWidget {
                 user: user,
                 status: resultPending
                     ? null
-                    : (alert.missingPlayers == 0 ? 'En camino' : 'Llegu?'),
+                    : (alert.missingPlayers == 0 ? 'En camino' : 'Llegué'),
               );
             }).toList(),
           ),
@@ -2320,12 +3235,26 @@ class _QuickChatCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                'Ver todo',
-                style: GoogleFonts.inter(
-                  color: AppColors.SecondBlue,
-                  fontSize: 9.2,
-                  fontWeight: FontWeight.w900,
+              InkWell(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => OpenMatchChatScreen(alert: alert),
+                  ),
+                ),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    'Ver todo',
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue,
+                      fontSize: 9.2,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -2352,6 +3281,121 @@ class _QuickChatCard extends StatelessWidget {
   }
 }
 
+class OpenMatchChatScreen extends StatefulWidget {
+  const OpenMatchChatScreen({super.key, required this.alert});
+
+  final OpenMatchAlert alert;
+
+  @override
+  State<OpenMatchChatScreen> createState() => _OpenMatchChatScreenState();
+}
+
+class _OpenMatchChatScreenState extends State<OpenMatchChatScreen> {
+  final _controller = TextEditingController();
+
+  bool get _canCoordinate =>
+      DateTime.now().isAfter(widget.alert.startsAt.subtract(
+        const Duration(hours: 1),
+      ));
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_canCoordinate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El chat abre 1 hora antes del partido.')),
+      );
+      return;
+    }
+    if (_controller.text.trim().isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Chat real pendiente de backend.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final updates = widget.alert.coordinationUpdates;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F3F5),
+      appBar: AppBar(
+        title: const Text('Chat del partido'),
+        backgroundColor: AppColors.SecondBlue,
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: updates.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Aún no hay mensajes.',
+                        style: GoogleFonts.inter(
+                          color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                      itemBuilder: (_, index) {
+                        final update = updates[index];
+                        return _ChatPreviewRow(update: update);
+                      },
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemCount: updates.length,
+                    ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                12 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      enabled: _canCoordinate,
+                      decoration: InputDecoration(
+                        hintText: _canCoordinate
+                            ? 'Escribe un mensaje'
+                            : 'Disponible 1 hora antes',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton.filled(
+                    onPressed: _submit,
+                    icon: const Icon(Icons.send_rounded),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.PrimaryGreen,
+                      foregroundColor: AppColors.SecondBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HowToArriveCard extends StatelessWidget {
   const _HowToArriveCard({required this.alert});
 
@@ -2366,7 +3410,7 @@ class _HowToArriveCard extends StatelessWidget {
         children: [
           const _SectionTitle(
             icon: Icons.location_on,
-            title: '¿Cómo llegar',
+            title: 'Cómo llegar',
             subtitle: 'Encuentra el club y llega sin problemas',
           ),
           const SizedBox(height: 7),
@@ -2388,14 +3432,22 @@ class _HowToArriveCard extends StatelessWidget {
           ),
           const SizedBox(height: 9),
           Row(
-            children: const [
+            children: [
               Expanded(
                   child: _MapButton(
-                      label: 'Abrir en Google Maps', icon: Icons.map)),
-              SizedBox(width: 9),
+                label: 'Abrir en Google Maps',
+                icon: Icons.map,
+                query: '${alert.club}, ${alert.district}',
+                app: _MapApp.googleMaps,
+              )),
+              const SizedBox(width: 9),
               Expanded(
                   child: _MapButton(
-                      label: 'Abrir en Waze', icon: Icons.navigation)),
+                label: 'Abrir en Waze',
+                icon: Icons.navigation,
+                query: '${alert.club}, ${alert.district}',
+                app: _MapApp.waze,
+              )),
             ],
           ),
         ],
@@ -2630,6 +3682,41 @@ class _OpenMatchCommentCard extends StatelessWidget {
   }
 }
 
+class _OpenMatchResultUnavailableCard extends StatelessWidget {
+  const _OpenMatchResultUnavailableCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 16,
+            backgroundColor: Color(0xFFE9EEF6),
+            child: Icon(Icons.info_outline_rounded,
+                color: AppColors.SecondBlue, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OpenMatchCreatorCard extends StatelessWidget {
   const _OpenMatchCreatorCard({required this.alert});
 
@@ -2682,7 +3769,17 @@ class _OpenMatchConfirmedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final confirmed = <OpenMatchUser>[alert.organizer, ...alert.participants];
-    final slots = alert.totalMissingPlayers + 1;
+    final slots = alert.format.toLowerCase() == 'dobles'
+        ? 4
+        : math
+            .max(confirmed.length + alert.missingPlayers, 2)
+            .clamp(2, 4)
+            .toInt();
+    final missingText = alert.missingPlayers == 0
+        ? 'Equipo completo'
+        : alert.missingPlayers == 1
+            ? 'Falta 1 jugador'
+            : 'Faltan ${alert.missingPlayers} jugadores';
     return _DetailCard(
       padding: const EdgeInsets.fromLTRB(12, 9, 12, 11),
       child: Column(
@@ -2693,7 +3790,7 @@ class _OpenMatchConfirmedCard extends StatelessWidget {
               const Icon(Icons.groups, size: 13, color: AppColors.SecondBlue),
               const SizedBox(width: 6),
               Text(
-                'Ya confirmados',
+                'Jugadores',
                 style: GoogleFonts.inter(
                   color: AppColors.SecondBlue,
                   fontSize: 12.2,
@@ -2702,10 +3799,19 @@ class _OpenMatchConfirmedCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 4),
+          Text(
+            missingText,
+            style: GoogleFonts.inter(
+              color: AppColors.SecondBlue.withValues(alpha: 0.62),
+              fontSize: 10.2,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(slots.clamp(2, 4), (index) {
+            children: List.generate(slots, (index) {
               if (index < confirmed.length) {
                 return _ConfirmedPlayerBubble(user: confirmed[index]);
               }
@@ -3218,43 +4324,79 @@ class _MapButton extends StatelessWidget {
   const _MapButton({
     required this.label,
     required this.icon,
+    this.query,
+    this.app,
   });
 
   final String label;
   final IconData icon;
+  final String? query;
+  final _MapApp? app;
+
+  Future<void> _open(BuildContext context) async {
+    if (query == null || app == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Acción pendiente de integración.')),
+      );
+      return;
+    }
+    final encoded = Uri.encodeComponent(query!);
+    final uri = app == _MapApp.waze
+        ? Uri.parse('waze://?q=$encoded&navigate=yes')
+        : Uri.parse('comgooglemaps://?q=$encoded');
+    final fallback = app == _MapApp.waze
+        ? Uri.parse('https://waze.com/ul?q=$encoded&navigate=yes')
+        : Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!await launchUrl(fallback, mode: LaunchMode.externalApplication) &&
+          context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No pudimos abrir el mapa.')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.SecondBlue.withValues(alpha: 0.18)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 15, color: AppColors.SecondBlue),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: AppColors.SecondBlue,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
+    return InkWell(
+      onTap: () => _open(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border:
+              Border.all(color: AppColors.SecondBlue.withValues(alpha: 0.18)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 15, color: AppColors.SecondBlue),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
+enum _MapApp { googleMaps, waze }
 
 class _ResultChecklistItem extends StatelessWidget {
   const _ResultChecklistItem({required this.label});
@@ -3668,6 +4810,409 @@ class _EmptyPlayerSlot extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _InviteCounter extends StatelessWidget {
+  const _InviteCounter({
+    required this.selected,
+    required this.total,
+  });
+
+  final int selected;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.PrimaryGreen,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$selected/$total',
+        style: GoogleFonts.inter(
+          color: AppColors.SecondBlue,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteActionButton extends StatelessWidget {
+  const _InviteActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.SecondBlue.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: AppColors.SecondBlue, size: 15),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteQrButton extends StatelessWidget {
+  const _InviteQrButton({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 44,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.SecondBlue.withValues(alpha: 0.14),
+            ),
+          ),
+          child: const Icon(
+            Icons.qr_code_scanner_rounded,
+            color: AppColors.SecondBlue,
+            size: 18,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerSelectionCard extends StatelessWidget {
+  const _PlayerSelectionCard({
+    required this.name,
+    required this.label,
+    this.imageUrl,
+    this.onRemove,
+  });
+
+  final String name;
+  final String label;
+  final String? imageUrl;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 98,
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.SecondBlue.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DogAvatar(radius: 19, imageUrl: imageUrl),
+              const SizedBox(height: 6),
+              Text(
+                name.trim().isEmpty ? 'Jugador' : name.trim(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.58),
+                  fontSize: 8.6,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          if (onRemove != null)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: InkWell(
+                onTap: onRemove,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE9EDF3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: AppColors.SecondBlue,
+                    size: 13,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyInviteSlot extends StatelessWidget {
+  const _EmptyInviteSlot({required this.label, this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Opacity(
+        opacity: enabled ? 1 : 0.5,
+        child: Container(
+          width: 98,
+          height: 89,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.SecondBlue.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE9EDF3),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  color: AppColors.SecondBlue.withValues(alpha: 0.62),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue.withValues(alpha: 0.58),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteMessage extends StatelessWidget {
+  const _InviteMessage({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6F9),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          color: AppColors.SecondBlue.withValues(alpha: 0.65),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteNotice extends StatelessWidget {
+  const _InviteNotice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.PrimaryGreen.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.PrimaryGreen.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: AppColors.SecondBlue,
+            size: 15,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(
+                color: AppColors.SecondBlue.withValues(alpha: 0.72),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                height: 1.18,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerResultTile extends StatelessWidget {
+  const _PlayerResultTile({
+    required this.user,
+    required this.onTap,
+  });
+
+  final CommunityUser user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F6F9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.SecondBlue.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Row(
+          children: [
+            _DogAvatar(radius: 20, imageUrl: user.photoUrl),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.name.isEmpty ? 'Jugador' : user.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if ((user.category ?? '').isNotEmpty) user.category!,
+                      if ((user.preferredClub ?? '').isNotEmpty)
+                        user.preferredClub!,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue.withValues(alpha: 0.58),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.add_circle_rounded,
+              color: AppColors.secondaryGreen,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../models/profile_summary.dart';
 import '../services/profile_service.dart';
+import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
@@ -362,6 +363,7 @@ class _AvatarPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final trimmed = photoUrl?.trim() ?? '';
     final hasRemotePhoto = trimmed.startsWith('http');
+    final bytes = tryDecodeDataUrl(trimmed);
 
     return Container(
       padding: const EdgeInsets.all(3),
@@ -384,11 +386,20 @@ class _AvatarPreview extends StatelessWidget {
         backgroundImage: hasRemotePhoto ? NetworkImage(trimmed) : null,
         child: hasRemotePhoto
             ? null
-            : Icon(
-                Icons.person,
-                size: 42,
-                color: AppColors.SecondBlue.withValues(alpha: 0.7),
-              ),
+            : bytes != null
+                ? ClipOval(
+                    child: Image.memory(
+                      bytes,
+                      width: 84,
+                      height: 84,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Icon(
+                    Icons.person,
+                    size: 42,
+                    color: AppColors.SecondBlue.withValues(alpha: 0.7),
+                  ),
       ),
     );
   }

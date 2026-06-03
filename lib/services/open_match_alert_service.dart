@@ -57,6 +57,7 @@ class OpenMatchAlertService {
     required int costPerPerson,
     required String paymentLabel,
     String? comment,
+    List<String> invitedUserIds = const [],
   }) async {
     final response = await _send(
       (token) => _client.post(
@@ -72,6 +73,7 @@ class OpenMatchAlertService {
           'missingPlayers': missingPlayers,
           'costPerPerson': costPerPerson,
           'paymentLabel': paymentLabel,
+          if (invitedUserIds.isNotEmpty) 'invitedUserIds': invitedUserIds,
           if (comment != null && comment.trim().isNotEmpty)
             'comment': comment.trim(),
         }),
@@ -87,6 +89,19 @@ class OpenMatchAlertService {
     final response = await _send(
       (token) => _client.post(
         Uri.parse('${ApiConfig.baseUrl}/open-match-alerts/$id/join'),
+        headers: _headers(token),
+      ),
+    );
+
+    return OpenMatchAlert.fromJson(
+      (jsonDecode(response.body) as Map).cast<String, dynamic>(),
+    );
+  }
+
+  Future<OpenMatchAlert> leaveAlert(String id) async {
+    final response = await _send(
+      (token) => _client.post(
+        Uri.parse('${ApiConfig.baseUrl}/open-match-alerts/$id/leave'),
         headers: _headers(token),
       ),
     );

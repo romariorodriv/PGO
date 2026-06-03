@@ -47,8 +47,8 @@ class _TournamentRegisterPartnerScreenState
   bool _isScanningQr = false;
 
   TournamentRecord? get _tournament => widget.tournament;
-  String get _title => _tournament?.title ?? 'Torneo PGO';
-  String get _location => _tournament?.location ?? 'One Padel Trigal';
+  String get _title => _tournament?.title ?? '';
+  String get _location => _tournament?.location ?? '';
   int get _entryFee => _tournament?.entryFee ?? 60;
 
   String get _formattedDate {
@@ -138,7 +138,7 @@ class _TournamentRegisterPartnerScreenState
     if (tournament == null || partner == null) return;
     if (!TournamentRules.canJoin(tournament)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(TournamentRules.joinLabel(tournament))),
+        SnackBar(content: Text(TournamentRules.joinBlockedReason(tournament))),
       );
       return;
     }

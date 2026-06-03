@@ -59,6 +59,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _notifications = const [];
         _error = error.toString().replaceFirst('Exception: ', '');
         _isLoading = false;
       });
@@ -89,6 +90,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       await _notificationService.markRead(item.id);
     } catch (_) {}
+  }
+
+  Future<void> _deleteNotification(PgoAppNotification item) async {
+    final previous = _notifications;
+    final index = previous.indexWhere((current) => current.id == item.id);
+    setState(() {
+      _notifications =
+          _notifications.where((current) => current.id != item.id).toList();
+    });
+    try {
+      await _notificationService.deleteNotification(item.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        final restored = [..._notifications];
+        if (!restored.any((current) => current.id == item.id)) {
+          final restoredIndex =
+              index < 0 ? 0 : index.clamp(0, restored.length).toInt();
+          restored.insert(restoredIndex, item);
+        }
+        _notifications = restored;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo eliminar la notificación.'),
+        ),
+      );
+    }
   }
 
   Future<void> _openNotification(PgoAppNotification item) async {
@@ -189,31 +218,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               letterSpacing: 0,
                             ),
                           ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: _markAllAsRead,
-                              style: TextButton.styleFrom(
-                                backgroundColor: const Color(0xFFE9F8CB),
-                                foregroundColor: AppColors.SecondBlue,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                'Marcar leidas',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -243,7 +247,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   setState(() => _selectedFilter = filter);
                                 },
                               ),
-                              const SizedBox(height: 34),
+                              const SizedBox(height: 16),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: _MarkReadButton(
+                                  onPressed: _markAllAsRead,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
                               if (_isLoading)
                                 const Center(child: CircularProgressIndicator())
                               else if (_error != null)
@@ -261,6 +272,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     _NotificationsGroupCard(
                                       notifications: entry.value,
                                       onTap: _openNotification,
+                                      onDelete: _deleteNotification,
                                     ),
                                     const SizedBox(height: 24),
                                   ];
@@ -353,6 +365,31 @@ class _FilterTabs extends StatelessWidget {
   }
 }
 
+class _MarkReadButton extends StatelessWidget {
+  const _MarkReadButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.done_all_rounded, size: 16),
+      label: const Text('Marcar leidas'),
+      style: TextButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.SecondBlue,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title);
 
@@ -375,10 +412,12 @@ class _NotificationsGroupCard extends StatelessWidget {
   const _NotificationsGroupCard({
     required this.notifications,
     required this.onTap,
+    required this.onDelete,
   });
 
   final List<PgoAppNotification> notifications;
   final ValueChanged<PgoAppNotification> onTap;
+  final ValueChanged<PgoAppNotification> onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -397,9 +436,21 @@ class _NotificationsGroupCard extends StatelessWidget {
       child: Column(
         children: [
           for (var index = 0; index < notifications.length; index++) ...[
-            _NotificationRow(
-              notification: notifications[index],
-              onTap: () => onTap(notifications[index]),
+            Dismissible(
+              key: ValueKey(notifications[index].id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 18),
+                color: const Color(0xFFFFE2E2),
+                child: const Icon(Icons.delete_outline_rounded,
+                    color: Color(0xFFB3261E)),
+              ),
+              onDismissed: (_) => onDelete(notifications[index]),
+              child: _NotificationRow(
+                notification: notifications[index],
+                onTap: () => onTap(notifications[index]),
+              ),
             ),
             if (index != notifications.length - 1)
               const Padding(

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
@@ -17,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
 
   bool _rememberUser = false;
   bool _agreeTerms = false;
@@ -30,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController = TextEditingController();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
   }
 
   @override
@@ -37,6 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -44,24 +47,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       _showSnack('Completa todos los campos');
       return;
     }
 
-    if (!email.contains('@')) {
-      _showSnack('Ingresa un correo valido');
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      _showSnack('Ingresa un correo válido');
       return;
     }
 
-    if (password.length < 6) {
-      _showSnack('La contrasena debe tener al menos 6 caracteres');
+    if (password.length < 8 ||
+        !RegExp(r'\d').hasMatch(password) ||
+        !RegExp(r'[A-Z]').hasMatch(password)) {
+      _showSnack(
+          'La contraseña debe tener 8 caracteres, 1 número y 1 mayúscula');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showSnack('Las contraseñas no coinciden');
       return;
     }
 
     if (!_agreeTerms) {
-      _showSnack('Debes aceptar los terminos y condiciones');
+      _showSnack('Debes aceptar los términos y condiciones');
       return;
     }
 
@@ -125,7 +137,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Registrate',
+                'Regístrate',
                 style: GoogleFonts.inter(
                   color: AppColors.SecondBlue,
                   fontSize: 31,
@@ -177,7 +189,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Column(
       children: [
         _SocialAuthButton(
-          label: _isGoogleSubmitting ? 'Conectando...' : 'Sign up with Google',
+          label:
+              _isGoogleSubmitting ? 'Conectando...' : 'Registrarse con Google',
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF5F6673),
           borderColor: const Color(0xFFE7EAF0),
@@ -195,27 +208,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         _SocialAuthButton(
-          label: 'Sign up with Facebook',
-          backgroundColor: const Color(0xFF1877F2),
-          foregroundColor: Colors.white,
-          icon: const Text(
-            'f',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          onTap: disabled
-              ? null
-              : () {
-                  _showSnack('Facebook aún no esta disponible');
-                },
-        ),
-        const SizedBox(height: 8),
-        _SocialAuthButton(
-          label: 'Sign up with email',
+          label: 'Registrarse con email',
           backgroundColor: Colors.white,
           foregroundColor: AppColors.SecondBlue,
           borderColor: const Color(0xFFD8DDE6),
@@ -280,7 +273,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
-        hintText: 'Crea una contrasena',
+        hintText: 'Crea una contraseña',
         hintStyle: GoogleFonts.inter(
           color: AppColors.SecondBlue.withValues(alpha: 0.55),
           fontSize: 15,
@@ -398,6 +391,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
 
   bool _rememberUser = false;
   bool _agreeTerms = false;
@@ -410,6 +404,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
     _nameController = TextEditingController();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
   }
 
   @override
@@ -417,6 +412,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -424,24 +420,36 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
       _showSnack('Completa todos los campos');
       return;
     }
 
-    if (!email.contains('@')) {
-      _showSnack('Ingresa un correo valido');
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      _showSnack('Ingresa un correo válido');
       return;
     }
 
-    if (password.length < 6) {
-      _showSnack('La contrasena debe tener al menos 6 caracteres');
+    if (password.length < 8 ||
+        !RegExp(r'\d').hasMatch(password) ||
+        !RegExp(r'[A-Z]').hasMatch(password)) {
+      _showSnack(
+          'La contraseña debe tener 8 caracteres, 1 número y 1 mayúscula');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showSnack('Las contraseñas no coinciden');
       return;
     }
 
     if (!_agreeTerms) {
-      _showSnack('Debes aceptar los terminos y condiciones');
+      _showSnack('Debes aceptar los términos y condiciones');
       return;
     }
 
@@ -499,7 +507,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
               const SizedBox(height: 6),
               Center(
                 child: Text(
-                  'Registrate con email',
+                  'Regístrate con email',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
@@ -540,6 +548,15 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
                 obscureText: _obscurePassword,
                 onToggle: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
+                hint: 'Crea una contraseña',
+              ),
+              const SizedBox(height: 12),
+              _RegisterPasswordInput(
+                controller: _confirmPasswordController,
+                obscureText: _obscurePassword,
+                onToggle: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                hint: 'Confirma tu contraseña',
               ),
               const SizedBox(height: 10),
               _RegisterCheckRow(
@@ -551,7 +568,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
               _RegisterCheckRow(
                 value: _agreeTerms,
                 onChanged: (value) => setState(() => _agreeTerms = value),
-                text: 'He leido y acepto los terminos y condiciones de PGO.',
+                text: 'He leído y acepto los términos y condiciones de PGO.',
               ),
               const SizedBox(height: 18),
               _RegisterPrimaryButton(
@@ -639,11 +656,13 @@ class _RegisterPasswordInput extends StatelessWidget {
     required this.controller,
     required this.obscureText,
     required this.onToggle,
+    this.hint = 'Crea una contraseña',
   });
 
   final TextEditingController controller;
   final bool obscureText;
   final VoidCallback onToggle;
+  final String hint;
 
   @override
   Widget build(BuildContext context) {
@@ -657,7 +676,7 @@ class _RegisterPasswordInput extends StatelessWidget {
         fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
-        hintText: 'Crea una contrasena',
+        hintText: hint,
         hintStyle: GoogleFonts.inter(
           color: AppColors.SecondBlue.withValues(alpha: 0.52),
           fontSize: 14,

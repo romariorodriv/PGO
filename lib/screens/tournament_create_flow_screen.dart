@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -154,8 +154,10 @@ class _TournamentCreateFlowScreenState
     _descriptionController.text = tournament.description ?? '';
     _costController.text = 'S/. ${tournament.entryFee} x persona';
     _prizeController.text = tournament.prize;
-    _tournamentType = tournament.tournamentType;
-    _pairingMode = tournament.pairingMode;
+    _tournamentType = tournament.tournamentType.toLowerCase().contains('rey')
+        ? 'Americano'
+        : tournament.tournamentType;
+    _pairingMode = 'FIXED';
     _category = tournament.category;
     _modality = tournament.modality;
     _city = tournament.city;
@@ -293,18 +295,10 @@ class _TournamentCreateFlowScreenState
 
   void _setTournamentType(String value) {
     setState(() {
-      _tournamentType = value;
-      if (!_isKingOfCourt) {
-        _pairingMode = 'FIXED';
-      }
+      _tournamentType = 'Americano';
+      _pairingMode = 'FIXED';
     });
   }
-
-  bool get _isKingOfCourt =>
-      _tournamentType.toLowerCase().contains('rey de la cancha');
-
-  String get _pairingModeLabel =>
-      _pairingMode == 'ROTATING' ? 'Parejas rotativas' : 'Parejas fijas';
 
   void _normalizeCapacityForFormat() {
     final step = _capacityStep;
@@ -544,7 +538,7 @@ class _TournamentCreateFlowScreenState
           ? await service.createTournament(
               title: _nameController.text,
               tournamentType: _tournamentType,
-              pairingMode: _isKingOfCourt ? _pairingMode : 'FIXED',
+              pairingMode: 'FIXED',
               playerCapacity: _parsePlayerCapacity(),
               modality: _modality,
               format: _format,
@@ -564,7 +558,7 @@ class _TournamentCreateFlowScreenState
               tournamentId: _createdTournament!.id,
               title: _nameController.text,
               tournamentType: _tournamentType,
-              pairingMode: _isKingOfCourt ? _pairingMode : 'FIXED',
+              pairingMode: 'FIXED',
               playerCapacity: _parsePlayerCapacity(),
               modality: _modality,
               format: _format,
@@ -748,55 +742,12 @@ class _TournamentCreateFlowScreenState
                 Expanded(
                   child: _SegmentButton(
                     label: 'Americano',
-                    selected: _tournamentType == 'Americano',
+                    selected: true,
                     onTap: () => _setTournamentType('Americano'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _SegmentButton(
-                    label: 'Rey de la cancha',
-                    selected: _tournamentType == 'Rey de la cancha',
-                    onTap: () => _setTournamentType('Rey de la cancha'),
                   ),
                 ),
               ],
             ),
-            if (_isKingOfCourt) ...[
-              const SizedBox(height: 16),
-              const _FieldLabel(label: 'Tipo de parejas'),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SegmentButton(
-                      label: 'Fijas',
-                      selected: _pairingMode == 'FIXED',
-                      onTap: () => setState(() => _pairingMode = 'FIXED'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SegmentButton(
-                      label: 'Rotativas',
-                      selected: _pairingMode == 'ROTATING',
-                      onTap: () => setState(() => _pairingMode = 'ROTATING'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _pairingMode == 'ROTATING'
-                    ? 'Las parejas pueden mezclarse entre juegos según la lógica de rey de cancha.'
-                    : 'Las duplas se mantienen durante todo el torneo y suben o bajan juntas.',
-                style: TextStyle(
-                  color: AppColors.SecondBlue.withValues(alpha: 0.62),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Categoría'),
             _DropdownBox(
@@ -1135,7 +1086,6 @@ class _TournamentCreateFlowScreenState
             onTap: () => setState(() => _step = _TournamentCreateStep.basic),
             lines: [
               'Tipo: $_tournamentType',
-              if (_isKingOfCourt) 'Parejas: $_pairingModeLabel',
               'Categoría: ${_category.toLowerCase()}',
               'Modalidad: $_modality',
             ],

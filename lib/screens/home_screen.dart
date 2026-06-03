@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,17 +13,21 @@ import '../models/open_match_alert.dart';
 import '../models/profile_summary.dart';
 import '../models/tournament_record.dart';
 import '../services/open_match_alert_service.dart';
+import '../services/notification_service.dart';
 import '../services/profile_service.dart';
 import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'activity_screen.dart';
+import 'notifications_screen.dart';
 import 'open_match_alerts_screen.dart';
 import 'profile_history_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_description_screen.dart';
 import 'tournaments_screen.dart';
+
+const homeCtaGreen = Color(0xFFD7FF4F);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -33,6 +37,7 @@ class HomeScreen extends StatefulWidget {
     this.onTournamentsTap,
     this.onAlertsTap,
     this.onProfileTap,
+    this.initialProfile,
   });
 
   final bool showBottomNav;
@@ -40,54 +45,70 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onTournamentsTap;
   final VoidCallback? onAlertsTap;
   final VoidCallback? onProfileTap;
+  final ProfileSummary? initialProfile;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _onboardingPhonePrefix = 'profile_onboarding_phone_';
-  static const _onboardingSeenPrefix = 'profile_onboarding_seen_';
+  static const _homeGuideSeenPrefix = 'home_guide_seen_';
 
+  final List<GlobalKey> _quickAccessKeys = List.generate(4, (_) => GlobalKey());
   ProfileSummary? _profile;
   List<TournamentRecord> _tournaments = const [];
   List<OpenMatchAlert> _openMatchAlerts = const [];
   bool _isLoadingProfile = true;
   String? _profileError;
   bool _isUpdatingProfile = false;
-  bool _hasShownProfileComplete = false;
-  bool _hasShownProfileOnboarding = false;
-  bool _hasSeenProfileOnboarding = false;
-  String _savedOnboardingPhone = '';
+  bool _hasSeenHomeGuide = false;
+  bool _isHomeGuideVisible = false;
+  int _homeGuideStep = 0;
+  int _notificationCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _bootstrapHome();
   }
 
-  Future<void> _loadProfile() async {
-    try {
-      final profileFuture = ProfileService().getMyProfile();
-      final tournamentsFuture = TournamentService().getTournaments();
-      final alertsFuture = OpenMatchAlertService().getAlerts().catchError(
-            (_) => const <OpenMatchAlert>[],
-          );
-      final profile = await profileFuture;
-      final tournaments = await tournamentsFuture;
-      final alerts = await alertsFuture;
-      final savedPhone = await _readOnboardingPhone(profile.id);
-      final hasSeenOnboarding = await _readOnboardingSeen(profile.id);
+  void _logTiming(String label, Stopwatch watch) {
+    debugPrint('pgo_startup $label ${watch.elapsedMilliseconds}ms');
+  }
+
+  Future<void> _bootstrapHome() async {
+    final watch = Stopwatch()..start();
+    if (widget.initialProfile != null) {
+      final profile = widget.initialProfile!;
+      final hasSeenHomeGuide =
+          profile.hasSeenHomeGuide ?? await _readHomeGuideSeen(profile.id);
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _tournaments = tournaments;
-        _openMatchAlerts = alerts;
-        _savedOnboardingPhone = savedPhone;
-        _hasSeenProfileOnboarding = hasSeenOnboarding;
+        _hasSeenHomeGuide = hasSeenHomeGuide;
+        _isLoadingProfile = false;
+      });
+      _logTiming('first_screen_ready', watch);
+      _checkHomeGuide();
+      unawaited(_loadSecondaryHomeData(watch));
+      return;
+    }
+    await _loadProfile(watch);
+  }
+
+  Future<void> _loadProfile([Stopwatch? startupWatch]) async {
+    final watch = startupWatch ?? (Stopwatch()..start());
+    try {
+      final profile = await ProfileService().getMyProfile();
+      _logTiming('profile_loaded', watch);
+      final hasSeenHomeGuide =
+          profile.hasSeenHomeGuide ?? await _readHomeGuideSeen(profile.id);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _hasSeenHomeGuide = hasSeenHomeGuide;
         _profileError = null;
       });
-      _checkProfileCompletion();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -98,9 +119,33 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isLoadingProfile = false;
         });
-        _checkProfileOnboarding();
+        _logTiming('first_screen_ready', watch);
+        _checkHomeGuide();
+        unawaited(_loadSecondaryHomeData(watch));
       }
     }
+  }
+
+  Future<void> _loadSecondaryHomeData(Stopwatch watch) async {
+    final results = await Future.wait([
+      TournamentService().getTournaments().catchError(
+            (_) => const <TournamentRecord>[],
+          ),
+      NotificationService()
+          .getNotifications()
+          .then((value) => value.unreadCount)
+          .catchError((_) => 0),
+      OpenMatchAlertService().getAlerts().catchError(
+            (_) => const <OpenMatchAlert>[],
+          ),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _tournaments = results[0] as List<TournamentRecord>;
+      _notificationCount = results[1] as int;
+      _openMatchAlerts = results[2] as List<OpenMatchAlert>;
+    });
+    _logTiming('home_data_loaded', watch);
   }
 
   String _buildProfileSubtitle() {
@@ -116,9 +161,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _buildGreetingName() {
-    final fullName = (_profile?.name ?? 'Romario').trim();
+    final fullName = (_profile?.name ?? 'Jugador').trim();
     if (fullName.isEmpty) {
-      return 'Romario';
+      return 'Jugador';
     }
 
     return fullName.split(RegExp(r'\s+')).first;
@@ -145,24 +190,32 @@ class _HomeScreenState extends State<HomeScreen> {
   OpenMatchAlert? get _recommendedOpenMatch {
     final profileCategory = _normalizeText(_profile?.category);
     final preferredClub = _normalizeText(_profile?.preferredClub);
-    if (profileCategory.isEmpty || preferredClub.isEmpty) {
-      return null;
-    }
 
-    final matching = _openMatchAlerts
+    final openAlerts = _openMatchAlerts
         .where(
           (item) =>
               item.status == 'OPEN' &&
               !item.hasJoined &&
               !item.isOrganizer &&
-              item.missingPlayers > 0 &&
-              _normalizeText(item.category) == profileCategory &&
-              _normalizeText(item.club) == preferredClub,
+              item.missingPlayers > 0,
         )
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
-    return matching.isNotEmpty ? matching.first : null;
+    for (final alert in openAlerts) {
+      final sameCategory = profileCategory.isNotEmpty &&
+          _normalizeText(alert.category) == profileCategory;
+      final sameClub = preferredClub.isNotEmpty &&
+          _normalizeText(alert.club) == preferredClub;
+      if (sameCategory && sameClub) return alert;
+    }
+    for (final alert in openAlerts) {
+      if (profileCategory.isNotEmpty &&
+          _normalizeText(alert.category) == profileCategory) {
+        return alert;
+      }
+    }
+    return openAlerts.isNotEmpty ? openAlerts.first : null;
   }
 
   String _normalizeText(String? value) {
@@ -245,7 +298,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _profile = updated;
       });
-      _checkProfileCompletion();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -289,7 +341,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _profile = updated;
       });
-      _checkProfileCompletion();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -333,7 +384,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _profile = updated;
       });
-      _checkProfileCompletion();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,109 +400,52 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  bool get _isProfileComplete {
-    final profile = _profile;
-    if (profile == null) return false;
-    final side = profile.preferredSide?.trim() ?? '';
-    final schedule = profile.racketModel?.trim() ?? '';
-    final club = profile.preferredClub?.trim() ?? '';
-    return side.isNotEmpty && schedule.isNotEmpty && club.isNotEmpty;
+  Future<bool> _readHomeGuideSeen(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('$_homeGuideSeenPrefix$userId') ?? false;
   }
 
-  void _checkProfileCompletion() {
-    if (!_isProfileComplete || _hasShownProfileComplete) return;
-    _hasShownProfileComplete = true;
+  Future<void> _saveHomeGuideSeen(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_homeGuideSeenPrefix$userId', true);
+    try {
+      await ProfileService().markHomeGuideSeen();
+    } catch (_) {
+      // Backend support is optional; local state still prevents repeats.
+    }
+  }
+
+  void _checkHomeGuide() {
+    if (_isLoadingProfile || _profile == null) return;
+    if (_hasSeenHomeGuide || _isHomeGuideVisible) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (context) => const _ProfileCompleteDialog(),
-      );
+      if (!mounted || _hasSeenHomeGuide || _isHomeGuideVisible) return;
+      setState(() {
+        _isHomeGuideVisible = true;
+        _homeGuideStep = 0;
+      });
     });
   }
 
-  void _checkProfileOnboarding() {
-    if (_isLoadingProfile) return;
-    if (_profile == null || _hasShownProfileOnboarding) return;
-    if (_hasSeenProfileOnboarding) return;
-
-    _hasShownProfileOnboarding = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || _profile == null) return;
-
-      await _saveOnboardingSeen(_profile!.id);
-      if (!mounted) return;
-      setState(() {
-        _hasSeenProfileOnboarding = true;
-      });
-
-      final result = await showDialog<_ProfileOnboardingResult>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => _CompleteProfileOnboardingDialog(
-          initialName: _profile!.name,
-          email: _profile!.email,
-          initialPhotoUrl: _profile!.photoUrl,
-          initialPhone: _savedOnboardingPhone,
-        ),
-      );
-
-      if (!mounted || result == null || result.omitted) {
-        return;
-      }
-
-      setState(() {
-        _isUpdatingProfile = true;
-      });
-
-      try {
-        final updated = await ProfileService().updateMyProfile(
-          name: result.name,
-          photoUrl: result.photoUrl,
-        );
-        await _saveOnboardingPhone(updated.id, result.phone);
-        if (!mounted) return;
-        setState(() {
-          _profile = updated;
-          _savedOnboardingPhone = result.phone;
-        });
-        _checkProfileCompletion();
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar tu perfil inicial.'),
-          ),
-        );
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isUpdatingProfile = false;
-          });
-        }
-      }
+  Future<void> _finishHomeGuide() async {
+    final userId = _profile?.id;
+    setState(() {
+      _isHomeGuideVisible = false;
+      _hasSeenHomeGuide = true;
     });
+    if (userId != null) {
+      await _saveHomeGuideSeen(userId);
+    }
   }
 
-  Future<String> _readOnboardingPhone(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('$_onboardingPhonePrefix$userId') ?? '';
-  }
-
-  Future<void> _saveOnboardingPhone(String userId, String phone) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('$_onboardingPhonePrefix$userId', phone.trim());
-  }
-
-  Future<bool> _readOnboardingSeen(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('$_onboardingSeenPrefix$userId') ?? false;
-  }
-
-  Future<void> _saveOnboardingSeen(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_onboardingSeenPrefix$userId', true);
+  void _nextHomeGuideStep() {
+    if (_homeGuideStep >= _HomeGuideOverlay.steps.length - 1) {
+      _finishHomeGuide();
+      return;
+    }
+    setState(() {
+      _homeGuideStep += 1;
+    });
   }
 
   Future<void> _openRecommendedTournament() async {
@@ -569,104 +562,130 @@ class _HomeScreenState extends State<HomeScreen> {
     await _openRecommendedTournament();
   }
 
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
+    if (!mounted) return;
+    _loadProfile();
+  }
+
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F8),
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        toolbarHeight: AppColors.headerToolbarHeight,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: const DecoratedBox(
-          decoration: AppColors.headerGradientDecoration,
-        ),
-        elevation: 0,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/images/pgoIconoAPP.png',
-              height: 66,
-              fit: BoxFit.contain,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF7F7F8),
+          extendBody: true,
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            toolbarHeight: AppColors.headerToolbarHeight,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: const DecoratedBox(
+              decoration: AppColors.headerGradientDecoration,
             ),
-          ],
-        ),
-        actions: [
-          const PgoOptionsMenuButton(),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: DecoratedBox(
-          decoration: AppColors.headerGradientDecoration,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: topInset + AppColors.headerToolbarHeight,
+            elevation: 0,
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                Image.asset(
+                  'assets/images/pgoIconoAPP.png',
+                  height: 66,
+                  fit: BoxFit.contain,
+                ),
+              ],
             ),
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF2F3F5),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+            actions: [
+              _HeaderNotificationButton(
+                count: _notificationCount,
+                onTap: _openNotifications,
               ),
-              child: RefreshIndicator(
-                onRefresh: _loadProfile,
-                color: AppColors.SecondBlue,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: MediaQuery.sizeOf(context).height -
-                          (topInset + AppColors.headerToolbarHeight) -
-                          96,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHomeHeroSection(),
-                        const SizedBox(height: 22),
-                        _buildQuickAccessSection(),
-                        const SizedBox(height: 28),
-                        _buildActivityOverviewCardV2(),
-                        const SizedBox(height: 28),
-                        _buildHomeRecommendationsSection(),
-                        const SizedBox(height: 24),
-                      ],
+              const SizedBox(width: 2),
+              const PgoOptionsMenuButton(),
+            ],
+          ),
+          body: SafeArea(
+            top: false,
+            child: DecoratedBox(
+              decoration: AppColors.headerGradientDecoration,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: topInset + AppColors.headerToolbarHeight,
+                ),
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF2F3F5),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(34)),
+                  ),
+                  child: RefreshIndicator(
+                    onRefresh: _loadProfile,
+                    color: AppColors.SecondBlue,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 26, 20, 82),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.sizeOf(context).height -
+                              (topInset + AppColors.headerToolbarHeight) -
+                              96,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHomeHeroSection(),
+                            const SizedBox(height: 28),
+                            _buildQuickAccessSection(),
+                            const SizedBox(height: 34),
+                            _buildActivityOverviewCardV2(),
+                            const SizedBox(height: 34),
+                            _buildHomeRecommendationsSection(),
+                            const SizedBox(height: 14),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
+          bottomNavigationBar: widget.showBottomNav
+              ? widget.bottomNavigationBar ??
+                  PgoBottomNav(
+                    currentTab: PgoNavTab.home,
+                    onHomeTap: () {},
+                    onTournamentsTap: widget.onTournamentsTap ??
+                        () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const TournamentsScreen(),
+                            ),
+                          );
+                        },
+                    onAlertsTap: widget.onAlertsTap ?? _openAlertsSection,
+                    onProfileTap: widget.onProfileTap ??
+                        () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const ProfileScreen(),
+                            ),
+                          );
+                        },
+                  )
+              : null,
         ),
-      ),
-      bottomNavigationBar: widget.showBottomNav
-          ? widget.bottomNavigationBar ??
-              PgoBottomNav(
-                currentTab: PgoNavTab.home,
-                onHomeTap: () {},
-                onTournamentsTap: widget.onTournamentsTap ??
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const TournamentsScreen(),
-                        ),
-                      );
-                    },
-                onAlertsTap: widget.onAlertsTap ?? _openAlertsSection,
-                onProfileTap: widget.onProfileTap ??
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ProfileScreen(),
-                        ),
-                      );
-                    },
-              )
-          : null,
+        if (_isHomeGuideVisible)
+          _HomeGuideOverlay(
+            stepIndex: _homeGuideStep,
+            targetKey: _quickAccessKeys[_homeGuideStep],
+            onSkip: _finishHomeGuide,
+            onNext: _nextHomeGuideStep,
+          ),
+      ],
     );
   }
 
@@ -680,7 +699,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: PgoTextStyles.screenTitle(),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         Text(
           _buildProfileSubtitle(),
           textAlign: TextAlign.center,
@@ -752,14 +771,21 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Text(
           'Hola ${_buildGreetingName()},',
-          style: PgoTextStyles.screenTitle(),
+          style: PgoTextStyles.screenTitle().copyWith(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            height: 1.05,
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           'Listo para un nuevo partido?',
           style: PgoTextStyles.screenSubtitle(
             color: const Color(0xFF7D8795),
-            weight: FontWeight.w700,
+            weight: FontWeight.w600,
+          ).copyWith(
+            fontSize: 13,
+            height: 1.15,
           ),
         ),
       ],
@@ -782,21 +808,25 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _QuickAccessButton(
+              key: _quickAccessKeys[0],
               assetPath: 'assets/images/quick_register_match.png',
               label: 'Registrar\nmatch',
               onTap: _openActivity,
             ),
             _QuickAccessButton(
+              key: _quickAccessKeys[1],
               assetPath: 'assets/images/quick_create_alert.png',
               label: 'Crear\nalerta',
               onTap: _openCreateOpenMatch,
             ),
             _QuickAccessButton(
+              key: _quickAccessKeys[2],
               assetPath: 'assets/images/quick_find_match.png',
               label: 'Buscar\npartido',
               onTap: _openAlertsSection,
             ),
             _QuickAccessButton(
+              key: _quickAccessKeys[3],
               assetPath: 'assets/images/quick_find_tournament.png',
               label: 'Buscar\ntorneo',
               onTap: _openTournamentsSection,
@@ -880,14 +910,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 10),
                 SizedBox(
-                  width: 126,
+                  width: 104,
                   child: Align(
-                    alignment: Alignment.topRight,
+                    alignment: Alignment.centerRight,
                     child: Image.asset(
                       'assets/images/home_activity_padel.png',
-                      width: 140,
+                      width: 112,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
                     ),
@@ -1282,16 +1312,15 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.only(left: 14),
           child: Text(
             'Recomendaciones para ti',
-            style: GoogleFonts.inter(
+            style: PgoTextStyles.sectionTitle(
               color: AppColors.SecondBlue,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
+              weight: FontWeight.w900,
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        _buildFeaturedTournamentCard(),
         const SizedBox(height: 18),
+        _buildFeaturedTournamentCard(),
+        const SizedBox(height: 24),
         _buildFeaturedOpenMatchCard(),
       ],
     );
@@ -1381,7 +1410,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: ElevatedButton(
                             onPressed: _openTournamentsSection,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.PrimaryGreen,
+                              backgroundColor: homeCtaGreen,
                               foregroundColor: AppColors.SecondBlue,
                               elevation: 0,
                               padding: EdgeInsets.zero,
@@ -1435,24 +1464,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final dayLabel = alert == null ? 'Hoy' : _formatShortDay(alert.startsAt);
     final missing = alert?.missingPlayers ?? 2;
 
-    const suggestedGreen = Color(0xFFD5FF83);
-
     return GestureDetector(
       onTap: _openRecommendedOpenMatch,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 118),
+        constraints: const BoxConstraints(minHeight: 132),
         padding: EdgeInsets.zero,
         decoration: _homeCardDecoration(radius: 19),
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 34, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 46, 16, 16),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _AvatarCircle(
                     photoUrl: alert?.organizer.photoUrl,
-                    borderColor: suggestedGreen,
+                    borderColor: homeCtaGreen,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1520,7 +1547,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ElevatedButton(
                         onPressed: _openRecommendedOpenMatch,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: suggestedGreen,
+                          backgroundColor: homeCtaGreen,
                           foregroundColor: AppColors.SecondBlue,
                           elevation: 0,
                           padding: EdgeInsets.zero,
@@ -1540,7 +1567,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Positioned(
               left: 14,
-              top: 0,
+              top: 12,
               child: _MiniBadge(
                 text: 'Partido sugerido para ti',
                 color: const Color(0xFFE9F8CB),
@@ -1548,10 +1575,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Positioned(
               right: 14,
-              top: 8,
+              top: 14,
               child: _MiniBadge(
                 text: 'Faltan $missing jugadores',
-                color: suggestedGreen,
+                color: homeCtaGreen,
               ),
             ),
           ],
@@ -1972,8 +1999,342 @@ class _TournamentMetaLine extends StatelessWidget {
   }
 }
 
+class _HomeGuideStep {
+  const _HomeGuideStep({
+    required this.count,
+    required this.title,
+    required this.body,
+    required this.assetPath,
+  });
+
+  final String count;
+  final String title;
+  final String body;
+  final String assetPath;
+}
+
+class _HomeGuideOverlay extends StatelessWidget {
+  const _HomeGuideOverlay({
+    required this.stepIndex,
+    required this.targetKey,
+    required this.onSkip,
+    required this.onNext,
+  });
+
+  static const steps = [
+    _HomeGuideStep(
+      count: '1/4',
+      title: 'Registra tu actividad',
+      body: 'Guarda tus partidos y resultados para actualizar tu historial.',
+      assetPath: 'assets/images/quick_register_match.png',
+    ),
+    _HomeGuideStep(
+      count: '2/4',
+      title: 'Crea un partido',
+      body:
+          'Publica un partido abierto para encontrar jugadores y coordinar facilmente.',
+      assetPath: 'assets/images/quick_create_alert.png',
+    ),
+    _HomeGuideStep(
+      count: '3/4',
+      title: 'Encuentra un partido',
+      body: 'Descubre partidos abiertos segun tu categoria, horario y zona.',
+      assetPath: 'assets/images/quick_find_match.png',
+    ),
+    _HomeGuideStep(
+      count: '4/4',
+      title: 'Unete a un torneo',
+      body:
+          'Explora torneos disponibles, inscribete y sigue tus partidos desde la app.',
+      assetPath: 'assets/images/quick_find_tournament.png',
+    ),
+  ];
+
+  final int stepIndex;
+  final GlobalKey targetKey;
+  final VoidCallback onSkip;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final step = steps[stepIndex];
+    final size = MediaQuery.sizeOf(context);
+    final target = _targetRect();
+    final guideIconRect = target.inflate(18);
+    final cardWidth = (size.width * 0.52).clamp(210.0, 268.0);
+    final left = (target.center.dx - cardWidth / 2).clamp(
+      18.0,
+      size.width - cardWidth - 18,
+    );
+    final belowTop = target.bottom + 36;
+    final aboveTop = target.top - 178;
+    final top = belowTop + 174 < size.height ? belowTop : aboveTop;
+
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {},
+              child: Container(color: Colors.black.withValues(alpha: 0.58)),
+            ),
+          ),
+          Positioned.fromRect(
+            rect: guideIconRect,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      blurRadius: 18,
+                      spreadRadius: 9,
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      blurRadius: 34,
+                      spreadRadius: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fromRect(
+            rect: target,
+            child: IgnorePointer(
+              child: Image.asset(
+                step.assetPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+          ),
+          Positioned(
+            left: left,
+            top: top,
+            width: cardWidth,
+            child: _HomeGuideCard(
+              step: step,
+              isLast: stepIndex == steps.length - 1,
+              arrowX: target.center.dx - left,
+              onSkip: onSkip,
+              onNext: onNext,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Rect _targetRect() {
+    final context = targetKey.currentContext;
+    if (context == null) return const Rect.fromLTWH(80, 310, 82, 82);
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) {
+      return const Rect.fromLTWH(80, 310, 82, 82);
+    }
+    final offset = renderBox.localToGlobal(Offset.zero);
+    return offset & renderBox.size;
+  }
+}
+
+class _HomeGuideCard extends StatelessWidget {
+  const _HomeGuideCard({
+    required this.step,
+    required this.isLast,
+    required this.arrowX,
+    required this.onSkip,
+    required this.onNext,
+  });
+
+  final _HomeGuideStep step;
+  final bool isLast;
+  final double arrowX;
+  final VoidCallback onSkip;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final clampedArrow = arrowX.clamp(22.0, 246.0);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          top: -11,
+          left: clampedArrow - 11,
+          child: Transform.rotate(
+            angle: 0.785398,
+            child: Container(width: 22, height: 22, color: Colors.white),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: const ShapeDecoration(
+                  color: Color(0xFFD7FF4F),
+                  shape: StadiumBorder(),
+                ),
+                child: Text(
+                  step.count,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                step.title,
+                style: GoogleFonts.inter(
+                  color: AppColors.SecondBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                step.body,
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF5F6978),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.28,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: onSkip,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.SecondBlue,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(48, 34),
+                      alignment: Alignment.centerLeft,
+                    ),
+                    child: const Text(
+                      'Omitir',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    height: 34,
+                    child: ElevatedButton(
+                      onPressed: onNext,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD7FF4F),
+                        foregroundColor: AppColors.SecondBlue,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 22),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        isLast ? 'Entendido' : 'Siguiente',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeaderNotificationButton extends StatelessWidget {
+  const _HeaderNotificationButton({
+    required this.count,
+    required this.onTap,
+  });
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleCount = count > 99 ? '99+' : '$count';
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: IconButton(
+        onPressed: onTap,
+        tooltip: 'Notificaciones',
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(
+              Icons.notifications_none_rounded,
+              color: Colors.white,
+              size: 27,
+            ),
+            if (count > 0)
+              Positioned(
+                right: -6,
+                top: -6,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  height: 18,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD7FF4F),
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: AppColors.SecondBlue, width: 1),
+                  ),
+                  child: Text(
+                    visibleCount,
+                    style: GoogleFonts.inter(
+                      color: AppColors.SecondBlue,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _QuickAccessButton extends StatelessWidget {
   const _QuickAccessButton({
+    super.key,
     required this.assetPath,
     required this.label,
     required this.onTap,
@@ -2033,9 +2394,9 @@ class _QuickAccessButton extends StatelessWidget {
               maxLines: 2,
               style: GoogleFonts.inter(
                 color: AppColors.SecondBlue,
-                fontSize: 8.6,
-                fontWeight: FontWeight.w800,
-                height: 1.0,
+                fontSize: 8.2,
+                fontWeight: FontWeight.w600,
+                height: 1.08,
               ),
             ),
           ],
@@ -2373,66 +2734,6 @@ class _ProfileHintRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: content,
-    );
-  }
-}
-
-class _ProfileCompleteDialog extends StatelessWidget {
-  const _ProfileCompleteDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Tu perfil está listo',
-              style: TextStyle(
-                color: AppColors.SecondBlue,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Ya podemos recomendarte mejores torneos y jugadores',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.SecondBlue.withValues(alpha: 0.65),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD7FF59),
-                  foregroundColor: AppColors.SecondBlue,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: const Text(
-                  'Entendido',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

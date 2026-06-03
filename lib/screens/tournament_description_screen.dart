@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -16,6 +16,7 @@ import '../utils/tournament_rules.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
+import '../widgets/score_picker.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'tournament_bracket_screen.dart';
@@ -38,6 +39,8 @@ class TournamentDescriptionScreen extends StatefulWidget {
       _TournamentDescriptionScreenState();
 }
 
+enum _TournamentDetailTab { description, bracket, live, players }
+
 class _TournamentDescriptionScreenState
     extends State<TournamentDescriptionScreen> {
   TournamentRecord? _tournament;
@@ -46,19 +49,19 @@ class _TournamentDescriptionScreenState
   bool _isLoadingProfile = false;
   String? _loadError;
   TournamentAdminMatchesData? _matchesData;
+  _TournamentDetailTab _activeTab = _TournamentDetailTab.description;
 
   TournamentRecord? get _currentTournament => _tournament ?? widget.tournament;
-  String get _title => _currentTournament?.title ?? 'Torneo PGO';
-  String get _category => _currentTournament?.category ?? '4TA';
-  String get _location => _currentTournament?.location ?? 'One Padel Trigal';
-  String get _prize => _currentTournament?.prize ?? 'S/ 250 en premios';
-  String get _entryFee => _currentTournament != null
-      ? 'S/.${_currentTournament!.entryFee}'
-      : 'S/.60';
+  String get _title => _currentTournament?.title ?? '';
+  String get _category => _currentTournament?.category ?? '';
+  String get _location => _currentTournament?.location ?? '';
+  String get _prize => _currentTournament?.prize ?? '';
+  String get _entryFee =>
+      _currentTournament != null ? 'S/.${_currentTournament!.entryFee}' : '';
   String get _photoUrl => _currentTournament?.photoUrl ?? '';
-  int get _playerCapacity => _currentTournament?.playerCapacity ?? 16;
+  int get _playerCapacity => _currentTournament?.playerCapacity ?? 0;
   int get _registrationsCount => _currentTournament?.registrationsCount ?? 0;
-  String get _format => _currentTournament?.format ?? 'dobles';
+  String get _format => _currentTournament?.format ?? '';
   List<TournamentPlayer> get _players =>
       _currentTournament?.registeredPlayers ?? const [];
   List<TournamentAdminMatch> get _matches =>
@@ -112,7 +115,6 @@ class _TournamentDescriptionScreenState
       setState(() {
         _tournament = tournament;
       });
-      _loadMatches();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -128,7 +130,7 @@ class _TournamentDescriptionScreenState
   }
 
   String get _formattedDate {
-    if (_currentTournament == null) return 'Lunes 19 Dic';
+    if (_currentTournament == null) return '';
 
     const weekDays = [
       'Lunes',
@@ -164,7 +166,7 @@ class _TournamentDescriptionScreenState
 
   String get _statusChipText {
     final tournament = _currentTournament;
-    if (tournament == null) return 'torneo activo';
+    if (tournament == null) return '';
     return TournamentRules.statusLabel(tournament);
   }
 
@@ -183,7 +185,7 @@ class _TournamentDescriptionScreenState
     return tournament.registrationUserIds.contains(userId);
   }
 
-  bool get _showJoinAction => !_isLoadingProfile && !_isCurrentUserRegistered;
+  bool get _showJoinAction => !_isCurrentUserRegistered;
 
   TournamentAdminMatch? get _myMatch {
     final manageable = _matches.where((match) => match.canManage).toList();
@@ -296,138 +298,171 @@ class _TournamentDescriptionScreenState
           color: Color(0xFFF2F3F5),
           borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHero(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(30, 14, 30, 20),
+        child: _currentTournament == null && !_isLoading
+            ? Padding(
+                padding: const EdgeInsets.all(30),
+                child: _buildMessageCard(
+                  icon: Icons.warning_amber_rounded,
+                  title: 'No pudimos cargar el torneo',
+                  subtitle: _loadError ?? 'Intenta volver a abrir el torneo.',
+                ),
+              )
+            : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTabs(context),
-                    const SizedBox(height: 16),
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (_loadError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildMessageCard(
-                          icon: Icons.warning_amber_rounded,
-                          title: 'No pudimos actualizar el torneo',
-                          subtitle: _loadError!,
-                        ),
+                    _buildHero(),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(30, 14, 30, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTabs(context),
+                          const SizedBox(height: 16),
+                          if (_activeTab != _TournamentDetailTab.description)
+                            _buildEmbeddedTab()
+                          else ...[
+                            if (_isLoading)
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 16),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
+                              )
+                            else if (_loadError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildMessageCard(
+                                  icon: Icons.warning_amber_rounded,
+                                  title: 'No pudimos actualizar el torneo',
+                                  subtitle: _loadError!,
+                                ),
+                              ),
+                            const SizedBox(height: 6),
+                            _buildLocationRow(),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _openClubInMaps,
+                                    icon: const Icon(Icons.near_me_rounded,
+                                        size: 17),
+                                    label: const Text('Ver club en Maps'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.SecondBlue,
+                                      side: const BorderSide(
+                                        color: Color(0xFFD3DAE3),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _shareTournament,
+                                    icon: const Icon(Icons.share_outlined,
+                                        size: 17),
+                                    label: const Text('Compartir'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.SecondBlue,
+                                      side: const BorderSide(
+                                        color: Color(0xFFD3DAE3),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _buildDivider(),
+                            const SizedBox(height: 16),
+                            _buildPlayersProgress(),
+                            const SizedBox(height: 18),
+                            _buildSimpleRow(
+                              icon: Icons.emoji_events_outlined,
+                              text: _prize,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildSimpleRow(
+                              icon: Icons.monetization_on_outlined,
+                              text: _entryFee,
+                            ),
+                            const SizedBox(height: 22),
+                            _buildPlayersPreview(),
+                            if (_isCurrentUserRegistered) ...[
+                              const SizedBox(height: 18),
+                              if (_pairedPlayer != null) ...[
+                                _buildPairedNotification(_pairedPlayer!),
+                                const SizedBox(height: 12),
+                              ],
+                              _buildMyMatchCard(),
+                            ],
+                            const SizedBox(height: 24),
+                            if (_showJoinAction)
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed: _isLoadingProfile
+                                      ? null
+                                      : () {
+                                          final tournament = _currentTournament;
+                                          if (widget.isPaid ||
+                                              tournament == null) {
+                                            return;
+                                          }
+                                          if (!TournamentRules.canJoin(
+                                              tournament)) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  TournamentRules
+                                                      .joinBlockedReason(
+                                                    tournament,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          _handleRegisterTap(context);
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD7FF59),
+                                    foregroundColor: AppColors.SecondBlue,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _isLoadingProfile
+                                        ? 'Validando inscripción...'
+                                        : TournamentRules.joinLabel(
+                                            _currentTournament,
+                                            isPaid: widget.isPaid,
+                                          ),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ],
                       ),
-                    const SizedBox(height: 6),
-                    _buildLocationRow(),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _openClubInMaps,
-                            icon: const Icon(Icons.near_me_rounded, size: 17),
-                            label: const Text('Ver club en Maps'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.SecondBlue,
-                              side: const BorderSide(
-                                color: Color(0xFFD3DAE3),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _shareTournament,
-                            icon: const Icon(Icons.share_outlined, size: 17),
-                            label: const Text('Compartir'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.SecondBlue,
-                              side: const BorderSide(
-                                color: Color(0xFFD3DAE3),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
-                    const SizedBox(height: 14),
-                    _buildDivider(),
-                    const SizedBox(height: 16),
-                    _buildPlayersProgress(),
-                    const SizedBox(height: 18),
-                    _buildSimpleRow(
-                      icon: Icons.emoji_events_outlined,
-                      text: _prize,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSimpleRow(
-                      icon: Icons.monetization_on_outlined,
-                      text: _entryFee,
-                    ),
-                    const SizedBox(height: 22),
-                    _buildPlayersPreview(),
-                    if (_isCurrentUserRegistered) ...[
-                      const SizedBox(height: 18),
-                      if (_pairedPlayer != null) ...[
-                        _buildPairedNotification(_pairedPlayer!),
-                        const SizedBox(height: 12),
-                      ],
-                      _buildMyMatchCard(),
-                    ],
-                    const SizedBox(height: 24),
-                    if (_showJoinAction)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            final tournament = _currentTournament;
-                            if (widget.isPaid || tournament == null) {
-                              return;
-                            }
-                            if (!TournamentRules.canJoin(tournament)) {
-                              return;
-                            }
-                            _handleRegisterTap(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD7FF59),
-                            foregroundColor: AppColors.SecondBlue,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                          ),
-                          child: Text(
-                            TournamentRules.joinLabel(
-                              _currentTournament,
-                              isPaid: widget.isPaid,
-                            ),
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -437,7 +472,9 @@ class _TournamentDescriptionScreenState
     if (currentTournament == null ||
         !TournamentRules.canJoin(currentTournament)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(TournamentRules.joinLabel(currentTournament))),
+        SnackBar(
+          content: Text(TournamentRules.joinBlockedReason(currentTournament)),
+        ),
       );
       return;
     }
@@ -581,92 +618,63 @@ class _TournamentDescriptionScreenState
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.SecondBlue,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'Descripción',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        TournamentBracketScreen(tournament: _currentTournament),
-                  ),
-                );
-              },
-              child: Center(
-                child: Text(
-                  'Bracket',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        TournamentLiveScreen(tournament: _currentTournament),
-                  ),
-                );
-              },
-              child: Center(
-                child: Text(
-                  'En vivo',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        TournamentProfileScreen(tournament: _currentTournament),
-                  ),
-                );
-              },
-              child: Center(
-                child: Text(
-                  'Jugadores',
-                  style: TextStyle(
-                    color: AppColors.SecondBlue.withValues(alpha: 0.84),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _buildTabItem('Descripción', _TournamentDetailTab.description),
+          _buildTabItem('Bracket', _TournamentDetailTab.bracket),
+          _buildTabItem('En vivo', _TournamentDetailTab.live),
+          _buildTabItem('Jugadores', _TournamentDetailTab.players),
         ],
       ),
     );
+  }
+
+  Widget _buildTabItem(String label, _TournamentDetailTab tab) {
+    final selected = _activeTab == tab;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _activeTab = tab),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.SecondBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? Colors.white
+                  : AppColors.SecondBlue.withValues(alpha: 0.84),
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedTab() {
+    switch (_activeTab) {
+      case _TournamentDetailTab.bracket:
+        return TournamentBracketScreen(
+          tournament: _currentTournament,
+          embedded: true,
+        );
+      case _TournamentDetailTab.live:
+        return TournamentLiveScreen(
+          tournament: _currentTournament,
+          embedded: true,
+        );
+      case _TournamentDetailTab.players:
+        return TournamentProfileScreen(
+          tournament: _currentTournament,
+          embedded: true,
+        );
+      case _TournamentDetailTab.description:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildLocationRow() {
@@ -958,12 +966,25 @@ class _TournamentDescriptionScreenState
                     ),
                   ),
                 if (match.status == 'PENDING') const SizedBox(width: 10),
-                Expanded(
-                  child: _SmallActionButton(
-                    label: 'Registrar puntaje',
-                    onTap: () => _showUserWinnerDialog(match),
+                if (match.status == 'LIVE')
+                  Expanded(
+                    child: _SmallActionButton(
+                      label: 'Registrar puntaje',
+                      onTap: () => _showUserWinnerDialog(match),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: Text(
+                      'El partido aún no está en vivo',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.SecondBlue.withValues(alpha: 0.66),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ],
@@ -1005,18 +1026,6 @@ class _TournamentDescriptionScreenState
                 fontWeight: FontWeight.w800,
               ),
             ),
-          ),
-          TextButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Ahora sigues a ${player.name}')),
-            ),
-            child: const Text('Seguir'),
-          ),
-          TextButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Mensajes aún no disponible')),
-            ),
-            child: const Text('Mensaje'),
           ),
         ],
       ),
@@ -1062,13 +1071,8 @@ class _TournamentDescriptionScreenState
                 selected: winner == match.teamTwo,
                 onTap: () => setDialogState(() => winner = match.teamTwo),
               ),
-              TextField(
-                controller: scoreController,
-                decoration: const InputDecoration(
-                  labelText: 'Puntaje',
-                  hintText: 'Ej. 6-4, 4-2, 11-9',
-                ),
-              ),
+              const SizedBox(height: 12),
+              ScorePicker(controller: scoreController),
             ],
           ),
           actions: [
@@ -1077,9 +1081,33 @@ class _TournamentDescriptionScreenState
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(
-                (winner: winner, score: scoreController.text.trim()),
-              ),
+              onPressed: () {
+                final score = scoreController.text.trim();
+                if (score.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ingresa el puntaje del partido'),
+                    ),
+                  );
+                  return;
+                }
+                final leader = tournamentScoreLeader(score);
+                final expectedWinner = leader == 1
+                    ? match.teamOne
+                    : leader == 2
+                        ? match.teamTwo
+                        : null;
+                if (expectedWinner == null || expectedWinner != winner) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'El ganador debe coincidir con los sets ganados'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop((winner: winner, score: score));
+              },
               child: const Text('Guardar'),
             ),
           ],

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../constants/assets.dart';
 import '../constants/colors.dart';
@@ -8,6 +8,7 @@ import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
+import '../widgets/score_picker.dart';
 import 'tournament_admin_registrations_screen.dart';
 import 'tournament_admin_screen.dart';
 
@@ -32,6 +33,8 @@ class _TournamentAdminMatchesScreenState
   String? _stageKey;
   TournamentAdminMatchesData? _data;
   bool _isLoading = false;
+  bool _isFinalizing = false;
+  late bool _isCompleted;
   String? _error;
 
   TournamentRecord get _tournament => widget.tournament;
@@ -62,10 +65,17 @@ class _TournamentAdminMatchesScreenState
   }
 
   bool get _selectedStageHasPending =>
-      _stageMatches.any((match) => match.status == 'PENDING');
+      !_isCompleted && _stageMatches.any((match) => match.status == 'PENDING');
+
+  bool get _canFinalizeTournament {
+    final data = _data;
+    if (_isCompleted || data == null || data.totalMatches == 0) return false;
+    return data.completedMatches == data.totalMatches && data.liveMatches == 0;
+  }
 
   bool get _canDeleteBracket {
     final matches = _data?.matches ?? const <TournamentAdminMatch>[];
+    if (_isCompleted) return false;
     if (matches.isEmpty) return false;
 
     return matches.every(
@@ -256,6 +266,7 @@ class _TournamentAdminMatchesScreenState
   @override
   void initState() {
     super.initState();
+    _isCompleted = _tournament.status == 'COMPLETED';
     _filter = _parseInitialFilter(widget.initialFilter);
     _loadMatches();
   }
@@ -462,6 +473,29 @@ class _TournamentAdminMatchesScreenState
     }
   }
 
+  Future<void> _finalizeTournament() async {
+    setState(() => _isFinalizing = true);
+    try {
+      await TournamentService().finalizeTournament(_tournament.id);
+      if (!mounted) return;
+      setState(() => _isCompleted = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Torneo finalizado')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isFinalizing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = _data?.totalMatches ?? 0;
@@ -521,6 +555,32 @@ class _TournamentAdminMatchesScreenState
                     availableStages: _generatedStageKeys.toSet(),
                     onChanged: _handleStageTap,
                     stageLabel: _stageLabel,
+                  ),
+                ],
+                if (_canFinalizeTournament) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: _isFinalizing ? null : _finalizeTournament,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.SecondBlue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.flag_rounded, size: 20),
+                      label: Text(
+                        _isFinalizing ? 'FINALIZANDO...' : 'FINALIZAR TORNEO',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
                 if (_canDeleteBracket) ...[
@@ -588,6 +648,7 @@ class _TournamentAdminMatchesScreenState
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _AdminMatchCard(
                         match: match,
+                        locked: _isCompleted,
                         onStart: () => _startMatch(match),
                         onFinish: (winnerLabel, score) =>
                             _finishMatch(match, winnerLabel, score),
@@ -1046,12 +1107,14 @@ class _FilterButton extends StatelessWidget {
 class _AdminMatchCard extends StatelessWidget {
   const _AdminMatchCard({
     required this.match,
+    required this.locked,
     required this.onStart,
     required this.onFinish,
     required this.onCorrectResult,
   });
 
   final TournamentAdminMatch match;
+  final bool locked;
   final Future<void> Function() onStart;
   final Future<void> Function(String winnerLabel, String? score) onFinish;
   final Future<void> Function(String winnerLabel, String? score)
@@ -1168,40 +1231,43 @@ class _AdminMatchCard extends StatelessWidget {
                       SizedBox(
                         height: 34,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (match.status == 'PENDING') {
-                              showDialog<void>(
-                                context: context,
-                                barrierDismissible: true,
-                                builder: (context) => _StartMatchDialog(
-                                  match: match,
-                                  onConfirm: onStart,
-                                ),
-                              );
-                              return;
-                            }
+                          onPressed: locked
+                              ? null
+                              : () {
+                                  if (match.status == 'PENDING') {
+                                    showDialog<void>(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (context) => _StartMatchDialog(
+                                        match: match,
+                                        onConfirm: onStart,
+                                      ),
+                                    );
+                                    return;
+                                  }
 
-                            if (match.status == 'LIVE') {
-                              showDialog<void>(
-                                context: context,
-                                barrierDismissible: true,
-                                builder: (context) => _RegisterWinnerDialog(
-                                  match: match,
-                                  onConfirm: onFinish,
-                                ),
-                              );
-                              return;
-                            }
+                                  if (match.status == 'LIVE') {
+                                    showDialog<void>(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (context) =>
+                                          _RegisterWinnerDialog(
+                                        match: match,
+                                        onConfirm: onFinish,
+                                      ),
+                                    );
+                                    return;
+                                  }
 
-                            showDialog<void>(
-                              context: context,
-                              barrierDismissible: true,
-                              builder: (context) => _MatchResultDialog(
-                                match: match,
-                                onCorrectResult: onCorrectResult,
-                              ),
-                            );
-                          },
+                                  showDialog<void>(
+                                    context: context,
+                                    barrierDismissible: true,
+                                    builder: (context) => _MatchResultDialog(
+                                      match: match,
+                                      onCorrectResult: onCorrectResult,
+                                    ),
+                                  );
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: actionFilled
                                 ? const Color(0xFFD7FF59)
@@ -1690,7 +1756,7 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
             _ScoreInput(controller: _scoreController),
             const SizedBox(height: 10),
             Text(
-              'Puedes registrar un puntaje libre, por ejemplo 6-4, 4-2 o 11-9.',
+              'Selecciona sets terminados y games por set.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.SecondBlue.withValues(alpha: 0.7),
@@ -1737,9 +1803,28 @@ class _RegisterWinnerDialogState extends State<_RegisterWinnerDialog> {
                           : () async {
                               setState(() => _submitting = true);
                               try {
+                                final score = _scoreController.text.trim();
+                                final leader = tournamentScoreLeader(score);
+                                final expectedWinner = leader == 1
+                                    ? widget.match.teamOne
+                                    : leader == 2
+                                        ? widget.match.teamTwo
+                                        : null;
+                                if (score.isNotEmpty &&
+                                    (expectedWinner == null ||
+                                        expectedWinner != _selectedWinner)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'El ganador debe coincidir con los sets ganados',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
                                 await widget.onConfirm(
                                   _selectedWinner,
-                                  _scoreController.text.trim(),
+                                  score,
                                 );
                                 if (!context.mounted) return;
                                 Navigator.of(context).pop();
@@ -1840,36 +1925,7 @@ class _ScoreInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.text,
-      decoration: InputDecoration(
-        labelText: 'Puntaje',
-        hintText: 'Ej. 6-4, 4-2, 11-9',
-        labelStyle: const TextStyle(
-          color: AppColors.SecondBlue,
-          fontWeight: FontWeight.w800,
-        ),
-        hintStyle: TextStyle(
-          color: AppColors.SecondBlue.withValues(alpha: 0.42),
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-        filled: true,
-        fillColor: const Color(0xFFF2F4F8),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      ),
-      style: const TextStyle(
-        color: AppColors.SecondBlue,
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-      ),
-    );
+    return ScorePicker(controller: controller);
   }
 }
 
@@ -2242,9 +2298,28 @@ class _CorrectMatchResultDialogState extends State<_CorrectMatchResultDialog> {
                           : () async {
                               setState(() => _submitting = true);
                               try {
+                                final score = _scoreController.text.trim();
+                                final leader = tournamentScoreLeader(score);
+                                final expectedWinner = leader == 1
+                                    ? widget.match.teamOne
+                                    : leader == 2
+                                        ? widget.match.teamTwo
+                                        : null;
+                                if (score.isNotEmpty &&
+                                    (expectedWinner == null ||
+                                        expectedWinner != _selectedWinner)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'El ganador debe coincidir con los sets ganados',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
                                 await widget.onConfirm(
                                   _selectedWinner,
-                                  _scoreController.text.trim(),
+                                  score,
                                 );
                                 if (!context.mounted) return;
                                 Navigator.of(context).pop();

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,7 +13,6 @@ import '../services/tournament_service.dart';
 import '../utils/data_url_image.dart';
 import '../utils/tournament_rules.dart';
 import '../widgets/pgo_bottom_nav.dart';
-import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import 'profile_screen.dart';
 import 'tournament_admin_screen.dart';
@@ -189,6 +188,99 @@ class _TournamentsScreenState extends State<TournamentsScreen>
     return items.toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
   }
 
+  Future<void> _openTournament(TournamentRecord tournament) async {
+    final route =
+        _showMyTournaments && _myTournamentTab == _MyTournamentTab.draft
+            ? MaterialPageRoute(
+                builder: (context) => TournamentCreateFlowScreen(
+                  initialTournament: tournament,
+                ),
+              )
+            : _showMyTournaments && _myTournamentTab == _MyTournamentTab.created
+                ? MaterialPageRoute(
+                    builder: (context) => TournamentAdminScreen(
+                      tournament: tournament,
+                    ),
+                  )
+                : MaterialPageRoute(
+                    builder: (context) => TournamentDescriptionScreen(
+                      tournament: tournament,
+                    ),
+                  );
+    await Navigator.of(context).push(route);
+    if (!mounted) return;
+    _loadData();
+  }
+
+  Future<void> _deleteCreatedTournament(TournamentRecord tournament) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar torneo'),
+        content: Text(
+            '¿Eliminar "${tournament.title}"? Esta acción cerrará el torneo.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await TournamentService().deleteTournament(tournament.id);
+      if (!mounted) return;
+      setState(() {
+        _tournaments =
+            _tournaments.where((item) => item.id != tournament.id).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Torneo eliminado')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Widget _buildTournamentResults() {
+    final items = _filteredTournaments;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...items.map(
+          (tournament) => Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: _TournamentCard(
+              tournament: tournament,
+              isRegistered: _showMyTournaments &&
+                  _myTournamentTab == _MyTournamentTab.registered,
+              isCreated: _showMyTournaments &&
+                  _myTournamentTab == _MyTournamentTab.created,
+              isDraft: _showMyTournaments &&
+                  _myTournamentTab == _MyTournamentTab.draft,
+              onTap: () => _openTournament(tournament),
+              onDelete: _showMyTournaments &&
+                      _myTournamentTab == _MyTournamentTab.created
+                  ? () => _deleteCreatedTournament(tournament)
+                  : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final baseTheme = Theme.of(context);
@@ -199,183 +291,163 @@ class _TournamentsScreenState extends State<TournamentsScreen>
         primaryTextTheme:
             GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
       ),
-      child: PgoHeaderScaffold(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: widget.onBackTap ?? () => Navigator.of(context).pop(),
-        ),
-        titleSpacing: -4,
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/images/pgoIconoAPP.png',
-              height: 56,
-              fit: BoxFit.contain,
-            ),
-          ],
-        ),
-        actions: const [
-          PgoOptionsMenuButton(),
-        ],
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF2F3F5),
         body: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F3F5),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    RefreshIndicator(
-                      onRefresh: _loadData,
-                      color: AppColors.SecondBlue,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 112),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Center(
-                                  child: Text(
-                                    'Torneos',
-                                    style: PgoTextStyles.screenTitle()
-                                        .copyWith(fontSize: 30),
+          decoration: const BoxDecoration(gradient: AppColors.headerGradient),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 10, 14, 8),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            constraints: const BoxConstraints(
+                              minWidth: 30,
+                              minHeight: 40,
+                            ),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                            onPressed: widget.onBackTap ??
+                                () => Navigator.of(context).pop(),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Torneos',
+                              style: PgoTextStyles.screenTitle(
+                                color: Colors.white,
+                                weight: FontWeight.w900,
+                              ).copyWith(fontSize: 25, height: 1),
+                            ),
+                          ),
+                          const PgoOptionsMenuButton(),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 14, right: 4),
+                        child: _buildSearchField(),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF2F3F5),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(18)),
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        _buildTabs(),
+                        if (_showMyTournaments) ...[
+                          const SizedBox(height: 8),
+                          _buildMyTournamentTabs(),
+                        ],
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              RefreshIndicator(
+                                onRefresh: _loadData,
+                                color: AppColors.SecondBlue,
+                                child: SingleChildScrollView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      18, 14, 18, 112),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (_isLoading)
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(
+                                              vertical: 42),
+                                          child: Center(
+                                              child:
+                                                  CircularProgressIndicator()),
+                                        )
+                                      else if (_error != null)
+                                        _StatusCard(
+                                          title:
+                                              'No pudimos cargar los torneos',
+                                          message: _error!,
+                                          actionLabel: 'Reintentar',
+                                          onTap: _loadData,
+                                        )
+                                      else if (_filteredTournaments.isEmpty)
+                                        _StatusCard(
+                                          title: _showMyTournaments
+                                              ? _emptyMyTournamentsTitle
+                                              : 'A\u00fan no hay torneos disponibles',
+                                          message: _searchController.text
+                                                  .trim()
+                                                  .isEmpty
+                                              ? 'Cuando crees o publiques torneos aparecer\u00e1n aqu\u00ed.'
+                                              : 'No encontramos torneos con ese criterio.',
+                                        )
+                                      else
+                                        _buildTournamentResults(),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _buildSearchField(),
-                            const SizedBox(height: 10),
-                            _buildTabs(),
-                            if (_showMyTournaments) ...[
-                              const SizedBox(height: 10),
-                              _buildMyTournamentTabs(),
-                            ],
-                            const SizedBox(height: 14),
-                            if (_isLoading)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 42),
-                                child:
-                                    Center(child: CircularProgressIndicator()),
-                              )
-                            else if (_error != null)
-                              _StatusCard(
-                                title: 'No pudimos cargar los torneos',
-                                message: _error!,
-                                actionLabel: 'Reintentar',
-                                onTap: _loadData,
-                              )
-                            else if (_filteredTournaments.isEmpty)
-                              _StatusCard(
-                                title: _showMyTournaments
-                                    ? _emptyMyTournamentsTitle
-                                    : 'Aún no hay torneos disponibles',
-                                message: _searchController.text.trim().isEmpty
-                                    ? 'Cuando crees o publiques torneos aparecerán aquí.'
-                                    : 'No encontramos torneos con ese criterio.',
-                              )
-                            else
-                              Column(
-                                children: _filteredTournaments
-                                    .map(
-                                      (tournament) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 18),
-                                        child: _TournamentCard(
-                                          tournament: tournament,
-                                          isRegistered: _showMyTournaments &&
-                                              _myTournamentTab ==
-                                                  _MyTournamentTab.registered,
-                                          isCreated: _showMyTournaments &&
-                                              _myTournamentTab ==
-                                                  _MyTournamentTab.created,
-                                          isDraft: _showMyTournaments &&
-                                              _myTournamentTab ==
-                                                  _MyTournamentTab.draft,
-                                          onTap: () {
-                                            final route = _showMyTournaments &&
-                                                    _myTournamentTab ==
-                                                        _MyTournamentTab.draft
-                                                ? MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        TournamentCreateFlowScreen(
-                                                      initialTournament:
-                                                          tournament,
-                                                    ),
-                                                  )
-                                                : _showMyTournaments &&
-                                                        _myTournamentTab ==
-                                                            _MyTournamentTab
-                                                                .created
-                                                    ? MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            TournamentAdminScreen(
-                                                          tournament:
-                                                              tournament,
-                                                        ),
-                                                      )
-                                                    : MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            TournamentDescriptionScreen(
-                                                          tournament:
-                                                              tournament,
-                                                        ),
-                                                      );
-                                            Navigator.of(context)
-                                                .push(route)
-                                                .then((_) => _loadData());
-                                          },
+                              ),
+                              Positioned(
+                                right: 18,
+                                bottom: 96,
+                                child: Transform.translate(
+                                  offset: const Offset(0, -18),
+                                  child: _CreateTournamentFab(
+                                    onTap: () async {
+                                      await Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const TournamentCreateFlowScreen(),
                                         ),
-                                      ),
-                                    )
-                                    .toList(),
+                                      );
+                                      if (!mounted) return;
+                                      _loadData();
+                                    },
+                                  ),
+                                ),
                               ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 14,
-                      bottom: 22,
-                      child: _CreateTournamentFab(
-                        onTap: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const TournamentCreateFlowScreen(),
-                            ),
-                          );
-                          if (!mounted) return;
-                          _loadData();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.showBottomNav)
-                widget.bottomNavigationBar ??
-                    PgoBottomNav(
-                      currentTab: PgoNavTab.tournaments,
-                      onHomeTap:
-                          widget.onHomeTap ?? () => Navigator.of(context).pop(),
-                      onTournamentsTap: () {},
-                      onProfileTap: widget.onProfileTap ??
-                          () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const ProfileScreen(),
+                        if (widget.showBottomNav)
+                          widget.bottomNavigationBar ??
+                              PgoBottomNav(
+                                currentTab: PgoNavTab.tournaments,
+                                onHomeTap: widget.onHomeTap ??
+                                    () => Navigator.of(context).pop(),
+                                onTournamentsTap: () {},
+                                onProfileTap: widget.onProfileTap ??
+                                    () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const ProfileScreen(),
+                                        ),
+                                      );
+                                    },
                               ),
-                            );
-                          },
+                      ],
                     ),
-            ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -407,7 +479,7 @@ class _TournamentsScreenState extends State<TournamentsScreen>
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
-                  hintText: 'Nombre del torneo',
+                  hintText: 'Buscar torneo, sede o categor\u00eda',
                   hintStyle: PgoTextStyles.bodyLarge(
                     color: AppColors.SecondBlue.withValues(alpha: 0.72),
                   ),
@@ -421,72 +493,37 @@ class _TournamentsScreenState extends State<TournamentsScreen>
   }
 
   Widget _buildTabs() {
-    return Center(
-      child: Container(
-        width: 238,
-        height: 40,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE4E8EE),
-          borderRadius: BorderRadius.circular(20),
+    return Container(
+      height: 38,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF2F3F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFC9D0DB), width: 1),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showMyTournaments = false;
-                  });
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: !_showMyTournaments
-                        ? AppColors.SecondBlue
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(17),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Disponibles',
-                    style: PgoTextStyles.tabLabel(
-                      color: !_showMyTournaments
-                          ? Colors.white
-                          : AppColors.SecondBlue.withValues(alpha: 0.72),
-                    ),
-                  ),
-                ),
-              ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _TournamentHomeTab(
+              label: 'DISPONIBLE',
+              selected: !_showMyTournaments,
+              onTap: () => setState(() => _showMyTournaments = false),
             ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showMyTournaments = true;
-                    _myTournamentTab = _MyTournamentTab.registered;
-                  });
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _showMyTournaments
-                        ? AppColors.SecondBlue
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(17),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Mis torneos',
-                    style: PgoTextStyles.tabLabel(
-                      color: _showMyTournaments
-                          ? Colors.white
-                          : AppColors.SecondBlue.withValues(alpha: 0.72),
-                    ),
-                  ),
-                ),
-              ),
+          ),
+          Expanded(
+            child: _TournamentHomeTab(
+              label: 'MIS TORNEOS',
+              selected: _showMyTournaments,
+              onTap: () {
+                setState(() {
+                  _showMyTournaments = true;
+                  _myTournamentTab = _MyTournamentTab.registered;
+                });
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -516,7 +553,7 @@ class _TournamentsScreenState extends State<TournamentsScreen>
           children: [
             Expanded(
               child: _MyTournamentTabButton(
-                label: 'Inscrito',
+                label: 'Inscritos',
                 selected: _myTournamentTab == _MyTournamentTab.registered,
                 onTap: () {
                   setState(() {
@@ -558,6 +595,55 @@ enum _MyTournamentTab {
   registered,
   created,
   draft,
+}
+
+class _TournamentHomeTab extends StatelessWidget {
+  const _TournamentHomeTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: selected
+                    ? const Color(0xFF31577F)
+                    : AppColors.SecondBlue.withValues(alpha: 0.48),
+                fontSize: 11.4,
+                fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
+              ),
+            ),
+          ),
+          if (selected)
+            FractionallySizedBox(
+              widthFactor: 0.46,
+              child: Container(
+                height: 2.4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF31577F),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MyTournamentTabButton extends StatelessWidget {
@@ -613,6 +699,13 @@ class _CreateTournamentFab extends StatelessWidget {
         decoration: const BoxDecoration(
           color: Color(0xFFD7FF59),
           shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: const Icon(
           Icons.add,
@@ -628,6 +721,7 @@ class _TournamentCard extends StatelessWidget {
   const _TournamentCard({
     required this.tournament,
     required this.onTap,
+    this.onDelete,
     this.isRegistered = false,
     this.isCreated = false,
     this.isDraft = false,
@@ -635,6 +729,7 @@ class _TournamentCard extends StatelessWidget {
 
   final TournamentRecord tournament;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
   final bool isRegistered;
   final bool isCreated;
   final bool isDraft;
@@ -698,23 +793,26 @@ class _TournamentCard extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.SecondBlue.withValues(alpha: 0.07),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        height: 152,
+        height: 158,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: 145,
+              width: 122,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -803,12 +901,12 @@ class _TournamentCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _displayTitle.toUpperCase(),
-                            maxLines: 1,
+                            _displayTitle,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: PgoTextStyles.cardTitle(
                               color: AppColors.SecondBlue,
-                            ).copyWith(fontSize: 16, height: 1.0),
+                            ).copyWith(fontSize: 15, height: 1.02),
                           ),
                           const SizedBox(height: 4),
                           Row(
@@ -876,10 +974,11 @@ class _TournamentCard extends StatelessWidget {
                                 value: '${tournament.playerCapacity}',
                                 label: 'Cupos',
                               ),
-                              const _TournamentStatCell(
-                                icon: Icons.schedule_outlined,
-                                value: '2h',
-                                label: 'Duración',
+                              _TournamentStatCell(
+                                icon: Icons.person_add_alt_1_outlined,
+                                value:
+                                    '${tournament.registrationsCount}/${tournament.playerCapacity}',
+                                label: 'Inscritos',
                               ),
                             ],
                           ),
@@ -887,7 +986,7 @@ class _TournamentCard extends StatelessWidget {
                       ),
                     ),
                     SizedBox(
-                      height: 25,
+                      height: 36,
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: onTap,
@@ -897,7 +996,7 @@ class _TournamentCard extends StatelessWidget {
                           elevation: 0,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: Row(
@@ -907,11 +1006,10 @@ class _TournamentCard extends StatelessWidget {
                               'Ver torneo',
                               style: PgoTextStyles.buttonSecondary(
                                 weight: FontWeight.w900,
-                              ).copyWith(fontSize: 10.5),
+                              ).copyWith(fontSize: 12),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 4),
                             const Icon(Icons.chevron_right, size: 15),
-                            const SizedBox(width: 6),
                           ],
                         ),
                       ),
@@ -1088,20 +1186,11 @@ class _TournamentCard extends StatelessWidget {
                         label: 'Cupos',
                       ),
                       const _StatDivider(),
-                      const _RegisteredStatCell(
-                        icon: Icons.calendar_month_outlined,
-                        value: 'Hoy',
-                        label: '',
-                        color: Color(0xFF67B83F),
-                      ),
-                      const _StatDivider(),
                       _RegisteredStatCell(
-                        icon: Icons.whatshot,
-                        value: tournament.soloRegistrationsCount > 0
-                            ? 'Buscando'
-                            : _badgeText,
+                        icon: Icons.calendar_month_outlined,
+                        value: _formattedDate.split(' ').first,
                         label: '',
-                        color: AppColors.primaryOrange,
+                        color: const Color(0xFF67B83F),
                       ),
                     ],
                   ),
@@ -1168,11 +1257,21 @@ class _TournamentCard extends StatelessWidget {
                           color: AppColors.SecondBlue,
                           fill: AppColors.PrimaryGreen,
                         ),
-                        Icon(
-                          Icons.more_vert,
-                          size: 18,
-                          color: AppColors.SecondBlue.withValues(alpha: 0.55),
-                        ),
+                        if (onDelete != null)
+                          PopupMenuButton<String>(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.more_vert,
+                                color: AppColors.SecondBlue, size: 20),
+                            onSelected: (value) {
+                              if (value == 'delete') onDelete?.call();
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Eliminar torneo'),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                     const SizedBox(height: 9),
@@ -1227,10 +1326,11 @@ class _TournamentCard extends StatelessWidget {
                 label: 'buscando dupla',
               ),
               const _StatDivider(),
-              const _CreatedMetric(
-                icon: Icons.calendar_today_outlined,
-                value: '4',
-                label: 'partidos programados',
+              _CreatedMetric(
+                icon: Icons.person_add_alt_1_outlined,
+                value:
+                    '${tournament.playerCapacity - tournament.registrationsCount}',
+                label: 'cupos libres',
               ),
             ],
           ),
@@ -1258,20 +1358,6 @@ class _TournamentCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 9),
-              Container(
-                width: 48,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF2F5F8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.bar_chart_outlined,
-                  color: AppColors.SecondBlue,
-                  size: 18,
                 ),
               ),
             ],
@@ -1456,7 +1542,7 @@ class _TournamentCard extends StatelessWidget {
                         width: 86,
                         height: 30,
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: null,
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.zero,
                             foregroundColor: AppColors.SecondBlue,

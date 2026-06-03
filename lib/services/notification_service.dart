@@ -32,6 +32,10 @@ class NotificationService {
     await _send(method: 'PATCH', path: '/notifications/read-all');
   }
 
+  Future<void> deleteNotification(String notificationId) async {
+    await _send(method: 'DELETE', path: '/notifications/$notificationId');
+  }
+
   Future<dynamic> _send({
     required String method,
     required String path,
@@ -57,6 +61,11 @@ class NotificationService {
         case 'PATCH':
           response = await _client
               .patch(uri, headers: headers)
+              .timeout(_requestTimeout);
+          break;
+        case 'DELETE':
+          response = await _client
+              .delete(uri, headers: headers)
               .timeout(_requestTimeout);
           break;
         default:

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "924964507802",
-    "project_id": "pgoapp-4daa3",
-    "storage_bucket": "pgoapp-4daa3.firebasestorage.app"
+    "project_number": "27858588529",
+    "project_id": "pgo-app-23bbe",
+    "storage_bucket": "pgo-app-23bbe.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:924964507802:android:4729c92e26c81bcb724f23",
+        "mobilesdk_app_id": "1:27858588529:android:48cd74349f90bdd2b6dcd0",
         "android_client_info": {
           "package_name": "com.pgo.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDbGYmIwdTWyKS01Swv9Z5EtudwRGgMip4"
+          "current_key": "AIzaSyDUAJ9D8ePBdcZVlCmINhkicQJARAaX0es"
         }
       ],
       "services": {

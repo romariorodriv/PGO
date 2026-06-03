@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,6 +14,7 @@ import '../services/community_service.dart';
 import '../services/match_service.dart';
 import '../services/profile_service.dart';
 import '../services/social_service.dart';
+import '../utils/data_url_image.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_options_menu.dart';
 import '../widgets/pgo_header_scaffold.dart';
@@ -2197,6 +2198,7 @@ class ProfileAvatar extends StatelessWidget {
     final hasRemotePhoto = photoUrl != null &&
         photoUrl!.startsWith('http') &&
         photoUrl!.isNotEmpty;
+    final bytes = tryDecodeDataUrl(photoUrl);
 
     return Container(
       padding: const EdgeInsets.all(3),
@@ -2222,11 +2224,20 @@ class ProfileAvatar extends StatelessWidget {
         backgroundImage: hasRemotePhoto ? NetworkImage(photoUrl!) : null,
         child: hasRemotePhoto
             ? null
-            : Icon(
-                Icons.person,
-                size: radius,
-                color: AppColors.SecondBlue.withValues(alpha: 0.75),
-              ),
+            : bytes != null
+                ? ClipOval(
+                    child: Image.memory(
+                      bytes,
+                      width: radius * 2,
+                      height: radius * 2,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Icon(
+                    Icons.person,
+                    size: radius,
+                    color: AppColors.SecondBlue.withValues(alpha: 0.75),
+                  ),
       ),
     );
   }

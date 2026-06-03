@@ -43,6 +43,17 @@ class TournamentRules {
     return 'UNIRME';
   }
 
+  static String joinBlockedReason(TournamentRecord? tournament) {
+    if (tournament == null) return 'No pudimos cargar los datos del torneo';
+    if (isCanceled(tournament)) return 'Este torneo fue cancelado';
+    if (isCompleted(tournament)) return 'Este torneo ya finalizó';
+    if (isDraft(tournament)) return 'Este torneo todavía no está publicado';
+    if (isPast(tournament)) return 'La fecha del torneo ya pasó';
+    if (!tournament.registrationsOpen) return 'Las inscripciones están cerradas';
+    if (isFull(tournament)) return 'El torneo ya no tiene cupos disponibles';
+    return 'No puedes inscribirte en este torneo';
+  }
+
   static String statusLabel(TournamentRecord tournament) {
     if (isDraft(tournament)) return 'borrador';
     if (isCanceled(tournament)) return 'torneo cancelado';

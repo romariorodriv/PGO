@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
@@ -114,54 +115,71 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 50.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                _buildLogo(),
-                const SizedBox(height: 10),
-                Text(
-                  'Inicia sesión',
-                  style: GoogleFonts.inter(
-                    color: AppColors.SecondBlue,
-                    fontSize: 31,
-                    fontWeight: FontWeight.w800,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
                   ),
-                ),
-                const SizedBox(height: 18),
-                _buildSocialButtons(),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'No tienes una cuenta? ',
-                      style: TextStyle(color: AppColors.loginGreen),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 50,
+                        vertical: 28,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildLogo(),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Inicia sesión',
+                            style: GoogleFonts.inter(
+                              color: AppColors.SecondBlue,
+                              fontSize: 31,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        );
-                      },
-                      child: const Text(
-                        'Registrate',
-                        style: TextStyle(
-                          color: AppColors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
+                          const SizedBox(height: 18),
+                          _buildSocialButtons(),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'No tienes una cuenta? ',
+                                style: TextStyle(
+                                  color: AppColors.loginGreen,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RegisterScreen(),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  'Regístrate',
+                                  style: TextStyle(
+                                    color: AppColors.blue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -228,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: _obscurePassword,
       style: const TextStyle(color: AppColors.SecondBlue),
       decoration: InputDecoration(
-        hintText: 'Contrasena',
+        hintText: 'Contraseña',
         hintStyle: TextStyle(
           color: AppColors.SecondBlue.withValues(alpha: 0.5),
         ),
@@ -304,13 +322,13 @@ class _LoginScreenState extends State<LoginScreen> {
         GestureDetector(
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Ir a Recuperar Contrasena')),
+              const SnackBar(content: Text('Ir a recuperar contraseña')),
             );
           },
           child: Padding(
             padding: const EdgeInsets.only(left: 4),
             child: Text(
-              'Olvidaste tu contrasena?',
+              '¿Olvidaste tu contraseña?',
               style: TextStyle(
                 color: AppColors.SecondBlue.withValues(alpha: 0.7),
                 fontSize: 12,
@@ -357,50 +375,36 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       children: [
         _SocialAuthButton(
-          label: _isGoogleSubmitting ? 'Conectando...' : 'Continue with Google',
+          label: _isGoogleSubmitting ? 'Conectando...' : 'Continuar con Google',
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF5F6673),
           borderColor: const Color(0xFFE7EAF0),
           icon: const _GoogleGIcon(size: 19),
           onTap: disabled ? null : _handleGoogleLogin,
         ),
-        const SizedBox(height: 8),
-        _SocialAuthButton(
-          label: 'Continue with Facebook',
-          backgroundColor: const Color(0xFF1877F2),
-          foregroundColor: Colors.white,
-          icon: const Text(
-            'f',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Facebook aún no esta disponible')),
-            );
-          },
+        const SizedBox(height: 10),
+        const _SocialAuthButton(
+          label: 'Apple pendiente de configuración',
+          backgroundColor: Color(0xFFF3F5F7),
+          foregroundColor: Color(0xFF8A94A6),
+          borderColor: Color(0xFFE0E4EA),
+          icon: Icon(Icons.apple, color: Color(0xFF8A94A6), size: 20),
+          onTap: null,
         ),
-        const SizedBox(height: 8),
-        _SocialAuthButton(
-          label: 'Continue with Apple',
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.apple, color: Colors.white, size: 22),
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Apple aún no esta disponible')),
-            );
-          },
+        const SizedBox(height: 10),
+        const _SocialAuthButton(
+          label: 'Facebook pendiente de configuración',
+          backgroundColor: Color(0xFFF3F5F7),
+          foregroundColor: Color(0xFF8A94A6),
+          borderColor: Color(0xFFE0E4EA),
+          icon: Icon(Icons.facebook, color: Color(0xFF8A94A6), size: 20),
+          onTap: null,
         ),
         const SizedBox(height: 14),
-        _buildDividerLabel('Or'),
+        _buildDividerLabel('O'),
         const SizedBox(height: 14),
         _SocialAuthButton(
-          label: 'Log in with Email',
+          label: 'Ingresar con email',
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF5F6673),
           borderColor: const Color(0xFFD8DDE6),
@@ -456,6 +460,8 @@ class EmailLoginScreen extends StatefulWidget {
 }
 
 class _EmailLoginScreenState extends State<EmailLoginScreen> {
+  static const _rememberEmailKey = 'remembered_login_email';
+
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
 
@@ -468,6 +474,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
     super.initState();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    _loadRememberedEmail();
   }
 
   @override
@@ -489,6 +496,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
     setState(() => _isSubmitting = true);
     try {
       await AuthService().login(email: email, password: password);
+      await _saveRememberedEmail(email);
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MainShell.route(),
@@ -499,6 +507,25 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
       _showSnack(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_rememberEmailKey) ?? '';
+    if (!mounted || email.isEmpty) return;
+    setState(() {
+      _emailController.text = email;
+      _rememberUser = true;
+    });
+  }
+
+  Future<void> _saveRememberedEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberUser) {
+      await prefs.setString(_rememberEmailKey, email);
+    } else {
+      await prefs.remove(_rememberEmailKey);
     }
   }
 
@@ -567,7 +594,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                 obscureText: _obscurePassword,
                 onToggle: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
-                hint: 'Contrasena',
+                hint: 'Contraseña',
               ),
               const SizedBox(height: 8),
               Row(
@@ -591,9 +618,15 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => _showSnack('Recuperacion en preparacion'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(
+                          initialEmail: _emailController.text.trim(),
+                        ),
+                      ),
+                    ),
                     child: Text(
-                      'Olvide mi clave',
+                      'Olvidé mi clave',
                       style: GoogleFonts.inter(
                         color: AppColors.SecondBlue,
                         fontSize: 12,
@@ -624,6 +657,130 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key, this.initialEmail = ''});
+
+  final String initialEmail;
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  late final TextEditingController _emailController;
+  bool _isSubmitting = false;
+  bool _sent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      _showSnack('Ingresa un correo válido');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await AuthService().forgotPassword(email: email);
+      if (!mounted) return;
+      setState(() => _sent = true);
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.primaryDark,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(28, 10, 28, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back, color: AppColors.SecondBlue),
+              ),
+              const SizedBox(height: 70),
+              Center(
+                child: Icon(
+                  _sent ? Icons.mark_email_read_outlined : Icons.lock_reset,
+                  color: AppColors.SecondBlue,
+                  size: 74,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Center(
+                child: Text(
+                  _sent ? 'Revisa tu correo' : 'Recuperar clave',
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  _sent
+                      ? 'Si el correo existe, recibirás instrucciones para recuperar tu clave.'
+                      : 'Te enviaremos instrucciones para volver a entrar a tu cuenta.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.68),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              if (!_sent)
+                _EmailInput(
+                  controller: _emailController,
+                  hint: 'Correo electrónico',
+                  icon: Icons.mail_outline,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              const SizedBox(height: 18),
+              _AuthPrimaryButton(
+                label: _sent ? 'Entendido' : 'Enviar instrucciones',
+                loading: _isSubmitting,
+                onTap: _isSubmitting
+                    ? null
+                    : _sent
+                        ? () => Navigator.of(context).pop()
+                        : _submit,
               ),
             ],
           ),

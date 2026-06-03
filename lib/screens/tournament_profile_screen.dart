@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/assets.dart';
@@ -22,9 +22,11 @@ class TournamentProfileScreen extends StatefulWidget {
   const TournamentProfileScreen({
     super.key,
     this.tournament,
+    this.embedded = false,
   });
 
   final TournamentRecord? tournament;
+  final bool embedded;
 
   @override
   State<TournamentProfileScreen> createState() =>
@@ -51,7 +53,9 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   void initState() {
     super.initState();
     _tournament = widget.tournament;
-    _loadTournament();
+    if (!widget.embedded) {
+      _loadTournament();
+    }
   }
 
   Future<void> _loadTournament() async {
@@ -152,6 +156,17 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
   Widget build(BuildContext context) {
     final baseTheme = Theme.of(context);
 
+    if (widget.embedded) {
+      return Theme(
+        data: baseTheme.copyWith(
+          textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+          primaryTextTheme:
+              GoogleFonts.interTextTheme(baseTheme.primaryTextTheme),
+        ),
+        child: _buildEmbeddedContent(),
+      );
+    }
+
     return Theme(
       data: baseTheme.copyWith(
         textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
@@ -243,6 +258,58 @@ class _TournamentProfileScreenState extends State<TournamentProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmbeddedContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFriendsRegisteredBadge(),
+        const SizedBox(height: 10),
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_loadError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildInfoTile(
+              icon: Icons.warning_amber_rounded,
+              title: 'No pudimos actualizar los jugadores',
+              subtitle: _loadError!,
+            ),
+          ),
+        _buildOrganizerCard(),
+        const SizedBox(height: 16),
+        const Text(
+          'Jugadores',
+          style: TextStyle(
+            color: AppColors.SecondBlue,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (_players.isEmpty)
+          _buildInfoTile(
+            icon: Icons.person_off_outlined,
+            title: 'Aún no hay jugadores visibles',
+            subtitle:
+                'Cuando existan inscripciones confirmadas aparecerán aquí.',
+          )
+        else
+          ..._players.map(
+            (player) => _RegisteredPlayerTile(
+              player: player,
+              isFollowing: _followingIds.contains(player.id),
+              isLoading: _followLoadingIds.contains(player.id),
+              onFollowTap: () => _requestFriend(player),
+              onProfileTap: () => _openPlayerProfile(player),
+            ),
+          ),
+      ],
     );
   }
 
@@ -736,7 +803,7 @@ class _RegisteredPlayerTile extends StatelessWidget {
                                 ),
                               )
                             : Text(
-                                isFollowing ? 'Enviado' : '+ Seguir',
+                                isFollowing ? 'Enviado' : 'Añadir',
                                 style: TextStyle(
                                   color: isFollowing
                                       ? AppColors.SecondBlue

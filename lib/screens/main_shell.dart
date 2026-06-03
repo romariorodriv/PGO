@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/colors.dart';
 import '../models/tournament_alert.dart';
+import '../models/profile_summary.dart';
 import '../services/tournament_service.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
@@ -22,19 +23,23 @@ class MainShell extends StatefulWidget {
     super.key,
     this.initialTab = PgoNavTab.home,
     this.openProfileFriendsOnStart = false,
+    this.initialProfile,
   });
 
   final PgoNavTab initialTab;
   final bool openProfileFriendsOnStart;
+  final ProfileSummary? initialProfile;
 
   static Route<void> route({
     PgoNavTab initialTab = PgoNavTab.home,
     bool openProfileFriendsOnStart = false,
+    ProfileSummary? initialProfile,
   }) {
     return MaterialPageRoute(
       builder: (_) => MainShell(
         initialTab: initialTab,
         openProfileFriendsOnStart: openProfileFriendsOnStart,
+        initialProfile: initialProfile,
       ),
     );
   }
@@ -246,7 +251,8 @@ class _MainShellState extends State<MainShell> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos abrir el partido del torneo.')),
+        const SnackBar(
+            content: Text('No pudimos abrir el partido del torneo.')),
       );
     }
   }
@@ -278,43 +284,51 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F8),
-      body: PgoFooterScope(
-        hasShellFooter: true,
-        child: IndexedStack(
-          index: PgoNavTab.values.indexOf(_currentTab),
-          children: [
-            HomeScreen(
-              showBottomNav: false,
+      body: Stack(
+        children: [
+          PgoFooterScope(
+            hasShellFooter: true,
+            child: IndexedStack(
+              index: PgoNavTab.values.indexOf(_currentTab),
+              children: [
+                HomeScreen(
+                  showBottomNav: false,
+                  initialProfile: widget.initialProfile,
+                  onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
+                  onAlertsTap: () => _setTab(PgoNavTab.alerts),
+                  onProfileTap: () => _setTab(PgoNavTab.profile),
+                ),
+                TournamentsScreen(
+                  showBottomNav: false,
+                  isActive: _currentTab == PgoNavTab.tournaments,
+                  onBackTap: () => _setTab(PgoNavTab.home),
+                  onHomeTap: () => _setTab(PgoNavTab.home),
+                  onProfileTap: () => _setTab(PgoNavTab.profile),
+                ),
+                OpenMatchAlertsScreen(
+                  onBackTap: () => _setTab(PgoNavTab.home),
+                ),
+                ProfileScreen(
+                  showBottomNav: false,
+                  openFriendsOnStart: widget.openProfileFriendsOnStart,
+                  onBackTap: () => _setTab(PgoNavTab.home),
+                  onHomeTap: () => _setTab(PgoNavTab.home),
+                  onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
+                ),
+              ],
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: PgoBottomNav(
+              currentTab: _currentTab,
+              onHomeTap: () => _setTab(PgoNavTab.home),
               onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
               onAlertsTap: () => _setTab(PgoNavTab.alerts),
               onProfileTap: () => _setTab(PgoNavTab.profile),
             ),
-            TournamentsScreen(
-              showBottomNav: false,
-              isActive: _currentTab == PgoNavTab.tournaments,
-              onBackTap: () => _setTab(PgoNavTab.home),
-              onHomeTap: () => _setTab(PgoNavTab.home),
-              onProfileTap: () => _setTab(PgoNavTab.profile),
-            ),
-            OpenMatchAlertsScreen(
-              onBackTap: () => _setTab(PgoNavTab.home),
-            ),
-            ProfileScreen(
-              showBottomNav: false,
-              openFriendsOnStart: widget.openProfileFriendsOnStart,
-              onBackTap: () => _setTab(PgoNavTab.home),
-              onHomeTap: () => _setTab(PgoNavTab.home),
-              onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: PgoBottomNav(
-        currentTab: _currentTab,
-        onHomeTap: () => _setTab(PgoNavTab.home),
-        onTournamentsTap: () => _setTab(PgoNavTab.tournaments),
-        onAlertsTap: () => _setTab(PgoNavTab.alerts),
-        onProfileTap: () => _setTab(PgoNavTab.profile),
+          ),
+        ],
       ),
     );
   }

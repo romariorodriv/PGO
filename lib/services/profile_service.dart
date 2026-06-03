@@ -36,6 +36,15 @@ class ProfileService {
         },
       ).timeout(_requestTimeout);
 
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw Exception('AUTH_EXPIRED');
+      }
+      if (response.statusCode == 404) {
+        throw Exception('ENDPOINT_NOT_FOUND_404');
+      }
+      if (response.statusCode >= 500) {
+        throw Exception('SERVER_UNAVAILABLE_${response.statusCode}');
+      }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(json['message'] ?? 'No se pudo cargar el perfil');
@@ -44,11 +53,11 @@ class ProfileService {
       return ProfileSummary.fromJson(json);
     } on TimeoutException {
       throw Exception(
-        'La carga del perfil expiró. Verifica la conexión con el backend.',
+        'TIMEOUT',
       );
     } on http.ClientException {
       throw Exception(
-        'No se pudo conectar al backend para cargar el perfil.',
+        'NETWORK_ERROR',
       );
     }
   }
@@ -61,6 +70,14 @@ class ProfileService {
     String? preferredSide,
     String? racketModel,
     String? experienceLevel,
+    String? categoryOrigin,
+    bool? categoryIsProvisional,
+    String? categorySuggested,
+    String? categoryPreliminary,
+    String? categoryMaxApplied,
+    int? categoryScore,
+    Map<String, List<String>>? categoryQuizAnswers,
+    bool? hasCompletedInitialOnboarding,
   }) async {
     final token = await _sessionService.getAccessToken();
     if (token == null || token.isEmpty) {
@@ -75,6 +92,14 @@ class ProfileService {
       'preferredSide': preferredSide?.trim(),
       'racketModel': racketModel?.trim(),
       'experienceLevel': experienceLevel?.trim().toUpperCase(),
+      'categoryOrigin': categoryOrigin?.trim(),
+      'categoryIsProvisional': categoryIsProvisional,
+      'categorySuggested': categorySuggested?.trim(),
+      'categoryPreliminary': categoryPreliminary?.trim(),
+      'categoryMaxApplied': categoryMaxApplied?.trim(),
+      'categoryScore': categoryScore,
+      'categoryQuizAnswers': categoryQuizAnswers,
+      'hasCompletedInitialOnboarding': hasCompletedInitialOnboarding,
     }..removeWhere((key, value) => value == null || value == '');
 
     try {
@@ -89,6 +114,7 @@ class ProfileService {
           )
           .timeout(_requestTimeout);
 
+      _throwIfAuthExpired(response);
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(json['message'] ?? 'No se pudo actualizar el perfil');
@@ -103,6 +129,75 @@ class ProfileService {
       throw Exception(
         'No se pudo conectar al backend para actualizar el perfil.',
       );
+    }
+  }
+
+  Future<void> markHomeGuideSeen() async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    try {
+      final response = await _client
+          .patch(
+            Uri.parse('${ApiConfig.baseUrl}/profile/me'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({'hasSeenHomeGuide': true}),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw Exception('AUTH_EXPIRED');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (response.body.isEmpty) {
+          throw Exception('No se pudo guardar la guia');
+        }
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(json['message'] ?? 'No se pudo guardar la guia');
+      }
+    } on TimeoutException {
+      throw Exception('La actualización de la guia expiró.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar al backend.');
+    }
+  }
+
+  Future<void> markInitialOnboardingComplete() async {
+    await _patchFlags({'hasCompletedInitialOnboarding': true});
+  }
+
+  Future<void> _patchFlags(Map<String, dynamic> body) async {
+    final token = await _sessionService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa');
+    }
+
+    final response = await _client
+        .patch(
+          Uri.parse('${ApiConfig.baseUrl}/profile/me'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
+
+    _throwIfAuthExpired(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception(json['message'] ?? 'No se pudo actualizar el perfil');
+    }
+  }
+
+  void _throwIfAuthExpired(http.Response response) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('AUTH_EXPIRED');
     }
   }
 

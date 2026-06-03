@@ -37,8 +37,8 @@ class _TournamentRegisterSoloScreenState
   bool _isSubmitting = false;
 
   TournamentRecord? get _tournament => widget.tournament;
-  String get _title => _tournament?.title ?? 'Torneo PGO';
-  String get _location => _tournament?.location ?? 'One Padel Trigal';
+  String get _title => _tournament?.title ?? '';
+  String get _location => _tournament?.location ?? '';
 
   String get _formattedDate {
     final startsAt = _tournament?.startsAt;
@@ -75,7 +75,7 @@ class _TournamentRegisterSoloScreenState
     if (tournament == null) return;
     if (!TournamentRules.canJoin(tournament)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(TournamentRules.joinLabel(tournament))),
+        SnackBar(content: Text(TournamentRules.joinBlockedReason(tournament))),
       );
       return;
     }
