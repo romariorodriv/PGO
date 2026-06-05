@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 class ApiConfig {
   static const String _productionBaseUrl = 'http://3.145.41.187/api';
   static const String _defaultAndroidGoogleClientId =
-      '870677477488-25pehte6fmjo0hk45o3imcqfk4euptd3.apps.googleusercontent.com';
+      '27858588529-0o3sreikgi33i0slkjdvhmms58sthj8i.apps.googleusercontent.com';
   static const String _defaultIosGoogleClientId =
-      '870677477488-vnl3ektpua8bopksmfaa8gm4087leolr.apps.googleusercontent.com';
+      '27858588529-lumaihfvi9k7uvpc0f7g208r4hsdcuq8.apps.googleusercontent.com';
 
   static const String _overrideBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
