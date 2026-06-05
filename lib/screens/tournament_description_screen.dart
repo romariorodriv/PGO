@@ -19,6 +19,7 @@ import '../widgets/pgo_options_menu.dart';
 import '../widgets/score_picker.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'main_shell.dart';
 import 'tournament_bracket_screen.dart';
 import 'tournament_live_screen.dart';
 import 'tournament_profile_screen.dart';
@@ -495,6 +496,10 @@ class _TournamentDescriptionScreenState
               tournament: currentTournament,
               isModal: true,
               scrollController: scrollController,
+              onGoToMyTournaments: () => MainShell.openReplacement(
+                context,
+                initialTab: PgoNavTab.tournaments,
+              ),
             ),
           );
         },
