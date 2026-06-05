@@ -1,6 +1,7 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/community_user.dart';
@@ -103,6 +104,32 @@ class ProfileService {
     }..removeWhere((key, value) => value == null || value == '');
 
     try {
+      return await _sendUpdateProfilePayload(payload);
+    } on Exception catch (error) {
+      if (_shouldRetryWithoutLegacyOnboardingFields(error, payload)) {
+        final fallbackPayload = Map<String, dynamic>.from(payload)
+          ..remove('categoryOrigin')
+          ..remove('categoryIsProvisional')
+          ..remove('categorySuggested')
+          ..remove('categoryPreliminary')
+          ..remove('categoryMaxApplied')
+          ..remove('categoryScore')
+          ..remove('categoryQuizAnswers')
+          ..remove('hasCompletedInitialOnboarding');
+        return _sendUpdateProfilePayload(fallbackPayload);
+      }
+      rethrow;
+    }
+  }
+
+  Future<ProfileSummary> _sendUpdateProfilePayload(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final token = await _sessionService.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('No hay sesión activa');
+      }
       final response = await _client
           .patch(
             Uri.parse('${ApiConfig.baseUrl}/profile/me'),
@@ -115,9 +142,24 @@ class ProfileService {
           .timeout(_requestTimeout);
 
       _throwIfAuthExpired(response);
+      _logProfileUpdate(
+        status: response.statusCode,
+        payloadKeys: payload.keys.toList(),
+        body: _shortBody(response.body),
+      );
+      if (response.statusCode == 413) {
+        throw Exception(
+          'El archivo es muy pesado. Intenta con una imagen más liviana.',
+        );
+      }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(json['message'] ?? 'No se pudo actualizar el perfil');
+        throw Exception(
+          _friendlyApiMessage(
+            json['message'],
+            'No se pudo actualizar el perfil',
+          ),
+        );
       }
 
       return ProfileSummary.fromJson(json);
@@ -191,7 +233,9 @@ class ProfileService {
     _throwIfAuthExpired(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      throw Exception(json['message'] ?? 'No se pudo actualizar el perfil');
+      throw Exception(
+        _friendlyApiMessage(json['message'], 'No se pudo actualizar el perfil'),
+      );
     }
   }
 
@@ -199,6 +243,83 @@ class ProfileService {
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw Exception('AUTH_EXPIRED');
     }
+  }
+
+  bool _shouldRetryWithoutLegacyOnboardingFields(
+    Object error,
+    Map<String, dynamic> payload,
+  ) {
+    final message = error.toString().toLowerCase();
+    final hasLegacyFields = payload.containsKey('categoryOrigin') ||
+        payload.containsKey('categoryIsProvisional') ||
+        payload.containsKey('categorySuggested') ||
+        payload.containsKey('categoryPreliminary') ||
+        payload.containsKey('categoryMaxApplied') ||
+        payload.containsKey('categoryScore') ||
+        payload.containsKey('categoryQuizAnswers') ||
+        payload.containsKey('hasCompletedInitialOnboarding');
+    return hasLegacyFields &&
+        (message.contains('should not exist') ||
+            message.contains('validation') ||
+            message.contains('badrequest') ||
+            message.contains('bad request') ||
+            message.contains('must be') ||
+            message.contains('property') ||
+            message.contains('categoryorigin') ||
+            message.contains('categoryisprovisional') ||
+            message.contains('categorysuggested') ||
+            message.contains('categorypreliminary') ||
+            message.contains('categorymaxapplied') ||
+            message.contains('categoryscore') ||
+            message.contains('categoryquizanswers') ||
+            message.contains('hascompletedinitialonboarding'));
+  }
+
+  static void _logProfileUpdate({
+    required int status,
+    required List<String> payloadKeys,
+    required String body,
+  }) {
+    if (!kDebugMode) return;
+    debugPrint(
+      'pgo_profile_update status=$status payload=${payloadKeys.join(",")} body=$body',
+    );
+  }
+
+  static String _shortBody(String body) {
+    final trimmed = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (trimmed.length <= 180) return trimmed;
+    return '${trimmed.substring(0, 180)}...';
+  }
+
+  String _friendlyApiMessage(Object? message, String fallback) {
+    if (message is String && message.trim().isNotEmpty) {
+      final lower = message.toLowerCase();
+      if (lower.contains('should not exist') ||
+          lower.contains('must be') ||
+          lower.contains('validation') ||
+          lower.contains('bad request')) {
+        return message.trim();
+      }
+      return message;
+    }
+    if (message is List && message.isNotEmpty) {
+      return message
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .join(' ');
+    }
+    if (message is Map && message.isNotEmpty) {
+      final nested = message['message'];
+      if (nested != null) {
+        return _friendlyApiMessage(nested, fallback);
+      }
+      return message.values
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .join(' ');
+    }
+    return fallback;
   }
 
   Future<ProfileHistory> getMyHistory() async {
