@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -15,9 +17,14 @@ import 'services/profile_service.dart';
 import 'services/push_notification_service.dart';
 import 'services/session_service.dart';
 import 'utils/initial_category_onboarding.dart';
+import 'utils/match_share_link.dart';
+import 'utils/post_auth_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessaging.onBackgroundMessage(
+    pgoFirebaseMessagingBackgroundHandler,
+  );
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -113,22 +120,29 @@ class _AppEntryScreen extends StatefulWidget {
 }
 
 class _AppEntryScreenState extends State<_AppEntryScreen> {
+  final AppLinks _appLinks = AppLinks();
   final Stopwatch _watch = Stopwatch();
   bool _slow = false;
   bool _failed = false;
   String _error = '';
   Future<Widget>? _bootstrapFuture;
   Timer? _slowTimer;
+  StreamSubscription<Uri>? _matchLinkSubscription;
+  bool _initialLinkCaptured = false;
 
   @override
   void initState() {
     super.initState();
+    _matchLinkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      unawaited(_captureMatchLinkWhileLoggedOut(uri));
+    });
     _start();
   }
 
   @override
   void dispose() {
     _slowTimer?.cancel();
+    _matchLinkSubscription?.cancel();
     super.dispose();
   }
 
@@ -155,6 +169,7 @@ class _AppEntryScreenState extends State<_AppEntryScreen> {
 
   Future<Widget> _bootstrap() async {
     try {
+      await _captureInitialMatchLink();
       final token = await SessionService().getAccessToken();
       _log('auth_loaded');
       if (token == null || token.isEmpty) {
@@ -204,6 +219,27 @@ class _AppEntryScreenState extends State<_AppEntryScreen> {
         error: _error,
         onRetry: _start,
       );
+    }
+  }
+
+  Future<void> _captureInitialMatchLink() async {
+    if (_initialLinkCaptured) return;
+    _initialLinkCaptured = true;
+    try {
+      final uri = await _appLinks.getInitialLink();
+      if (uri != null && parseMatchShareLink(uri).isMatchPath) {
+        await savePendingDeepLink(uri);
+      }
+    } catch (error) {
+      debugPrint('Initial match link capture failed: $error');
+    }
+  }
+
+  Future<void> _captureMatchLinkWhileLoggedOut(Uri uri) async {
+    if (!parseMatchShareLink(uri).isMatchPath) return;
+    final token = await SessionService().getAccessToken();
+    if (token == null || token.isEmpty) {
+      await savePendingDeepLink(uri);
     }
   }
 

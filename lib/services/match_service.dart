@@ -93,6 +93,11 @@ class MatchService {
           )
           .timeout(_requestTimeout);
 
+      if (response.statusCode == 413) {
+        throw Exception(
+          'El archivo es muy pesado. Intenta con una imagen más liviana.',
+        );
+      }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(json['message'] ?? 'No se pudo registrar el match');
@@ -137,6 +142,11 @@ class MatchService {
           )
           .timeout(_requestTimeout);
 
+      if (response.statusCode == 413) {
+        throw Exception(
+          'El archivo es muy pesado. Intenta con una imagen más liviana.',
+        );
+      }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(json['message'] ?? 'No se pudo actualizar el match');
@@ -182,6 +192,11 @@ class MatchService {
           )
           .timeout(_requestTimeout);
 
+      if (response.statusCode == 413) {
+        throw Exception(
+          'El archivo es muy pesado. Intenta con una imagen más liviana.',
+        );
+      }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(json['message'] ?? 'No se pudo finalizar el match');

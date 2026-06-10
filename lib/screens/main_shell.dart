@@ -9,6 +9,8 @@ import '../constants/colors.dart';
 import '../models/tournament_alert.dart';
 import '../models/profile_summary.dart';
 import '../services/tournament_service.dart';
+import '../utils/match_share_link.dart';
+import '../utils/post_auth_router.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import 'open_match_alerts_screen.dart';
@@ -70,6 +72,7 @@ class _MainShellState extends State<MainShell> {
   StreamSubscription<Uri>? _linkSubscription;
   bool _isDialogOpen = false;
   String? _lastHandledTournamentLink;
+  String? _lastHandledMatchLink;
 
   @override
   void initState() {
@@ -88,6 +91,16 @@ class _MainShellState extends State<MainShell> {
 
   Future<void> _bootstrapDeepLinks() async {
     try {
+      final pendingLink = await takePendingDeepLink();
+      if (!mounted) return;
+      if (pendingLink != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(_handleIncomingLink(pendingLink));
+          }
+        });
+      }
+
       final initialLink = await _appLinks.getInitialLink();
       if (!mounted) return;
       if (initialLink != null) {
@@ -110,12 +123,32 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _handleIncomingLink(Uri uri) async {
+    final matchLink = parseMatchShareLink(uri);
+    if (matchLink.isMatchPath) {
+      final navigationKey = matchLink.openMatchAlertId ?? uri.toString();
+      if (_lastHandledMatchLink == navigationKey) return;
+      _lastHandledMatchLink = navigationKey;
+      await _openMatchDetail(matchLink.openMatchAlertId);
+      return;
+    }
+
     final tournamentId = _extractTournamentId(uri);
     if (tournamentId == null || tournamentId.isEmpty) return;
     if (_lastHandledTournamentLink == tournamentId) return;
 
     _lastHandledTournamentLink = tournamentId;
     await _openTournamentDescription(tournamentId);
+  }
+
+  Future<void> _openMatchDetail(String? matchId) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OpenMatchDetailByIdScreen(
+          openMatchAlertId: matchId,
+        ),
+      ),
+    );
   }
 
   String? _extractTournamentId(Uri uri) {

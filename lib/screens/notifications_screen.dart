@@ -60,7 +60,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       setState(() {
         _notifications = const [];
-        _error = error.toString().replaceFirst('Exception: ', '');
+        debugPrint('notifications_load_error: $error');
+        _error = _friendlyError(error.toString());
         _isLoading = false;
       });
     }
@@ -114,7 +115,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo eliminar la notificación.'),
+          content: Text('No se pudo eliminar la notificacion.'),
         ),
       );
     }
@@ -300,6 +301,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       grouped.putIfAbsent(_sectionFor(item.createdAt), () => []).add(item);
     }
     return grouped;
+  }
+
+  String _friendlyError(String raw) {
+    final message = raw.replaceFirst('Exception: ', '').trim();
+    if (message == 'AUTH_EXPIRED') {
+      return 'Tu sesion expiro. Vuelve a iniciar sesion.';
+    }
+    if (message == 'ENDPOINT_NOT_FOUND_404' ||
+        message.contains('Cannot GET /api/notifications')) {
+      return 'El servicio de notificaciones no esta disponible. Vuelve a intentar mas tarde.';
+    }
+    if (message == 'TIMEOUT' || message == 'NETWORK_ERROR') {
+      return 'No pudimos conectar con el servidor.';
+    }
+    if (message.startsWith('SERVER_UNAVAILABLE_')) {
+      return 'El servidor de notificaciones no esta disponible.';
+    }
+    return message;
   }
 }
 

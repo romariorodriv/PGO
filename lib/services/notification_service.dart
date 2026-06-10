@@ -72,19 +72,40 @@ class NotificationService {
           throw Exception('Metodo no soportado');
       }
 
-      final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
+      final decoded = _decodeBody(response.body);
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw Exception('AUTH_EXPIRED');
+      }
+      if (response.statusCode == 404) {
+        throw Exception('ENDPOINT_NOT_FOUND_404');
+      }
+      if (response.statusCode >= 500) {
+        throw Exception('SERVER_UNAVAILABLE_${response.statusCode}');
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         if (decoded is Map<String, dynamic>) {
           throw Exception(decoded['message'] ?? 'No se pudo completar acción');
+        }
+        if (decoded is String && decoded.trim().isNotEmpty) {
+          throw Exception(decoded.trim());
         }
         throw Exception('No se pudo completar acción');
       }
 
       return decoded;
     } on TimeoutException {
-      throw Exception('La acción expiró. Verifica tu conexión.');
+      throw Exception('TIMEOUT');
     } on http.ClientException {
-      throw Exception('No se pudo conectar al backend.');
+      throw Exception('NETWORK_ERROR');
+    }
+  }
+
+  dynamic _decodeBody(String body) {
+    if (body.trim().isEmpty) return null;
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return body;
     }
   }
 }

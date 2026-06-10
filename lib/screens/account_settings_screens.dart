@@ -1,4 +1,4 @@
-﻿// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
+// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,8 +10,8 @@ import '../constants/colors.dart';
 import '../constants/typography.dart';
 import '../models/profile_summary.dart';
 import '../services/account_service.dart';
+import '../services/auth_service.dart';
 import '../services/profile_service.dart';
-import '../services/session_service.dart';
 import '../services/support_service.dart';
 import 'login_screen.dart';
 
@@ -520,19 +520,15 @@ class SecurityAccessScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsScaffold(
       title: 'Seguridad y acceso',
-      subtitle: 'Administra tu contraseña y protege el acceso a tu cuenta.',
+      subtitle: 'Administra tu acceso y protege tu cuenta.',
       compact: true,
       body: [
         _SettingsCard(
           title: 'Seguridad e inicio de sesión',
           dense: true,
           children: [
-            _ActionRow(
-              icon: Icons.lock_outline,
-              title: 'Cambiar contraseña',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-              ),
+            const Text(
+              'Tu cuenta usa acceso con Google. No hay contraseña local para cambiar.',
             ),
           ],
         ),
@@ -568,59 +564,19 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final TextEditingController _passwordController = TextEditingController();
-  final AccountService _accountService = AccountService();
-  bool _isSaving = false;
-
-  bool get _hasMinLength => _passwordController.text.length >= 8;
-  bool get _hasNumber => RegExp(r'\d').hasMatch(_passwordController.text);
-  bool get _hasUpper => RegExp(r'[A-Z]').hasMatch(_passwordController.text);
-  bool get _isValid => _hasMinLength && _hasNumber && _hasUpper;
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (!_isValid || _isSaving) return;
-    setState(() => _isSaving = true);
-    try {
-      await _accountService.changePassword(_passwordController.text);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-      _showSnack(context, 'Contrasena actualizada.');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnack(context, error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return _SettingsScaffold(
-      title: 'Cambiar contraseña',
-      subtitle: 'Crea una contraseña segura para proteger tu cuenta.',
+      title: 'Acceso con Google',
+      subtitle: 'PGO usa Google para iniciar sesión.',
       compact: true,
       body: [
-        _SettingsTextField(
-          controller: _passwordController,
-          hint: 'Contraseña',
-          obscureText: true,
-          onChanged: (_) => setState(() {}),
+        const Text(
+          'No hay contraseña local en PGO. Si necesitas recuperar tu acceso, usa tu cuenta de Google.',
         ),
-        const SizedBox(height: 28),
-        _PasswordRule(valid: _hasMinLength, text: 'Mínimo 8 caracteres'),
-        _PasswordRule(valid: _hasNumber, text: 'Mínimo 1 número'),
-        _PasswordRule(valid: _hasUpper, text: 'Mínimo 1 mayúscula'),
       ],
-      bottomButtonLabel: 'Cambiar contraseña',
-      bottomLoading: _isSaving,
-      bottomEnabled: _isValid,
-      onBottomTap: _save,
+      bottomButtonLabel: 'Entendido',
+      onBottomTap: () => Navigator.of(context).pop(),
     );
   }
 }
@@ -1627,7 +1583,7 @@ void _showDeleteAccountDialog(BuildContext context) {
       dangerLabel: 'Eliminar cuenta',
       onDanger: () async {
         await AccountService().deleteAccount();
-        await SessionService().clear();
+        await AuthService().logout();
         if (!context.mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -1648,7 +1604,7 @@ void showLogoutDialog(BuildContext context) {
       primaryLabel: 'Cancelar',
       dangerLabel: 'Cerrar sesión',
       onDanger: () async {
-        await SessionService().clear();
+        await AuthService().logout();
         if (!context.mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),

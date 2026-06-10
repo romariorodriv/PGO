@@ -38,7 +38,8 @@ class _LevelQuizScreenState extends State<LevelQuizScreen> {
       setState(() => _index += 1);
       return;
     }
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context)
+        .push<LevelQuizCompletion>(
       MaterialPageRoute(
         builder: (_) => LevelQuizResultScreen(
           completion: LevelQuizCompletion(
@@ -47,7 +48,12 @@ class _LevelQuizScreenState extends State<LevelQuizScreen> {
           ),
         ),
       ),
-    );
+    )
+        .then((completion) {
+      if (completion != null && mounted) {
+        Navigator.of(context).pop(completion);
+      }
+    });
   }
 
   void _select(String id) {

@@ -11,6 +11,7 @@ bool needsInitialCategoryOnboarding(ProfileSummary profile) {
     return false;
   }
 
+  if (profile.categoryIsProvisional == true) return false;
   if ((profile.categorySuggested ?? '').trim().isNotEmpty) return false;
   if ((profile.categoryPreliminary ?? '').trim().isNotEmpty) return false;
   if ((profile.categoryMaxApplied ?? '').trim().isNotEmpty) return false;

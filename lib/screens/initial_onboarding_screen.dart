@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 
 import '../constants/colors.dart';
 import '../constants/lima_padel_clubs.dart';
-import '../utils/data_url_image.dart';
 import '../utils/level_quiz_calculator.dart';
 import 'level_quiz_screen.dart';
 
@@ -56,12 +55,15 @@ class InitialOnboardingScreen extends StatefulWidget {
 }
 
 class _InitialOnboardingScreenState extends State<InitialOnboardingScreen> {
+  static const _maxProfilePhotoBytes = 650 * 1024;
+
   final _picker = ImagePicker();
   late final TextEditingController _name;
   late final TextEditingController _email;
   late final TextEditingController _phone;
   int _step = 0;
   String? _photoUrl;
+  Uint8List? _localPhotoBytes;
   String _side = 'Ambos';
   String _club = limaPadelClubDetails.first.name;
   String? _category;
@@ -101,18 +103,24 @@ class _InitialOnboardingScreenState extends State<InitialOnboardingScreen> {
     try {
       final picked = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1200,
+        imageQuality: 45,
+        maxWidth: 720,
+        maxHeight: 720,
       );
       if (picked != null) {
         final bytes = await picked.readAsBytes();
-        final lower = picked.path.toLowerCase();
-        final mime = lower.endsWith('.png')
-            ? 'image/png'
-            : lower.endsWith('.webp')
-                ? 'image/webp'
-                : 'image/jpeg';
-        setState(() => _photoUrl = 'data:$mime;base64,${base64Encode(bytes)}');
+        if (bytes.length > _maxProfilePhotoBytes) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'La imagen sigue siendo muy grande. Prueba con una foto más ligera o recortada.',
+              ),
+            ),
+          );
+          return;
+        }
+        setState(() => _localPhotoBytes = bytes);
       }
     } finally {
       if (mounted) setState(() => _picking = false);
@@ -129,7 +137,7 @@ class _InitialOnboardingScreenState extends State<InitialOnboardingScreen> {
         name: _name.text.trim(),
         email: _email.text.trim(),
         phone: _phone.text.trim(),
-        photoUrl: _photoUrl ?? '',
+        photoUrl: _isRemotePhotoUrl(_photoUrl) ? _photoUrl!.trim() : '',
         preferredSide: _side,
         preferredClub: _club,
         category: _category ?? 'Por definir',
@@ -205,7 +213,14 @@ class _InitialOnboardingScreenState extends State<InitialOnboardingScreen> {
   }
 
   Widget _profileStep() {
-    final bytes = tryDecodeDataUrl(_photoUrl);
+    final remotePhotoUrl =
+        _isRemotePhotoUrl(_photoUrl) ? _photoUrl!.trim() : null;
+    ImageProvider<Object>? avatarImage;
+    if (_localPhotoBytes != null) {
+      avatarImage = MemoryImage(_localPhotoBytes!);
+    } else if (remotePhotoUrl != null) {
+      avatarImage = NetworkImage(remotePhotoUrl);
+    }
     return Column(
       children: [
         _Title(
@@ -219,8 +234,8 @@ class _InitialOnboardingScreenState extends State<InitialOnboardingScreen> {
             CircleAvatar(
               radius: 48,
               backgroundColor: const Color(0xFFF0F3F7),
-              backgroundImage: bytes != null ? MemoryImage(bytes) : null,
-              child: bytes == null
+              backgroundImage: avatarImage,
+              child: avatarImage == null
                   ? const Icon(Icons.add_rounded,
                       color: Color(0xFF788390), size: 46)
                   : null,
@@ -292,6 +307,15 @@ class _InitialOnboardingScreenState extends State<InitialOnboardingScreen> {
         ),
       ],
     );
+  }
+
+  bool _isRemotePhotoUrl(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty || trimmed.length > 2048) return false;
+    final uri = Uri.tryParse(trimmed);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
   }
 
   Widget _levelStep() {

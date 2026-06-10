@@ -1,7 +1,9 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
@@ -12,6 +14,7 @@ import 'session_service.dart';
 
 class AuthService {
   static const _requestTimeout = Duration(seconds: 15);
+  static const _googleSignInTimeout = Duration(seconds: 30);
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   static bool _googleInitialized = false;
 
@@ -26,11 +29,17 @@ class AuthService {
 
   Future<void> _ensureGoogleInitialized() async {
     if (_googleInitialized) {
+      _logGoogleEvent('initialize_skipped already_initialized=true');
       return;
     }
 
+    _logGoogleEvent(
+      'initialize_start platform=${defaultTargetPlatform.name} '
+      'server_client_id_configured=${ApiConfig.googleServerClientIdOrNull != null}',
+    );
     if (defaultTargetPlatform == TargetPlatform.android &&
         ApiConfig.googleServerClientIdOrNull == null) {
+      _logGoogleEvent('initialize_failed reason=missing_server_client_id');
       throw Exception(
         'Falta GOOGLE_SERVER_CLIENT_ID para Google Sign-In en Android. '
         'Debes usar el web client id del proyecto Firebase/Google Cloud.',
@@ -47,11 +56,20 @@ class AuthService {
         : (ApiConfig.googleServerClientIdOrNull ??
             '27858588529-ao5coqdfo1bbfr4l38l0ig4gkk0i1a9c.apps.googleusercontent.com');
 
-    await _googleSignIn.initialize(
+    await _googleSignIn
+        .initialize(
       clientId: clientId,
       serverClientId: serverClientId,
+    )
+        .timeout(
+      _googleSignInTimeout,
+      onTimeout: () {
+        _logGoogleEvent('initialize_failed reason=timeout');
+        throw const _GoogleAuthTimeout('initialize');
+      },
     );
     _googleInitialized = true;
+    _logGoogleEvent('initialize_success');
   }
 
   Future<AuthResponse> login({
@@ -75,11 +93,11 @@ class AuthService {
       return _handleAuthResponse(response);
     } on TimeoutException {
       throw Exception(
-        'La conexión con el backend expiró. Verifica que Nest esté corriendo y que la URL sea correcta.',
+        'No pudimos conectar. Revisa tu internet e intenta otra vez.',
       );
     } on http.ClientException {
       throw Exception(
-        'No se pudo conectar al backend. Revisa la URL de API y tu emulador/dispositivo.',
+        'No pudimos conectar. Revisa tu internet e intenta otra vez.',
       );
     }
   }
@@ -105,11 +123,11 @@ class AuthService {
       return _handleAuthResponse(response);
     } on TimeoutException {
       throw Exception(
-        'La conexión con el backend expiró. Verifica que Nest esté corriendo y que la URL sea correcta.',
+        'No pudimos conectar. Revisa tu internet e intenta otra vez.',
       );
     } on http.ClientException {
       throw Exception(
-        'No se pudo conectar al backend. Revisa la URL de API y tu emulador/dispositivo.',
+        'No pudimos conectar. Revisa tu internet e intenta otra vez.',
       );
     }
   }
@@ -146,28 +164,40 @@ class AuthService {
 
   Future<AuthResponse> loginWithGoogle() async {
     try {
-      await _ensureGoogleInitialized();
-      final bool isAndroid = defaultTargetPlatform == TargetPlatform.android;
-      final String? clientId = isAndroid ? null : ApiConfig.googleClientIdOrNull;
-      final String serverClientId = isAndroid
-          ? (ApiConfig.googleServerClientIdOrNull ??
-              ApiConfig.googleClientIdOrNull ??
-              '')
-          : (ApiConfig.googleServerClientIdOrNull ??
-              '27858588529-ao5coqdfo1bbfr4l38l0ig4gkk0i1a9c.apps.googleusercontent.com');
+      return await _loginWithGoogle().timeout(
+        _googleSignInTimeout,
+        onTimeout: () {
+          _logGoogleEvent('login_failed reason=overall_timeout');
+          throw const _GoogleAuthTimeout('overall');
+        },
+      );
+    } on _GoogleAuthTimeout catch (error) {
+      _logGoogleEvent('google_auth_timeout stage=${error.stage}');
+      throw Exception(
+        'La conexión tardó demasiado. Revisa tu internet e intenta otra vez.',
+      );
+    }
+  }
 
-      final GoogleSignInAccount account = await _googleSignIn.authenticate();
-      _logGoogleDebug(
-        'google_auth account email=${_maskEmail(account.email)} '
-        'platform=${defaultTargetPlatform.name}',
+  Future<AuthResponse> _loginWithGoogle() async {
+    try {
+      _logGoogleEvent('login_start');
+      await _ensureGoogleInitialized();
+
+      _logGoogleEvent('account_selection_start');
+      final GoogleSignInAccount account =
+          await _googleSignIn.authenticate().timeout(
+        _googleSignInTimeout,
+        onTimeout: () {
+          _logGoogleEvent('account_selection_failed reason=timeout');
+          throw const _GoogleAuthTimeout('account_selection');
+        },
       );
-      _logGoogleDebug(
-        'google_auth config platform=${defaultTargetPlatform.name} '
-        'clientIdIos=${clientId?.startsWith("27858588529") == true} '
-        'serverClientId=${serverClientId.startsWith("27858588529")}',
-      );
+      _logGoogleEvent('account_selection_success account_present=true');
       final String? idToken = account.authentication.idToken;
-      _logGoogleDebug('google_auth idToken=${idToken == null ? 'null' : 'ok'}');
+      _logGoogleEvent(
+        'id_token_result present=${idToken != null && idToken.isNotEmpty}',
+      );
 
       if (idToken == null || idToken.isEmpty) {
         throw Exception(
@@ -175,28 +205,27 @@ class AuthService {
         );
       }
 
-      _logGoogleDebug(
-        'google_auth request ${ApiConfig.baseUrl}/auth/google '
-        'platform=${defaultTargetPlatform.name}',
+      final authUrl = Uri.parse('${ApiConfig.baseUrl}/auth/google');
+      _logGoogleEvent(
+        'backend_request_start url=$authUrl '
+        'timeout_seconds=${_requestTimeout.inSeconds}',
       );
       final response = await _client
           .post(
-            Uri.parse('${ApiConfig.baseUrl}/auth/google'),
+            authUrl,
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'idToken': idToken,
             }),
           )
           .timeout(_requestTimeout);
-      _logGoogleDebug(
-        'google_auth response status=${response.statusCode} '
-        'body=${_shortBody(response.body)}',
-      );
+      _logGoogleEvent('backend_response status=${response.statusCode}');
 
       return _handleAuthResponse(response);
     } on GoogleSignInException catch (error) {
-      _logGoogleDebug(
-        'google_auth exception code=${error.code} desc=${error.description}',
+      _logGoogleEvent(
+        'google_sign_in_exception code=${error.code.name} '
+        'developer_error=${error.code == GoogleSignInExceptionCode.clientConfigurationError}',
       );
       switch (error.code) {
         case GoogleSignInExceptionCode.canceled:
@@ -211,14 +240,42 @@ class AuthService {
                 'No se pudo iniciar sesión con Google en este momento.',
           );
       }
-    } on TimeoutException {
+    } on _GoogleAuthTimeout catch (error) {
+      _logGoogleEvent('google_auth_timeout stage=${error.stage}');
       throw Exception(
-        'La conexión con el backend expiró. Verifica que Nest esté corriendo y que la URL sea correcta.',
+        'Google no respondió y el inicio de sesión fue cancelado. Verifica Google Play Services, la conexión y la configuración SHA de la app.',
       );
-    } on http.ClientException {
+    } on PlatformException catch (error) {
+      _logGoogleEvent(
+        'platform_exception code=${_safeLogValue(error.code)} '
+        'developer_error=${error.code == '10' || error.code == 'DEVELOPER_ERROR'}',
+      );
       throw Exception(
-        'No se pudo conectar al backend. Revisa la URL de API y tu emulador/dispositivo.',
+        'Google Sign-In falló antes de contactar al servidor. Revisa la firma release, SHA-1, SHA-256 y Web client ID.',
       );
+    } on TimeoutException catch (error) {
+      _logGoogleEvent(
+        'backend_request_failed reason=timeout '
+        'type=${_safeLogValue(error.runtimeType.toString())} '
+        'url=${ApiConfig.baseUrl}/auth/google',
+      );
+      throw Exception(
+        'No pudimos conectar. Revisa tu internet e intenta otra vez.',
+      );
+    } on http.ClientException catch (error) {
+      _logGoogleEvent(
+        'backend_request_failed reason=client_exception '
+        'type=${_safeLogValue(error.runtimeType.toString())} '
+        'url=${ApiConfig.baseUrl}/auth/google',
+      );
+      throw Exception(
+        'No pudimos conectar. Revisa tu internet e intenta otra vez.',
+      );
+    } catch (error) {
+      _logGoogleEvent(
+        'login_failed type=${_safeLogValue(error.runtimeType.toString())}',
+      );
+      rethrow;
     }
   }
 
@@ -231,26 +288,27 @@ class AuthService {
 
     final authResponse = AuthResponse.fromJson(json);
     await _sessionService.saveAccessToken(authResponse.accessToken);
-    await PushNotificationService().registerCurrentDevice();
+    unawaited(
+      PushNotificationService().registerCurrentDevice().catchError((error) {
+        _logGoogleEvent(
+          'push_register_background_failed '
+          'type=${_safeLogValue(error.runtimeType.toString())}',
+        );
+      }),
+    );
     return authResponse;
   }
 
-  static void _logGoogleDebug(String message) {
-    if (kDebugMode) debugPrint('pgo_google $message');
+  static void _logGoogleEvent(String message) {
+    developer.log(message, name: 'pgo.google');
   }
 
-  static String _maskEmail(String email) {
-    final parts = email.split('@');
-    if (parts.length != 2) return '***';
-    final local = parts.first;
-    final domain = parts.last;
-    final visible = local.isEmpty ? '***' : '${local[0]}***';
-    return '$visible@$domain';
-  }
+  static String _safeLogValue(String value) =>
+      value.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
+}
 
-  static String _shortBody(String body) {
-    final trimmed = body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (trimmed.length <= 120) return trimmed;
-    return '${trimmed.substring(0, 120)}...';
-  }
+class _GoogleAuthTimeout implements Exception {
+  const _GoogleAuthTimeout(this.stage);
+
+  final String stage;
 }

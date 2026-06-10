@@ -87,7 +87,7 @@ class ProfileService {
 
     final payload = <String, dynamic>{
       'name': name.trim(),
-      'photoUrl': photoUrl?.trim(),
+      'photoUrl': _normalizeRemotePhotoUrl(photoUrl),
       'category': category?.trim(),
       'preferredClub': preferredClub?.trim(),
       'preferredSide': preferredSide?.trim(),
@@ -102,6 +102,7 @@ class ProfileService {
       'categoryQuizAnswers': categoryQuizAnswers,
       'hasCompletedInitialOnboarding': hasCompletedInitialOnboarding,
     }..removeWhere((key, value) => value == null || value == '');
+    _logProfilePayload(payload);
 
     try {
       return await _sendUpdateProfilePayload(payload);
@@ -145,7 +146,7 @@ class ProfileService {
       _logProfileUpdate(
         status: response.statusCode,
         payloadKeys: payload.keys.toList(),
-        body: _shortBody(response.body),
+        body: _safeResponseSummary(response.body),
       );
       if (response.statusCode == 413) {
         throw Exception(
@@ -154,12 +155,7 @@ class ProfileService {
       }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-          _friendlyApiMessage(
-            json['message'],
-            'No se pudo actualizar el perfil',
-          ),
-        );
+        throw Exception(_profileUpdateMessage(json));
       }
 
       return ProfileSummary.fromJson(json);
@@ -286,10 +282,42 @@ class ProfileService {
     );
   }
 
-  static String _shortBody(String body) {
-    final trimmed = body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (trimmed.length <= 180) return trimmed;
-    return '${trimmed.substring(0, 180)}...';
+  static void _logProfilePayload(Map<String, dynamic> payload) {
+    if (!kDebugMode) return;
+    final details = payload.entries.map((entry) {
+      final value = entry.value;
+      final length = value is String ? ' length=${value.length}' : '';
+      return '${entry.key}=${value.runtimeType} present=true$length';
+    }).join(' ');
+    debugPrint('pgo.profile_update payload_types $details');
+  }
+
+  static String? _normalizeRemotePhotoUrl(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty || trimmed.length > 2048) return null;
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  static String _safeResponseSummary(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return 'json_object=false';
+      final code = decoded['code']?.toString() ?? 'none';
+      final message = decoded['message'];
+      final messageLength = message is String ? message.length : 0;
+      final requestIdPresent =
+          decoded['requestId']?.toString().trim().isNotEmpty == true;
+      return 'code=$code message_length=$messageLength '
+          'request_id_present=$requestIdPresent';
+    } catch (_) {
+      return 'json_object=false body_length=${body.length}';
+    }
   }
 
   String _friendlyApiMessage(Object? message, String fallback) {
@@ -320,6 +348,33 @@ class ProfileService {
           .join(' ');
     }
     return fallback;
+  }
+
+  String _profileUpdateMessage(Map<String, dynamic> json) {
+    final code = json['code']?.toString();
+    switch (code) {
+      case 'invalid_profile_payload':
+      case 'invalid_category':
+      case 'invalid_preferred_side':
+        return _friendlyApiMessage(
+          json['message'],
+          'Revisa los datos de tu perfil e intenta nuevamente.',
+        );
+      case 'user_not_found':
+        return 'No pudimos iniciar sesión. Inténtalo nuevamente.';
+      case 'profile_conflict':
+      case 'profile_update_failed':
+        return 'No pudimos completar tu perfil. Inténtalo nuevamente.';
+      default:
+        final status = (json['statusCode'] as num?)?.toInt();
+        if (status != null && status >= 500) {
+          return 'No pudimos completar tu perfil. Inténtalo nuevamente.';
+        }
+        return _friendlyApiMessage(
+          json['message'],
+          'No pudimos completar tu perfil. Inténtalo nuevamente.',
+        );
+    }
   }
 
   Future<ProfileHistory> getMyHistory() async {

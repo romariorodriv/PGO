@@ -60,6 +60,7 @@ app.*.map.json
 **/ios/**/*.swp
 **/ios/**/*~.nib
 **/ios/**/*.pbxproj
+!/ios/Runner.xcodeproj/project.pbxproj
 **/ios/**/*.pbxuser
 **/ios/**/*.perspectivev3
 **/ios/**/*.xcconfig

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -53,6 +54,7 @@ class PushNotificationService {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
   static bool _initialized = false;
+  static Future<void>? _initialization;
   static String? _lastHandledPayload;
 
   final http.Client _client;
@@ -60,8 +62,26 @@ class PushNotificationService {
 
   Future<void> initialize() async {
     if (_initialized || kIsWeb) return;
-    _initialized = true;
+    final pendingInitialization = _initialization;
+    if (pendingInitialization != null) {
+      await pendingInitialization;
+      return;
+    }
 
+    final initialization = _initialize();
+    _initialization = initialization;
+    try {
+      await initialization;
+      _initialized = true;
+    } finally {
+      _initialization = null;
+    }
+  }
+
+  Future<void> _initialize() async {
+    _logPushEvent(
+      'initialize_start platform=${defaultTargetPlatform.name}',
+    );
     await Firebase.initializeApp();
 
     await _localNotifications.initialize(
@@ -99,7 +119,7 @@ class PushNotificationService {
       badge: true,
       sound: true,
     );
-    _logPushDebug(
+    _logPushEvent(
       'permission platform=${defaultTargetPlatform.name} '
       'status=${permission.authorizationStatus.name}',
     );
@@ -109,9 +129,6 @@ class PushNotificationService {
       sound: true,
     );
 
-    FirebaseMessaging.onBackgroundMessage(
-      pgoFirebaseMessagingBackgroundHandler,
-    );
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
     unawaited(messaging.getInitialMessage().then((message) {
@@ -121,8 +138,15 @@ class PushNotificationService {
     }));
 
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+      _logPushEvent(
+        'token_refresh platform=${defaultTargetPlatform.name} '
+        'present=${token.isNotEmpty} length=${token.length}',
+      );
       unawaited(registerCurrentDevice(tokenOverride: token));
     });
+    _logPushEvent(
+      'initialize_success platform=${defaultTargetPlatform.name}',
+    );
   }
 
   Future<void> registerCurrentDevice({String? tokenOverride}) async {
@@ -131,23 +155,40 @@ class PushNotificationService {
     try {
       await initialize();
       final accessToken = await _sessionService.getAccessToken();
-      if (accessToken == null || accessToken.isEmpty) return;
+      if (accessToken == null || accessToken.isEmpty) {
+        _logPushEvent('register_skipped reason=no_session');
+        return;
+      }
 
       await _resetTokenIfFirebaseSenderChanged();
       if (defaultTargetPlatform == TargetPlatform.iOS) {
         final apnsToken = await _waitForApnsToken();
-        _logPushDebug('apns_token=${_maskToken(apnsToken)}');
+        _logPushEvent(
+          'apns_token present=${apnsToken != null && apnsToken.isNotEmpty} '
+          'length=${apnsToken?.length ?? 0}',
+        );
+        if (apnsToken == null || apnsToken.isEmpty) {
+          _logPushEvent('register_skipped reason=apns_token_unavailable');
+          return;
+        }
       }
       final fcmToken =
           tokenOverride ?? await FirebaseMessaging.instance.getToken();
       if (fcmToken == null || fcmToken.isEmpty) {
-        _logPushDebug('fcm_token=null platform=${defaultTargetPlatform.name}');
+        _logPushEvent(
+          'fcm_token present=false length=0 '
+          'platform=${defaultTargetPlatform.name}',
+        );
         return;
       }
-      _logPushDebug(
-        'fcm_token=${_maskToken(fcmToken)} platform=${defaultTargetPlatform.name}',
+      _logPushEvent(
+        'fcm_token present=true length=${fcmToken.length} '
+        'platform=${defaultTargetPlatform.name}',
       );
 
+      _logPushEvent(
+        'backend_register_start platform=${defaultTargetPlatform.name}',
+      );
       final response = await _client
           .post(
             Uri.parse('${ApiConfig.baseUrl}/notifications/devices'),
@@ -161,18 +202,21 @@ class PushNotificationService {
             }),
           )
           .timeout(_requestTimeout);
-      _logPushDebug(
-        'push_register status=${response.statusCode} '
+      _logPushEvent(
+        'backend_register_result status=${response.statusCode} '
         'platform=${defaultTargetPlatform.name}',
       );
     } catch (error) {
-      debugPrint('Push device registration skipped: $error');
+      _logPushEvent(
+        'register_failed platform=${defaultTargetPlatform.name} '
+        'type=${_safeLogValue(error.runtimeType.toString())}',
+      );
       // No bloquea login ni navegacion si el registro push falla.
     }
   }
 
   Future<void> _resetTokenIfFirebaseSenderChanged() async {
-    final senderId = Firebase.app().options.messagingSenderId ?? '';
+    final senderId = Firebase.app().options.messagingSenderId;
     if (senderId.isEmpty) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -185,23 +229,27 @@ class PushNotificationService {
   }
 
   Future<String?> _waitForApnsToken() async {
-    for (var attempt = 0; attempt < 10; attempt++) {
-      final token = await FirebaseMessaging.instance.getAPNSToken();
-      if (token != null && token.isNotEmpty) return token;
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+    for (var attempt = 1; attempt <= 30; attempt++) {
+      try {
+        final token = await FirebaseMessaging.instance.getAPNSToken();
+        if (token != null && token.isNotEmpty) return token;
+      } catch (error) {
+        _logPushEvent(
+          'apns_token_check_failed attempt=$attempt '
+          'type=${_safeLogValue(error.runtimeType.toString())}',
+        );
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
     }
     return null;
   }
 
-  static void _logPushDebug(String message) {
-    if (kDebugMode) debugPrint('pgo_push $message');
+  static void _logPushEvent(String message) {
+    developer.log(message, name: 'pgo.push');
   }
 
-  static String _maskToken(String? token) {
-    if (token == null || token.isEmpty) return 'null';
-    if (token.length <= 12) return '${token.substring(0, 2)}...';
-    return '${token.substring(0, 6)}...${token.substring(token.length - 6)}';
-  }
+  static String _safeLogValue(String value) =>
+      value.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
 
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
     final notification = message.notification;

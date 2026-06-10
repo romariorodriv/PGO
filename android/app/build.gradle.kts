@@ -1,3 +1,6 @@
+import java.util.Properties
+import org.gradle.api.GradleException
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -10,6 +13,13 @@ android {
     namespace = "com.pgo.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val keystoreProperties = Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            load(keystorePropertiesFile.inputStream())
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -34,9 +44,17 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (keystorePropertiesFile.exists()) {
+                    signingConfigs.create("release").apply {
+                        keyAlias = keystoreProperties["keyAlias"] as String
+                        keyPassword = keystoreProperties["keyPassword"] as String
+                        storeFile = file(keystoreProperties["storeFile"] as String)
+                        storePassword = keystoreProperties["storePassword"] as String
+                    }
+                } else {
+                    throw GradleException("Falta android/key.properties para firmar release")
+                }
         }
     }
 }

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/colors.dart';
@@ -16,6 +17,7 @@ import '../services/community_service.dart';
 import '../services/match_service.dart';
 import '../services/open_match_alert_service.dart';
 import '../services/profile_service.dart';
+import '../utils/match_share_link.dart';
 import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
@@ -2071,6 +2073,186 @@ class _CreateOpenMatchScreenState extends State<CreateOpenMatchScreen> {
   }
 }
 
+class OpenMatchDetailByIdScreen extends StatefulWidget {
+  const OpenMatchDetailByIdScreen({
+    super.key,
+    required this.openMatchAlertId,
+  });
+
+  final String? openMatchAlertId;
+
+  @override
+  State<OpenMatchDetailByIdScreen> createState() =>
+      _OpenMatchDetailByIdScreenState();
+}
+
+class _OpenMatchDetailByIdScreenState extends State<OpenMatchDetailByIdScreen> {
+  final OpenMatchAlertService _service = OpenMatchAlertService();
+  OpenMatchAlert? _alert;
+  String? _error;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final openMatchAlertId = widget.openMatchAlertId;
+    if (openMatchAlertId == null || !isUuid(openMatchAlertId)) {
+      setState(() {
+        _isLoading = false;
+        _error =
+            'Enlace de partido no válido.\nVerifica que el enlace sea correcto o solicita uno nuevo.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final alert = await _service.getAlert(openMatchAlertId);
+      if (!mounted) return;
+      setState(() => _alert = alert);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      setState(() => _error = _friendlyLoadError(message));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _friendlyLoadError(String message) {
+    final normalized = message.toLowerCase();
+    if (normalized.contains('no encontrado') || normalized.contains('404')) {
+      return 'Este partido no existe o ya no está disponible.';
+    }
+    if (normalized.contains('expiró') || normalized.contains('timeout')) {
+      return 'La carga está demorando más de lo esperado.';
+    }
+    if (normalized.contains('conectar') ||
+        normalized.contains('network') ||
+        normalized.contains('socket')) {
+      return 'No pudimos conectar con el servidor. Revisa tu internet.';
+    }
+    return message;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final alert = _alert;
+    if (alert != null) {
+      return OpenMatchDetailScreen(alert: alert);
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F3F5),
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.headerGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 12, 18, 18),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Partido',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF2F3F5),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(30)),
+                  ),
+                  child: Center(
+                    child: _isLoading
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(
+                                color: AppColors.PrimaryGreen,
+                              ),
+                              const SizedBox(height: 18),
+                              Text(
+                                'Cargando partido...',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.SecondBlue,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Container(
+                            constraints: const BoxConstraints(maxWidth: 420),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.sports_tennis_rounded,
+                                  color: AppColors.SecondBlue,
+                                  size: 42,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _error ?? 'No pudimos cargar el partido.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.inter(
+                                    color: AppColors.SecondBlue,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                _PrimaryButton(
+                                  label: 'Reintentar',
+                                  onTap: _load,
+                                  height: 42,
+                                  fontSize: 14,
+                                  borderRadius: 22,
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class OpenMatchDetailScreen extends StatefulWidget {
   const OpenMatchDetailScreen({
     super.key,
@@ -2110,6 +2292,25 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
       return 'Debes participar en el partido para registrar resultado.';
     }
     return null;
+  }
+
+  Future<void> _shareMatch() async {
+    final message = buildMatchShareMessage(
+      openMatchAlertId: _alert.id,
+      category: _alert.category,
+      club: _alert.club,
+      startsAt: _alert.startsAt,
+    );
+    try {
+      await Share.share(message, subject: 'Partido de pádel en PGO');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos abrir las opciones para compartir.'),
+        ),
+      );
+    }
   }
 
   Future<void> _confirmJoin() async {
@@ -2206,6 +2407,7 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
   }
 
   List<Widget> _openMatchChildren() {
+    final joinBlocked = _isFull || _isCompleted || _isCanceled || _isJoining;
     return [
       _OpenMatchHeroCard(alert: _alert),
       if ((_alert.comment ?? '').trim().isNotEmpty) ...[
@@ -2228,27 +2430,44 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
       _PrimaryButton(
         label: _alert.hasJoined
             ? 'Ya estás dentro'
-            : (_isJoining ? 'Uniendo...' : 'Unirme'),
-        onTap: _alert.hasJoined || _isJoining ? null : () => _confirmJoin(),
+            : _isCompleted
+                ? 'Partido finalizado'
+                : _isCanceled
+                    ? 'Partido cancelado'
+                    : _isFull
+                        ? 'Partido completo'
+                        : (_isJoining ? 'Uniendo...' : 'Unirme'),
+        onTap: _alert.hasJoined || joinBlocked ? null : () => _confirmJoin(),
         height: 36,
         fontSize: 14,
         borderRadius: 18,
       ),
       const SizedBox(height: 8),
-      Center(
-        child: Text(
-          'Compartir partido',
-          style: GoogleFonts.inter(
-            color: AppColors.SecondBlue.withValues(alpha: 0.65),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+      _ShareMatchButton(
+        onPressed: _shareMatch,
+        fontSize: 12,
       ),
     ];
   }
 
   List<Widget> _myMatchChildren() {
+    if (_isCompleted || _isCanceled) {
+      return [
+        _MyOpenMatchHeroCard(alert: _alert, resultPending: false),
+        const SizedBox(height: 16),
+        _OpenMatchResultUnavailableCard(
+          message: _isCompleted
+              ? 'Este partido ya fue finalizado.'
+              : 'Este partido fue cancelado y ya no está disponible.',
+        ),
+        const SizedBox(height: 12),
+        _ShareMatchButton(
+          onPressed: _shareMatch,
+          fontSize: 14,
+        ),
+      ];
+    }
+
     final resultUnavailableMessage = _resultUnavailableMessage;
     return [
       _MyOpenMatchHeroCard(alert: _alert, resultPending: _resultPending),
@@ -2280,15 +2499,9 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
           borderRadius: 22,
         ),
         const SizedBox(height: 10),
-        Center(
-          child: Text(
-            'Compartir partido',
-            style: GoogleFonts.inter(
-              color: AppColors.SecondBlue.withValues(alpha: 0.65),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        _ShareMatchButton(
+          onPressed: _shareMatch,
+          fontSize: 14,
         ),
       ] else if (_resultPending) ...[
         const SizedBox(height: 42),
@@ -2321,6 +2534,13 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
           height: 38,
           fontSize: 16,
           borderRadius: 22,
+        ),
+      ],
+      if (_isFull) ...[
+        const SizedBox(height: 12),
+        _ShareMatchButton(
+          onPressed: _shareMatch,
+          fontSize: 14,
         ),
       ],
       if (_canLeaveMatch) ...[
@@ -2473,6 +2693,36 @@ class _OpenMatchDetailScreenState extends State<OpenMatchDetailScreen> {
             content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
     }
+  }
+}
+
+class _ShareMatchButton extends StatelessWidget {
+  const _ShareMatchButton({
+    required this.onPressed,
+    required this.fontSize,
+  });
+
+  final VoidCallback onPressed;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.share_rounded, size: 18),
+        label: Text(
+          'Compartir partido',
+          style: GoogleFonts.inter(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.SecondBlue.withValues(alpha: 0.76),
+        ),
+      ),
+    );
   }
 }
 
@@ -3313,7 +3563,7 @@ class _OpenMatchChatScreenState extends State<OpenMatchChatScreen> {
     }
     if (_controller.text.trim().isEmpty) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Chat real pendiente de backend.')),
+      const SnackBar(content: Text('Esta funcion estara disponible pronto.')),
     );
   }
 
@@ -4336,7 +4586,7 @@ class _MapButton extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     if (query == null || app == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Acción pendiente de integración.')),
+        const SnackBar(content: Text('Esta funcion estara disponible pronto.')),
       );
       return;
     }

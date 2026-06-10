@@ -17,6 +17,7 @@ import '../widgets/pgo_bottom_nav.dart';
 import '../widgets/pgo_header_scaffold.dart';
 import '../widgets/pgo_options_menu.dart';
 import '../widgets/score_picker.dart';
+import '../widgets/tournament_role_table_view.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'main_shell.dart';
@@ -40,7 +41,7 @@ class TournamentDescriptionScreen extends StatefulWidget {
       _TournamentDescriptionScreenState();
 }
 
-enum _TournamentDetailTab { description, bracket, live, players }
+enum _TournamentDetailTab { description, table, bracket, live, players }
 
 class _TournamentDescriptionScreenState
     extends State<TournamentDescriptionScreen> {
@@ -87,6 +88,9 @@ class _TournamentDescriptionScreenState
       if (!mounted) return;
       setState(() {
         _profile = profile;
+        if (_isCurrentUserAdmin && _activeTab == _TournamentDetailTab.table) {
+          _activeTab = _TournamentDetailTab.description;
+        }
       });
     } catch (_) {
       // If profile loading fails, keep the previous CTA behavior.
@@ -187,6 +191,15 @@ class _TournamentDescriptionScreenState
   }
 
   bool get _showJoinAction => !_isCurrentUserRegistered;
+
+  bool get _isCurrentUserAdmin {
+    final userId = _profile?.id;
+    final tournament = _currentTournament;
+    if (userId == null || userId.isEmpty || tournament == null) {
+      return false;
+    }
+    return tournament.createdById == userId;
+  }
 
   TournamentAdminMatch? get _myMatch {
     final manageable = _matches.where((match) => match.canManage).toList();
@@ -614,6 +627,15 @@ class _TournamentDescriptionScreenState
   }
 
   Widget _buildTabs(BuildContext context) {
+    final tabs = <Widget>[
+      _buildTabItem('Descripción', _TournamentDetailTab.description),
+      if (!_isCurrentUserAdmin)
+        _buildTabItem('Tabla', _TournamentDetailTab.table),
+      _buildTabItem('Bracket', _TournamentDetailTab.bracket),
+      _buildTabItem('En vivo', _TournamentDetailTab.live),
+      _buildTabItem('Jugadores', _TournamentDetailTab.players),
+    ];
+
     return Container(
       height: 34,
       padding: const EdgeInsets.all(3),
@@ -622,12 +644,7 @@ class _TournamentDescriptionScreenState
         borderRadius: BorderRadius.circular(17),
       ),
       child: Row(
-        children: [
-          _buildTabItem('Descripción', _TournamentDetailTab.description),
-          _buildTabItem('Bracket', _TournamentDetailTab.bracket),
-          _buildTabItem('En vivo', _TournamentDetailTab.live),
-          _buildTabItem('Jugadores', _TournamentDetailTab.players),
-        ],
+        children: tabs,
       ),
     );
   }
@@ -666,6 +683,11 @@ class _TournamentDescriptionScreenState
         return TournamentBracketScreen(
           tournament: _currentTournament,
           embedded: true,
+        );
+      case _TournamentDetailTab.table:
+        return TournamentRoleTableView(
+          tournament: _currentTournament,
+          profile: _profile,
         );
       case _TournamentDetailTab.live:
         return TournamentLiveScreen(

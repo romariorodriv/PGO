@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -170,17 +170,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   TournamentRecord? get _recommendedTournament {
-    final profileCategory = _profile?.category?.trim().toUpperCase();
+    final profileCategory = _normalizeCategory(_profile?.category);
+
     final upcoming = _tournaments
         .where((item) => item.status == 'PUBLISHED')
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
-    for (final tournament in upcoming) {
-      if (profileCategory != null &&
-          profileCategory.isNotEmpty &&
-          tournament.category.toUpperCase() == profileCategory) {
-        return tournament;
+    if (profileCategory.isNotEmpty) {
+      for (final tournament in upcoming) {
+        if (_normalizeCategory(tournament.category) == profileCategory) {
+          return tournament;
+        }
       }
     }
 
@@ -220,6 +221,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _normalizeText(String? value) {
     return (value ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String _normalizeCategory(String? value) {
+    return (value ?? '')
+        .trim()
+        .toLowerCase()
+        .replaceAll('categoría', '')
+        .replaceAll('categoria', '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll('ta', '');
   }
 
   String _formatTournamentDate(DateTime value) {
@@ -805,7 +816,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 10),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _QuickAccessButton(
               key: _quickAccessKeys[0],
@@ -1308,14 +1320,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 14),
-          child: Text(
-            'Recomendaciones para ti',
-            style: PgoTextStyles.sectionTitle(
-              color: AppColors.SecondBlue,
-              weight: FontWeight.w900,
-            ),
+        Text(
+          'Recomendaciones para ti',
+          style: PgoTextStyles.sectionTitle(
+            color: AppColors.SecondBlue,
+            weight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 18),
@@ -2350,18 +2359,18 @@ class _QuickAccessButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
       child: SizedBox(
-        width: 76,
+        width: 82,
         child: Column(
           children: [
             SizedBox(
-              height: 82,
+              height: 92,
               child: OverflowBox(
-                maxWidth: 112,
-                maxHeight: 112,
+                maxWidth: 124,
+                maxHeight: 124,
                 child: Image.asset(
                   assetPath,
-                  width: 108,
-                  height: 108,
+                  width: 118,
+                  height: 118,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                   errorBuilder: (_, __, ___) => Container(
@@ -2394,9 +2403,9 @@ class _QuickAccessButton extends StatelessWidget {
               maxLines: 2,
               style: GoogleFonts.inter(
                 color: AppColors.SecondBlue,
-                fontSize: 8.2,
-                fontWeight: FontWeight.w600,
-                height: 1.08,
+                fontSize: 9.2,
+                fontWeight: FontWeight.w800,
+                height: 1.05,
               ),
             ),
           ],
@@ -2772,6 +2781,8 @@ class _CompleteProfileOnboardingDialog extends StatefulWidget {
 
 class _CompleteProfileOnboardingDialogState
     extends State<_CompleteProfileOnboardingDialog> {
+  static const _maxProfilePhotoBytes = 650 * 1024;
+
   final ImagePicker _imagePicker = ImagePicker();
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
@@ -2816,8 +2827,9 @@ class _CompleteProfileOnboardingDialogState
       });
       final picked = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1200,
+        imageQuality: 45,
+        maxWidth: 720,
+        maxHeight: 720,
       );
       if (picked == null || !mounted) {
         setState(() {
@@ -2826,6 +2838,20 @@ class _CompleteProfileOnboardingDialogState
         return;
       }
       final bytes = await picked.readAsBytes();
+      if (bytes.length > _maxProfilePhotoBytes) {
+        if (!mounted) return;
+        setState(() {
+          _savingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'La imagen sigue siendo muy grande. Prueba con una foto más ligera o recortada.',
+            ),
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       final mimeType = _guessMimeType(picked.path);
       setState(() {

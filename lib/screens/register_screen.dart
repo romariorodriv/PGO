@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
+import '../utils/post_auth_router.dart';
 import 'login_screen.dart';
 import 'main_shell.dart';
 
@@ -63,7 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         !RegExp(r'\d').hasMatch(password) ||
         !RegExp(r'[A-Z]').hasMatch(password)) {
       _showSnack(
-          'La contraseña debe tener 8 caracteres, 1 número y 1 mayúscula');
+          'La Contraseña debe tener 8 caracteres, 1 número y 1 mayúscula');
       return;
     }
 
@@ -86,7 +87,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: password,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MainShell.route());
+      final routed = await routeAfterSuccessfulAuth(context);
+      if (!routed && mounted) setState(() {});
     } catch (error) {
       if (!mounted) return;
       _showSnack(error.toString().replaceFirst('Exception: ', ''));
@@ -102,9 +104,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await AuthService().loginWithGoogle();
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MainShell.route());
+      final routed = await routeAfterSuccessfulAuth(context);
+      if (!routed && mounted) setState(() {});
     } catch (error) {
       if (!mounted) return;
+      if (error.toString().toLowerCase().contains('cancel')) return;
       _showSnack(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) {
@@ -124,59 +128,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: AppColors.primaryDark,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(28, 20, 28, 24),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Image.asset(
-                'assets/images/Logo_Icono.png',
-                width: 170,
-                height: 170,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Regístrate',
-                style: GoogleFonts.inter(
-                  color: AppColors.SecondBlue,
-                  fontSize: 31,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(28, 20, 28, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Image.asset(
+                  'assets/images/Logo_Icono.png',
+                  width: 170,
+                  height: 170,
+                  fit: BoxFit.contain,
                 ),
-              ),
-              const SizedBox(height: 18),
-              _buildSocialButtons(),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Ya tienes una cuenta? ',
+                const SizedBox(height: 4),
+                Text(
+                  'Crea tu cuenta con Google',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue,
+                    fontSize: 29,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Usaremos tu cuenta de Google para iniciar sesion de forma segura.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: AppColors.SecondBlue.withValues(alpha: 0.75),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _buildSocialButtons(),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  },
+                  child: Text(
+                    'Ya tengo cuenta',
                     style: GoogleFonts.inter(
-                      color: AppColors.SecondBlue.withValues(alpha: 0.75),
+                      color: AppColors.SecondBlue,
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      );
-                    },
-                    child: Text(
-                      'Inicia sesión',
-                      style: GoogleFonts.inter(
-                        color: AppColors.SecondBlue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -190,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         _SocialAuthButton(
           label:
-              _isGoogleSubmitting ? 'Conectando...' : 'Registrarse con Google',
+              _isGoogleSubmitting ? 'Conectando...' : 'Crear cuenta con Google',
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF5F6673),
           borderColor: const Color(0xFFE7EAF0),
@@ -205,27 +210,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 )
               : const _GoogleGIcon(size: 19),
-        ),
-        const SizedBox(height: 8),
-        _SocialAuthButton(
-          label: 'Registrarse con email',
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.SecondBlue,
-          borderColor: const Color(0xFFD8DDE6),
-          icon: Icon(
-            Icons.mail_outline,
-            size: 17,
-            color: AppColors.SecondBlue.withValues(alpha: 0.7),
-          ),
-          onTap: disabled
-              ? null
-              : () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const EmailRegisterScreen(),
-                    ),
-                  );
-                },
         ),
       ],
     );
@@ -273,7 +257,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
-        hintText: 'Crea una contraseña',
+        hintText: 'Crea una Contraseña',
         hintStyle: GoogleFonts.inter(
           color: AppColors.SecondBlue.withValues(alpha: 0.55),
           fontSize: 15,
@@ -439,7 +423,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
         !RegExp(r'\d').hasMatch(password) ||
         !RegExp(r'[A-Z]').hasMatch(password)) {
       _showSnack(
-          'La contraseña debe tener 8 caracteres, 1 número y 1 mayúscula');
+          'La Contraseña debe tener 8 caracteres, 1 número y 1 mayúscula');
       return;
     }
 
@@ -507,7 +491,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
               const SizedBox(height: 6),
               Center(
                 child: Text(
-                  'Regístrate con email',
+                  'Registrate­strate con email',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: AppColors.SecondBlue,
@@ -538,7 +522,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
               const SizedBox(height: 12),
               _RegisterInput(
                 controller: _emailController,
-                hint: 'Correo electrónico',
+                hint: 'Correo electronico',
                 icon: Icons.mail_outline,
                 keyboardType: TextInputType.emailAddress,
               ),
@@ -548,7 +532,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
                 obscureText: _obscurePassword,
                 onToggle: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
-                hint: 'Crea una contraseña',
+                hint: 'Crea una Contraseña',
               ),
               const SizedBox(height: 12),
               _RegisterPasswordInput(
@@ -556,7 +540,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
                 obscureText: _obscurePassword,
                 onToggle: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
-                hint: 'Confirma tu contraseña',
+                hint: 'Confirma tu Contraseña',
               ),
               const SizedBox(height: 10),
               _RegisterCheckRow(
@@ -568,7 +552,7 @@ class _EmailRegisterScreenState extends State<EmailRegisterScreen> {
               _RegisterCheckRow(
                 value: _agreeTerms,
                 onChanged: (value) => setState(() => _agreeTerms = value),
-                text: 'He leído y acepto los términos y condiciones de PGO.',
+                text: 'He leido­do y acepto los términos y condiciones de PGO.',
               ),
               const SizedBox(height: 18),
               _RegisterPrimaryButton(
@@ -656,7 +640,7 @@ class _RegisterPasswordInput extends StatelessWidget {
     required this.controller,
     required this.obscureText,
     required this.onToggle,
-    this.hint = 'Crea una contraseña',
+    this.hint = 'Crea una Contraseña',
   });
 
   final TextEditingController controller;
