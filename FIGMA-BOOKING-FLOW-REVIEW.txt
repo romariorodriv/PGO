@@ -1,0 +1,27 @@
+PGO — Ajuste Figma de header y flujo de reservas
+
+Fuente Figma:
+- 152:92 Web User Header
+- 150:4 PGO Web User / Book Court
+- 150:5 PGO Web User / Checkout
+- 150:6 PGO Web User / Booking Confirmed
+
+Cambios limitados a:
+- Header autenticado compartido del dashboard de jugador.
+- Flujo de reserva en 3 pantallas.
+- CSS/JS necesario para esas pantallas.
+
+Flujo:
+/reservar-cancha/
+  -> selecciona club, fecha, duración, hora y cancha con disponibilidad real
+  -> /reservar-cancha/checkout/
+  -> POST /api/reservations
+  -> /reservar-cancha/confirmada/
+
+Backend conservado:
+- GET /api/auth/context
+- GET /api/clubs
+- GET /api/clubs/:id/availability
+- POST /api/reservations
+
+El Home público NO fue modificado. index.html, styles.css y script.js de raíz mantienen exactamente los mismos bytes del ZIP anterior.

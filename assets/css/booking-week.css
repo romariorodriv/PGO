@@ -1,0 +1,39 @@
+/* Scoped to the player booking calendar. */
+.week-booking-page .figma-booking-body{width:min(1440px,calc(100% - 64px))}
+.week-booking-page .figma-booking-grid{grid-template-columns:minmax(0,1fr) 300px;gap:24px}
+.week-booking-page .figma-booking-summary{height:auto;min-height:0;gap:18px;top:120px}
+.week-booking-page .figma-booking-summary>strong{font-size:16px;line-height:1.5}
+.week-booking-page .figma-booking-summary>small{font-size:12px;line-height:1.6}
+.week-booking-page .figma-large-primary{height:auto;min-height:52px;padding:14px;font-size:13px;white-space:normal;line-height:1.4;width:100%}
+.week-summary-details{font-size:14px;line-height:1.6;color:#627086;min-height:90px}
+.week-summary-details p{margin:0 0 8px}
+.week-tools{display:flex;align-items:end;gap:16px;margin-bottom:24px}
+.week-tools label{display:grid;gap:8px;font-size:12px;font-weight:600}
+.week-club{flex:1;min-width:0}.week-duration{width:150px}.week-duration-copy{font-size:13px;padding-bottom:15px;color:#627086}
+.week-tools select{background:white;border:1px solid #d8dde5;border-radius:12px;padding:14px;font:inherit;min-width:0;width:100%;color:#1c2a3a}
+.week-navigation{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.week-navigation strong{font-size:15px}.week-navigation small{display:block;color:#627086;font-size:12px;margin-top:7px}
+.week-navigation-actions{display:flex;gap:6px}.week-navigation button{border:1px solid #d8dde5;background:white;color:#1c2a3a;border-radius:10px;padding:10px 14px;min-height:44px;font:inherit;font-size:12px;cursor:pointer}
+.week-navigation button:disabled{opacity:.4;cursor:not-allowed}
+.week-help{font-size:13px;line-height:1.6;color:#627086;margin:24px 0 12px}
+.week-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;margin-bottom:16px;color:#7f8997}
+.week-legend span:first-child{color:#467226}.week-legend span:nth-child(2){color:#1c2a3a}
+.week-table-scroll{overflow:auto;max-height:650px;border:1px solid #d8dde5;border-radius:16px;isolation:isolate}
+.week-table{width:100%;min-width:700px;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+.week-table caption{padding:12px;text-align:left;background:#fff;color:#627086;font-size:12px}
+.week-table th,.week-table td{padding:6px;text-align:center;border-bottom:1px solid #e8edf2;border-right:1px solid #e8edf2;vertical-align:middle}
+.week-table th:first-child{width:58px;background:#f6f8fa;position:sticky;left:0;z-index:1;font-size:11px}
+.week-table thead th{position:sticky;top:0;z-index:2;background:#f6f8fa;height:86px}
+.week-table thead th:first-child{z-index:3}.week-table thead span{display:block;text-transform:capitalize;font-weight:500}.week-table thead strong{display:block;font-size:22px;margin-top:5px}.week-table thead small{display:block;font-size:10px;margin-top:4px}.week-table thead .is-today{background:#edf6e6;color:#385c21}
+.week-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:74px;width:100%;border:1px solid #c3d9ad;border-radius:10px;background:#eff8e8;color:#2d4b1c;font:inherit;cursor:pointer;padding:8px 4px;transition:background .16s ease,transform .16s ease}
+.week-slot strong{font-size:11px;line-height:1.5}.week-slot small{font-size:10px}.week-slot:hover{background:#dceecb;transform:translateY(-1px)}
+.week-slot.is-selected,.week-days button.is-selected,.week-court-picker button.is-selected{background:#1c2a3a;color:white;border-color:#1c2a3a}
+.week-unavailable{display:flex;align-items:center;justify-content:center;background:#f6f8fa;color:#627086;border-radius:10px;min-height:74px;font-size:10px;padding:6px;overflow-wrap:anywhere}
+.week-notice{padding:18px;background:#f6f8fa;border:1px solid #e8edf2;border-radius:12px;font-size:13px;line-height:1.6;margin:16px 0}
+.week-court-picker{padding:22px;background:white;border:1px solid #d8dde5;border-radius:16px;margin-top:22px}.week-court-picker h2{font-size:18px;margin:0 0 10px}.week-court-picker p{font-size:13px;color:#627086;line-height:1.6}.week-court-picker>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.week-court-picker button{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #d8dde5;border-radius:12px;padding:16px;background:white;color:#1c2a3a;font:inherit;font-size:13px;text-align:left;cursor:pointer}.week-court-picker small{display:block;font-size:11px;line-height:1.6;margin-top:6px}.week-court-picker b{white-space:nowrap}
+.week-mobile{display:none}
+.week-booking-page button:focus-visible,.week-booking-page select:focus-visible{outline:3px solid #68a93a;outline-offset:3px}
+@media(max-width:1150px){.week-booking-page .figma-booking-grid{grid-template-columns:1fr}.week-booking-page .figma-booking-summary{position:static;max-width:100%}.week-summary-details{min-height:0}}
+@media(max-width:760px){.week-booking-page .figma-booking-body{width:calc(100% - 28px)}.week-desktop{display:none}.week-mobile{display:block}.week-tools{gap:10px;align-items:end}.week-duration{width:125px}.week-tools select{padding:12px 8px;font-size:12px}.week-navigation strong{font-size:13px}.week-navigation-actions{width:100%;justify-content:space-between}.week-days{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity}.week-days button{flex:0 0 64px;min-height:80px;background:white;border:1px solid #d8dde5;border-radius:12px;color:#1c2a3a;padding:10px 6px;font:inherit;scroll-snap-align:start;cursor:pointer}.week-days button:disabled{opacity:.4;cursor:not-allowed}.week-days span{display:block;font-size:11px;text-transform:capitalize}.week-days strong{display:block;font-size:21px;margin:5px 0}.week-days small{display:block;font-size:10px;min-height:12px}.week-mobile h2{font-size:16px;line-height:1.6;margin:14px 0}.week-mobile-slots{display:grid;gap:10px}.week-mobile-row{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:10px;font-size:12px}.week-mobile-row .week-slot{min-height:70px;display:grid;grid-template-columns:1fr auto;text-align:left;justify-items:start;padding:14px 16px}.week-mobile-row .week-slot strong{font-size:13px}.week-mobile-row .week-slot small{grid-column:1/-1;font-size:11px}.week-mobile-row .week-unavailable{min-height:54px;font-size:12px;justify-content:flex-start;padding:14px 16px}.week-court-picker{padding:16px}.week-help{margin-top:20px}}
+@media(prefers-reduced-motion:reduce){.week-slot{transition:none}.week-slot:hover{transform:none}}

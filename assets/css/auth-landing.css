@@ -1,0 +1,46 @@
+/* PGO auth bridge — intentionally scoped, preserves landing palette and Montserrat */
+body.pgo-auth-page.pgo-unified-auth{--navy:#1c2a3a;--blue:#385e90;--lime:#d8ff59;--canvas:#f1f2f4;--muted:#667384;--line:#d8dde5;background:#fff;color:var(--navy);font-family:Montserrat,Arial,sans-serif;margin:0}
+.pgo-unified-auth *{box-sizing:border-box}
+.pgo-unified-auth .pgo-auth-top{min-height:80px;padding:16px max(24px,calc((100vw - 1180px)/2));display:flex;align-items:center;justify-content:space-between;gap:20px;background:#ffffffed;border-bottom:1px solid #1c2a3a12}
+.pgo-unified-auth .pgo-auth-logo{display:inline-flex;align-items:center;gap:9px;color:var(--navy);text-decoration:none}
+.pgo-unified-auth .pgo-auth-logo strong{font-size:27px;font-weight:800;letter-spacing:-1px}
+.pgo-unified-auth .pgo-auth-logo-mark{width:27px;display:flex;flex-direction:column;gap:4px}
+.pgo-unified-auth .pgo-auth-logo-mark i{width:27px;height:10px;border-radius:8px;background:var(--navy)}
+.pgo-unified-auth .pgo-auth-logo-mark i:last-child{background:var(--lime)}
+.pgo-unified-auth .pgo-auth-back{font-size:12px;color:var(--navy);text-decoration:none;font-weight:600}
+.pgo-unified-auth .pgo-auth-back:hover{text-decoration:underline}
+.pgo-unified-auth .pgo-auth-layout{width:min(1120px,calc(100% - 44px));margin:55px auto 65px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.pgo-unified-auth .pgo-auth-promo{padding:34px 10px 34px 0}
+.pgo-unified-auth .pgo-auth-eyebrow{font-size:11px;letter-spacing:1.2px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.pgo-unified-auth .pgo-auth-promo h1{font-size:clamp(32px,4vw,52px);letter-spacing:-1.8px;font-weight:800;line-height:1.1;margin:20px 0}
+.pgo-unified-auth .pgo-auth-promo p{font-size:15px;color:var(--muted);line-height:1.8}
+.pgo-unified-auth .pgo-auth-proof{margin-top:25px;display:grid;gap:14px}
+.pgo-unified-auth .pgo-auth-proof span{font-size:13px;font-weight:600}
+.pgo-unified-auth .pgo-auth-panel{padding:34px;background:#f8f9fb;border:1px solid #e2e7ed;border-radius:24px;box-shadow:0 8px 32px #1c2a3a06}
+.pgo-unified-auth .pgo-auth-panel h2{font-size:27px;letter-spacing:-.9px;line-height:1.15;margin:0 0 10px;font-weight:800}
+.pgo-unified-auth .pgo-auth-panel .pgo-auth-intro{font-size:13px;color:var(--muted);margin:0 0 24px;line-height:1.7}
+.pgo-unified-auth .pgo-auth-panel .figma-auth-form{display:flex;flex-direction:column;gap:16px}
+.pgo-unified-auth .pgo-auth-panel .figma-field{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600}
+.pgo-unified-auth .pgo-auth-panel .figma-field input,.pgo-unified-auth .pgo-auth-panel .figma-field select{width:100%;background:white;color:var(--navy);border:1px solid var(--line);border-radius:10px;min-height:46px;padding:11px 12px;font-size:13px;font-family:inherit}
+.pgo-unified-auth .pgo-auth-panel .figma-field input:focus-visible,.pgo-unified-auth .pgo-auth-panel .figma-field select:focus-visible{outline:3px solid #385e9066;outline-offset:2px}
+.pgo-unified-auth .pgo-auth-panel .figma-forgot{color:var(--blue);text-decoration:underline;font-size:12px;align-self:flex-end}
+.pgo-unified-auth .pgo-auth-panel .figma-auth-button{min-height:46px;padding:12px 20px;border-radius:50px;font-size:13px;font-family:inherit;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}
+.pgo-unified-auth .pgo-auth-panel .figma-auth-button-primary{background:var(--lime);color:var(--navy);border:0}
+.pgo-unified-auth .pgo-auth-panel .figma-auth-button-secondary{background:white;color:var(--navy);border:1px solid var(--line)}
+.pgo-unified-auth .pgo-auth-panel .figma-account-prompt{font-size:12px;color:var(--muted);text-align:center;margin:24px 0 10px}
+.pgo-unified-auth .pgo-auth-panel #auth-error:not(.hidden){font-size:12px;color:#ad2424;padding:10px;border:1px solid #e8bbbb;border-radius:8px}
+.pgo-unified-auth .pgo-auth-panel .hidden{display:none!important}
+.pgo-unified-auth .pgo-audience-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px}
+.pgo-unified-auth .pgo-audience-option{appearance:none;border:1px solid var(--line);background:white;border-radius:14px;padding:15px 10px;display:flex;flex-direction:column;align-items:flex-start;gap:7px;text-align:left;color:var(--navy);font:inherit;cursor:pointer;min-height:106px}
+.pgo-unified-auth .pgo-audience-option strong{font-size:13px;font-weight:700}
+.pgo-unified-auth .pgo-audience-option span{font-size:11px;color:var(--muted)}
+.pgo-unified-auth .pgo-audience-option[aria-selected=true]{border:2px solid var(--navy);padding:14px 9px;background:#f1f2f4}
+.pgo-unified-auth .pgo-club-signup{background:white;border-radius:16px;padding:18px;border:1px solid var(--line);display:none}
+.pgo-unified-auth .pgo-club-signup[aria-hidden=false]{display:block}
+.pgo-unified-auth .pgo-club-signup p{font-size:12px;color:var(--muted);line-height:1.7;margin:0 0 15px}
+.pgo-unified-auth .pgo-player-signup[hidden]{display:none!important}
+@media(max-width:800px){.pgo-unified-auth .pgo-auth-layout{grid-template-columns:1fr;gap:12px;margin:20px auto 45px}.pgo-unified-auth .pgo-auth-promo{padding:20px 0 4px}.pgo-unified-auth .pgo-auth-promo h1{font-size:33px;margin:12px 0}.pgo-unified-auth .pgo-auth-promo p{font-size:13px}.pgo-unified-auth .pgo-auth-proof{display:none}.pgo-unified-auth .pgo-auth-panel{padding:25px 22px}.pgo-unified-auth .pgo-auth-top{padding:14px 22px}}
+@media(max-width:400px){.pgo-unified-auth .pgo-audience-options{grid-template-columns:1fr}.pgo-unified-auth .pgo-auth-layout{width:calc(100% - 28px)}}
+
+/* Keep audience-specific fields hidden even when their layout uses flex. */
+.pgo-unified-auth .pgo-auth-panel [hidden]{display:none!important}

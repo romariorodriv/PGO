@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Ingresar | PGO</title>
+<meta content="Ingresa a tu cuenta PGO." name="description"/>
+<link href="../favicon.svg" rel="icon"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="../assets/css/styles.css" rel="stylesheet"/>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/utils.js"></script>
+<link href="/assets/css/session-state.css" rel="stylesheet"/><link href="../assets/css/auth-landing.css" rel="stylesheet"/></head>
+<body class="pgo-auth-page pgo-unified-auth"><header class="pgo-auth-top"><a aria-label="PGO Inicio" class="pgo-auth-logo" href="../"><span aria-hidden="true" class="pgo-auth-logo-mark"><i></i><i></i></span><strong>PGO</strong></a><a class="pgo-auth-back" href="../">← Volver al inicio</a></header><main class="pgo-auth-layout"><aside class="pgo-auth-promo"><p class="pgo-auth-eyebrow">UNA PLATAFORMA · DOS EXPERIENCIAS</p><h1>Tu pádel, en su mejor versión.</h1><p>Gestiona tu club o reserva tu próxima cancha. PGO conecta a clubes y jugadores en una plataforma fácil de usar.</p><div class="pgo-auth-proof"><span>✓ Para clubes: gestión de canchas y reservas</span><span>✓ Para jugadores: encuentra y reserva canchas</span></div></aside><section aria-label="Acceso PGO" class="pgo-auth-panel"><h2>Bienvenido a PGO</h2><p class="pgo-auth-intro">Una sola cuenta para jugadores y administradores de clubes.</p><form class="figma-auth-form" data-mode="login" id="auth-form" novalidate="">
+<label class="figma-field">
+<span>Correo</span>
+<input autocomplete="email" name="email" placeholder="tom@email.com" required="" type="email"/>
+</label>
+<label class="figma-field">
+<span>Contraseña</span>
+<input autocomplete="current-password" minlength="8" name="password" placeholder="••••••••" required="" type="password"/>
+</label>
+<a class="figma-forgot" data-forgot-password="" href="#">¿Olvidaste tu contraseña?</a>
+<div class="figma-form-error hidden" id="auth-error" role="alert"></div>
+<button class="figma-auth-button figma-auth-button-primary" type="submit">Iniciar sesión</button>
+</form><p class="figma-account-prompt">¿Aún no tienes cuenta?</p><a class="figma-auth-button figma-auth-button-secondary" data-auth-switch href="../registro/">Crear cuenta</a></section></main>
+
+
+<script src="../assets/js/auth.js"></script>
+<script src="/assets/js/session-ui.js"></script>
+</body>
+</html>
