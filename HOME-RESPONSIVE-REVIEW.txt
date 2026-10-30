@@ -1,0 +1,14 @@
+PGO Home responsive review
+
+Fixes applied only to the public Home files:
+- styles.css: full-width layout and responsive breakpoints.
+- script.js: mobile menu and footer year (the original index referenced this file, but it was missing).
+
+Other routes, backend API configuration, auth and application JS were not changed.
+
+Reference behavior:
+- 1440px: preserves the Figma desktop measurements.
+- >1440px: full-bleed sections with the 1440px design grid centered.
+- 981-1439px: fluid laptop layout.
+- <=980px: stacked tablet/mobile layout.
+- <=600px: phone-specific sizing.

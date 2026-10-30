@@ -1,0 +1,9 @@
+{
+  "name": "PGO",
+  "short_name": "PGO",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1C2A3A",
+  "icons": []
+}

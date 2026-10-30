@@ -1,0 +1,24 @@
+PGO — USER FLOW / FIGMA 05.1
+
+Diseños implementados en HTML/CSS/JS puro:
+- /login/    -> Figma node 157:157 (PGO Web User / Login)
+- /registro/ -> Figma node 157:158 (PGO Web User / Register)
+- /perfil/   -> Figma node 150:3 (PGO Web User / Home, dashboard autenticado)
+
+NO se modificaron los archivos del Home público:
+- /index.html
+- /styles.css
+- /script.js
+
+Backend conservado:
+- API_BASE = https://api.pgoapp.com/api
+- Login: /auth/web/login
+- Registro: /auth/web/register
+- Contexto: /auth/context
+- Reservas: /reservations/me (a través del helper que normaliza /api/)
+
+Nota de contrato:
+El diseño de Registro incluye "Categoría", pero el endpoint actual de registro sólo usa name/email/password.
+La categoría elegida se conserva temporalmente en sessionStorage como ayuda visual hasta que el backend exponga un campo persistente de perfil/categoría. El dashboard prioriza cualquier categoría real que venga del contexto del backend.
+
+El dashboard no inventa métricas: Reservas / Próximas se calculan del listado real de reservas; XP muestra datos del backend. Si no están disponibles, se muestra "—".

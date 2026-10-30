@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://pgoapp.com/sitemap.xml
+Sitemap: https://pgoapp.com/sitemap-idiomas.xml
